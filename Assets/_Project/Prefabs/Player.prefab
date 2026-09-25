@@ -194,6 +194,8 @@ GameObject:
   - component: {fileID: 2815231682330091840}
   - component: {fileID: 6978015848178365752}
   - component: {fileID: 8160183688375540562}
+  - component: {fileID: 2448611395600123331}
+  - component: {fileID: 7157125383510326500}
   m_Layer: 6
   m_Name: PlayerBodyMesh
   m_TagString: Untagged
@@ -273,6 +275,43 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!136 &2448611395600123331
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2142467901949786052}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.35
+  m_Height: 1.6
+  m_Direction: 1
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &7157125383510326500
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2142467901949786052}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eef123a9d68529d48bfe43f82d93edc8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
+  _hitboxType: 1
+  _damageableTarget: {fileID: 8148796173920827955}
 --- !u!1 &3990227018134108929
 GameObject:
   m_ObjectHideFlags: 0
@@ -286,6 +325,10 @@ GameObject:
   - component: {fileID: 7603448977831202054}
   - component: {fileID: 8666317341786661592}
   - component: {fileID: 166179427234535869}
+  - component: {fileID: 8148796173920827955}
+  - component: {fileID: 8044882393265108530}
+  - component: {fileID: 9060686978780575275}
+  - component: {fileID: 8184653799288585890}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -347,8 +390,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 13029659
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 4263025701
+  InScenePlacedSourceGlobalObjectIdHash: 1529716428
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -427,6 +470,7 @@ MonoBehaviour:
   _audioListener: {fileID: 1477161229970835489}
   _playerBodyMesh: {fileID: 2142467901949786052}
   _weaponViewmodel: {fileID: 6457979424595455948}
+  _health: {fileID: 0}
   _walkSpeed: 4.5
   _sprintSpeed: 7
   _backwardMultiplier: 0.7
@@ -437,6 +481,160 @@ MonoBehaviour:
   _pitchClampMax: 85
   _playerBodyLayerName: PlayerBody
   _viewmodelLayerName: Viewmodel
+--- !u!114 &8148796173920827955
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1681fbdf8bea0f429cc25ee2c3498fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.Health
+  ShowTopMostFoldoutHeaderGroup: 1
+  _maxHealth: 100
+  _isPlayer: 1
+  _downedDuration: 60
+  _reviveHealthPercent: 0.3
+  _despawnDelay: 3
+--- !u!114 &8044882393265108530
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34d25d57fd5fa74418130bbee4ae0d2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerRevive
+  ShowTopMostFoldoutHeaderGroup: 1
+  _reviveDistance: 2
+  _reviveHoldDuration: 3
+--- !u!114 &9060686978780575275
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94e4016cbed4110468741683ea7f33ed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.WeaponController
+  ShowTopMostFoldoutHeaderGroup: 1
+  _currentWeapon: {fileID: 11400000, guid: b6db7b6e3d7a32145a8263424cc1968f, type: 2}
+  _availableWeapons:
+  - {fileID: 11400000, guid: b6db7b6e3d7a32145a8263424cc1968f, type: 2}
+  - {fileID: 11400000, guid: 4c9280da51c842340ad9576dbe64bec3, type: 2}
+  - {fileID: 11400000, guid: b64ece583e317f6478ceaf94718915a1, type: 2}
+  - {fileID: 11400000, guid: 46356dd8fbaaa034c900df6be4e77b6a, type: 2}
+  _playerCamera: {fileID: 0}
+  _weaponMuzzlePoint: {fileID: 0}
+  _playerHealth: {fileID: 0}
+  _audioSource: {fileID: 0}
+  _tracerDuration: 0.05
+--- !u!82 &8184653799288585890
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &6457979424595455948
 GameObject:
   m_ObjectHideFlags: 0
@@ -478,6 +676,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6926716154751748396}
+  - component: {fileID: 2423039429092753396}
+  - component: {fileID: 235718598500552373}
   m_Layer: 0
   m_Name: CameraPivot
   m_TagString: Untagged
@@ -501,3 +701,38 @@ Transform:
   - {fileID: 5768589036763545454}
   m_Father: {fileID: 1232220718768369076}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &2423039429092753396
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6835410290461769424}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.25
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &235718598500552373
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6835410290461769424}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eef123a9d68529d48bfe43f82d93edc8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
+  _hitboxType: 0
+  _damageableTarget: {fileID: 8148796173920827955}

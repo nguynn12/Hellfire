@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 266aef6efdfbb31409e3e8246ce1bd6f, type: 3}
+  m_Name: Rifle_Data
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.WeaponData
+  _weaponName: "S\xFAng tr\u01B0\u1EDDng (Rifle)"
+  _weaponId: rifle
+  _weaponIcon: {fileID: 0}
+  _baseDamage: 35
+  _headMultiplier: 2
+  _torsoMultiplier: 1
+  _limbMultiplier: 0.75
+  _fireRate: 0.6
+  _range: 150
+  _pelletCount: 1
+  _spread: 0.01
+  _isAutomatic: 0
+  _magSize: 10
+  _reloadTime: 1.8
+  _viewmodelPrefab: {fileID: 0}
+  _worldModelPrefab: {fileID: 0}
+  _fireSound: {fileID: 0}
+  _reloadSound: {fileID: 0}
+  _emptySound: {fileID: 0}
