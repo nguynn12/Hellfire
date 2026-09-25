@@ -137,6 +137,11 @@ namespace Hellfire.Combat
         }
 
         /// <summary>
+        /// Cờ bất tử tạm thời (Mục 5.2: Boss chuyển phase; Mục 6.2: Khiên tạm thời).
+        /// </summary>
+        public bool IsInvulnerable { get; set; }
+
+        /// <summary>
         /// Gây sát thương lên thực thể (Server-Authoritative theo Mục 3.1 & 3.2).
         /// </summary>
         public void TakeDamage(float damage, HitboxType hitboxType, ulong attackerClientId)
@@ -147,7 +152,7 @@ namespace Hellfire.Combat
                 return;
             }
 
-            if (IsDead.Value || damage <= 0f)
+            if (IsInvulnerable || IsDead.Value || damage <= 0f)
             {
                 return;
             }
