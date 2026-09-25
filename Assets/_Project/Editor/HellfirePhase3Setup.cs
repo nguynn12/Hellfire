@@ -119,7 +119,7 @@ namespace Hellfire.Editor
             renderer.sharedMaterial = mat;
 
             // 5. Hitbox colliders
-            DestroyImmediate(body.GetComponent<Collider>());
+            Object.DestroyImmediate(body.GetComponent<Collider>());
             SetupHitboxColliders(root, scale);
 
             // 6. FSM
@@ -160,7 +160,7 @@ namespace Hellfire.Editor
             mat.color = skinColor;
             renderer.sharedMaterial = mat;
 
-            DestroyImmediate(body.GetComponent<Collider>());
+            Object.DestroyImmediate(body.GetComponent<Collider>());
             SetupHitboxColliders(root, scale);
 
             var fsm = root.AddComponent<HellspawnArcherAI>();
@@ -200,7 +200,7 @@ namespace Hellfire.Editor
             mat.color = skinColor;
             renderer.sharedMaterial = mat;
 
-            DestroyImmediate(body.GetComponent<Collider>());
+            Object.DestroyImmediate(body.GetComponent<Collider>());
             SetupHitboxColliders(root, scale);
 
             var fsm = root.AddComponent<BruteAI>();
@@ -240,7 +240,7 @@ namespace Hellfire.Editor
             mat.color = skinColor;
             renderer.sharedMaterial = mat;
 
-            DestroyImmediate(body.GetComponent<Collider>());
+            Object.DestroyImmediate(body.GetComponent<Collider>());
             SetupHitboxColliders(root, scale);
 
             var fsm = root.AddComponent<BossStateMachine>();
