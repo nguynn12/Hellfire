@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &2349592938837686117
+--- !u!1 &570799678971775051
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,9 +8,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 4541055465829044980}
-  - component: {fileID: 73229863395992054}
-  - component: {fileID: 3294010671741373360}
+  - component: {fileID: 5740589567333964389}
+  - component: {fileID: 3668276206410683520}
+  - component: {fileID: 2832293696060186786}
   m_Layer: 0
   m_Name: Model
   m_TagString: Untagged
@@ -18,36 +18,36 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &4541055465829044980
+--- !u!4 &5740589567333964389
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2349592938837686117}
+  m_GameObject: {fileID: 570799678971775051}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.6, z: 0}
-  m_LocalScale: {x: 0.8, y: 1.2, z: 0.8}
+  m_LocalPosition: {x: 0, y: 1.75, z: 0}
+  m_LocalScale: {x: 2.5, y: 3.5, z: 2.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1254441081220015315}
+  m_Father: {fileID: 724342471259572515}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &73229863395992054
+--- !u!33 &3668276206410683520
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2349592938837686117}
+  m_GameObject: {fileID: 570799678971775051}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &3294010671741373360
+--- !u!23 &2832293696060186786
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2349592938837686117}
+  m_GameObject: {fileID: 570799678971775051}
   m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
@@ -90,7 +90,7 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &3650045039467407458
+--- !u!1 &2208933647990980209
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -98,79 +98,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 5651993845001941747}
-  - component: {fileID: 5955344777480106507}
-  - component: {fileID: 657687313696188317}
-  m_Layer: 0
-  m_Name: Hitbox_Torso
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &5651993845001941747
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3650045039467407458}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.6, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4326763848202779889}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!136 &5955344777480106507
-CapsuleCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3650045039467407458}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.32000002
-  m_Height: 0.72
-  m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &657687313696188317
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3650045039467407458}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eef123a9d68529d48bfe43f82d93edc8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
-  _hitboxType: 1
-  _damageableTarget: {fileID: 5737091182976568509}
---- !u!1 &3813110091508439571
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1098547333517893784}
-  - component: {fileID: 6690947850701757908}
-  - component: {fileID: 4822617822512579646}
+  - component: {fileID: 1282656111125080382}
+  - component: {fileID: 6032314911628419330}
+  - component: {fileID: 7933769562657029189}
   m_Layer: 0
   m_Name: Hitbox_Head
   m_TagString: Untagged
@@ -178,28 +108,28 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1098547333517893784
+--- !u!4 &1282656111125080382
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3813110091508439571}
+  m_GameObject: {fileID: 2208933647990980209}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.0200001, z: 0}
+  m_LocalPosition: {x: 0, y: 2.9750001, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4326763848202779889}
+  m_Father: {fileID: 6847800396489000606}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &6690947850701757908
+--- !u!135 &6032314911628419330
 SphereCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3813110091508439571}
+  m_GameObject: {fileID: 2208933647990980209}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -212,23 +142,23 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.28
+  m_Radius: 0.875
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &4822617822512579646
+--- !u!114 &7933769562657029189
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3813110091508439571}
+  m_GameObject: {fileID: 2208933647990980209}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: eef123a9d68529d48bfe43f82d93edc8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
   _hitboxType: 0
-  _damageableTarget: {fileID: 5737091182976568509}
---- !u!1 &5118490757666153919
+  _damageableTarget: {fileID: 2805475105267023195}
+--- !u!1 &3789195551100724646
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -236,7 +166,77 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 4326763848202779889}
+  - component: {fileID: 3077461977969270298}
+  - component: {fileID: 4414988185183819271}
+  - component: {fileID: 7053264598419220768}
+  m_Layer: 0
+  m_Name: Hitbox_Torso
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3077461977969270298
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3789195551100724646}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.75, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6847800396489000606}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!136 &4414988185183819271
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3789195551100724646}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 1
+  m_Height: 2.1000001
+  m_Direction: 1
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &7053264598419220768
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3789195551100724646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eef123a9d68529d48bfe43f82d93edc8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
+  _hitboxType: 1
+  _damageableTarget: {fileID: 2805475105267023195}
+--- !u!1 &3857556996986441155
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6847800396489000606}
   m_Layer: 0
   m_Name: Hitboxes
   m_TagString: Untagged
@@ -244,25 +244,25 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &4326763848202779889
+--- !u!4 &6847800396489000606
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5118490757666153919}
+  m_GameObject: {fileID: 3857556996986441155}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1098547333517893784}
-  - {fileID: 5651993845001941747}
-  - {fileID: 4014089601166440669}
-  m_Father: {fileID: 1254441081220015315}
+  - {fileID: 1282656111125080382}
+  - {fileID: 3077461977969270298}
+  - {fileID: 2763692767919796908}
+  m_Father: {fileID: 724342471259572515}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &7920229576687535306
+--- !u!1 &5937095992736994228
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -270,117 +270,49 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 4014089601166440669}
-  - component: {fileID: 4124745535848759119}
-  - component: {fileID: 1533867047602043415}
+  - component: {fileID: 724342471259572515}
+  - component: {fileID: 4277816679989860663}
+  - component: {fileID: 7523300340162597683}
+  - component: {fileID: 5486231612450421447}
+  - component: {fileID: 2805475105267023195}
+  - component: {fileID: 6289259359809539645}
   m_Layer: 0
-  m_Name: Hitbox_Limbs
+  m_Name: EnemyBossHellfireLord
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &4014089601166440669
+--- !u!4 &724342471259572515
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7920229576687535306}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.18, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4326763848202779889}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &4124745535848759119
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7920229576687535306}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.56, y: 0.36, z: 0.56}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &1533867047602043415
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7920229576687535306}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eef123a9d68529d48bfe43f82d93edc8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
-  _hitboxType: 2
-  _damageableTarget: {fileID: 5737091182976568509}
---- !u!1 &8187070297308079450
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1254441081220015315}
-  - component: {fileID: 6796943683429429025}
-  - component: {fileID: 7333485314717849181}
-  - component: {fileID: 634529866530383661}
-  - component: {fileID: 5737091182976568509}
-  - component: {fileID: 3313106983028253364}
-  m_Layer: 0
-  m_Name: EnemyImp
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1254441081220015315
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8187070297308079450}
+  m_GameObject: {fileID: 5937095992736994228}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 4541055465829044980}
-  - {fileID: 4326763848202779889}
+  - {fileID: 5740589567333964389}
+  - {fileID: 6847800396489000606}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6796943683429429025
+--- !u!114 &4277816679989860663
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8187070297308079450}
+  m_GameObject: {fileID: 5937095992736994228}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 433070197
+  GlobalObjectIdHash: 1378622105
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -395,13 +327,13 @@ MonoBehaviour:
   AutoObjectParentSync: 1
   SyncOwnerTransformWhenParented: 1
   AllowOwnerToParent: 0
---- !u!114 &7333485314717849181
+--- !u!114 &7523300340162597683
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8187070297308079450}
+  m_GameObject: {fileID: 5937095992736994228}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e96cb6065543e43c4a752faaa1468eb1, type: 3}
@@ -441,64 +373,64 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
---- !u!195 &634529866530383661
+--- !u!195 &5486231612450421447
 NavMeshAgent:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8187070297308079450}
+  m_GameObject: {fileID: 5937095992736994228}
   m_Enabled: 1
   m_AgentTypeID: 0
-  m_Radius: 0.32000002
-  m_Speed: 5
+  m_Radius: 1.125
+  m_Speed: 3.5
   m_Acceleration: 8
   avoidancePriority: 50
   m_AngularSpeed: 120
-  m_StoppingDistance: 1.4399999
+  m_StoppingDistance: 3.5
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1
-  m_Height: 1.2
+  m_Height: 3.5
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
---- !u!114 &5737091182976568509
+--- !u!114 &2805475105267023195
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8187070297308079450}
+  m_GameObject: {fileID: 5937095992736994228}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d1681fbdf8bea0f429cc25ee2c3498fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.Health
   ShowTopMostFoldoutHeaderGroup: 1
-  _maxHealth: 30
+  _maxHealth: 800
   _isPlayer: 0
   _downedDuration: 60
   _reviveHealthPercent: 0.3
   _despawnDelay: 3
---- !u!114 &3313106983028253364
+--- !u!114 &6289259359809539645
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8187070297308079450}
+  m_GameObject: {fileID: 5937095992736994228}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8b11a58ec0bdff24698d407effbf93a3, type: 3}
+  m_Script: {fileID: 11500000, guid: 7580695a8530df74092865b743128082, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.AI.EnemyStateMachine
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.AI.BossStateMachine
   ShowTopMostFoldoutHeaderGroup: 1
-  _enemyType: 0
-  _moveSpeed: 5
-  _attackDamage: 10
-  _attackRange: 1.8
-  _attackCooldown: 1
+  _enemyType: 3
+  _moveSpeed: 3.5
+  _attackDamage: 30
+  _attackRange: 4
+  _attackCooldown: 1.8
   _detectionRange: 15
   _sightObstacleMask:
     serializedVersion: 2
@@ -506,3 +438,79 @@ MonoBehaviour:
   _targetSearchInterval: 0.5
   _meshRoot: {fileID: 0}
   _renderers: []
+  _currentPhase: 0
+  _phase1Speed: 3.5
+  _phase2Speed: 4.5
+  _phase1MeleeDamage: 30
+  _phase2FireballDamage: 20
+  _fireballExplosionRadius: 3
+  _impMinionPrefab: {fileID: 8187070297308079450, guid: 00da543e2f861034b9cb7af4e9a3a4e1, type: 3}
+  _bossRoomCenter: {x: 0, y: 0, z: 0}
+--- !u!1 &6579397727876992927
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2763692767919796908}
+  - component: {fileID: 3095742303205333455}
+  - component: {fileID: 8665900520840975018}
+  m_Layer: 0
+  m_Name: Hitbox_Limbs
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2763692767919796908
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6579397727876992927}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.52500004, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6847800396489000606}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &3095742303205333455
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6579397727876992927}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.75, y: 1.0500001, z: 1.75}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &8665900520840975018
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6579397727876992927}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eef123a9d68529d48bfe43f82d93edc8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
+  _hitboxType: 2
+  _damageableTarget: {fileID: 2805475105267023195}
