@@ -22,7 +22,7 @@ namespace Hellfire.Editor
         private const string ScenesPath = "Assets/_Project/Scenes";
         private const string MaterialsPath = "Assets/_Project/Materials";
 
-        [MenuItem("Hellfire/Phase 3/Setup All (Dungeon Generator, NavMesh Baker, Enemy & Boss Prefabs)", false, 20)]
+        [MenuItem("Hellfire/Phase 3/Setup All (Dungeon Generator, NavMesh Baker, Enemy & Boss Prefabs)", false, 1)]
         public static void SetupAllPhase3()
         {
             EnsureDirectories();
@@ -37,6 +37,7 @@ namespace Hellfire.Editor
             RegisterNetworkPrefab(archerPrefab);
             RegisterNetworkPrefab(brutePrefab);
             RegisterNetworkPrefab(bossPrefab);
+            RegisterPrefabsToNetworkManager(impPrefab, archerPrefab, brutePrefab, bossPrefab);
 
             // Cập nhật scene Gameplay.unity
             SetupGameplayScene(impPrefab, archerPrefab, brutePrefab, bossPrefab);
@@ -50,6 +51,32 @@ namespace Hellfire.Editor
                 "- DungeonManager & NavMeshSurface đã tích hợp vào scene Gameplay.\n" +
                 "- Tự động đồng bộ Seed qua mạng và sinh hầm ngục + bake NavMesh.",
                 "OK");
+        }
+
+        [MenuItem("Hellfire/Phase 3/1. Create Enemy & Boss Prefabs", false, 10)]
+        public static void MenuItemCreatePrefabs()
+        {
+            EnsureDirectories();
+            var impPrefab = CreateOrUpdateEnemyPrefab("EnemyImp", EnemyType.Imp, 30f, 5f, 10f, 1.8f, 1.0f, new Color(0.85f, 0.2f, 0.2f), new Vector3(0.8f, 1.2f, 0.8f));
+            var archerPrefab = CreateOrUpdateArcherPrefab("EnemyArcher", 25f, 3.5f, 12f, new Color(0.6f, 0.2f, 0.8f), new Vector3(0.8f, 1.6f, 0.8f));
+            var brutePrefab = CreateOrUpdateBrutePrefab("EnemyBrute", 120f, 2.5f, 25f, new Color(0.3f, 0.5f, 0.2f), new Vector3(1.6f, 2.2f, 1.6f));
+            CreateOrUpdateBossPrefab("EnemyBossHellfireLord", 800f, 3.5f, 30f, new Color(0.9f, 0.4f, 0.1f), new Vector3(2.5f, 3.5f, 2.5f), impPrefab);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[HellfirePhase3Setup] Đã tạo xong 4 Prefab quái vật & Boss!");
+        }
+
+        [MenuItem("Hellfire/Phase 3/2. Setup DungeonManager in Gameplay Scene", false, 11)]
+        public static void MenuItemSetupGameplayScene()
+        {
+            var impPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/EnemyImp.prefab");
+            var archerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/EnemyArcher.prefab");
+            var brutePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/EnemyBrute.prefab");
+            var bossPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/EnemyBossHellfireLord.prefab");
+            SetupGameplayScene(impPrefab, archerPrefab, brutePrefab, bossPrefab);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[HellfirePhase3Setup] Đã cấu hình DungeonManager vào Scene Gameplay!");
         }
 
         private static void EnsureDirectories()
@@ -290,6 +317,29 @@ namespace Hellfire.Editor
                     EditorUtility.SetDirty(prefabsList);
                 }
             }
+        }
+
+        private static void RegisterPrefabsToNetworkManager(params GameObject[] prefabs)
+        {
+            string nmPath = $"{PrefabsPath}/NetworkManager.prefab";
+            var nmAsset = AssetDatabase.LoadAssetAtPath<GameObject>(nmPath);
+            if (nmAsset == null) return;
+
+            var nmObj = PrefabUtility.InstantiatePrefab(nmAsset) as GameObject;
+            var nm = nmObj.GetComponent<NetworkManager>();
+            if (nm != null)
+            {
+                foreach (var p in prefabs)
+                {
+                    if (p != null && !nm.NetworkConfig.Prefabs.Contains(p))
+                    {
+                        nm.NetworkConfig.Prefabs.Add(new NetworkPrefab { Prefab = p });
+                    }
+                }
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(nmObj, nmPath);
+            Object.DestroyImmediate(nmObj);
         }
 
         private static void SetupGameplayScene(GameObject imp, GameObject archer, GameObject brute, GameObject boss)
