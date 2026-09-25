@@ -382,7 +382,7 @@ namespace Hellfire.Combat
                         hitbox.ForwardDamage(damage, OwnerClientId);
 
                         // Gửi hit confirm về cho người bắn
-                        NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+                        NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
                         SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
                     }
                     else
@@ -394,7 +394,7 @@ namespace Hellfire.Combat
                             float damage = weaponToUse.BaseDamage * weaponToUse.GetMultiplier(HitboxType.Torso);
                             damageable.TakeDamage(damage, HitboxType.Torso, OwnerClientId);
 
-                            NotifyHitConfirmClientRpc(false, RpcTarget.Single(OwnerClientId, RpcTargetUse.Temp));
+                            NotifyHitConfirmClientRpc(false);
                             SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
                         }
                         else
@@ -408,7 +408,7 @@ namespace Hellfire.Combat
         }
 
         [ClientRpc]
-        private void NotifyHitConfirmClientRpc(bool isHeadshot, RpcParams rpcParams = default)
+        private void NotifyHitConfirmClientRpc(bool isHeadshot)
         {
             if (IsOwner)
             {
