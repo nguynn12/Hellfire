@@ -27,6 +27,9 @@ namespace Hellfire.AI
         [SerializeField] private float _phase2FireballDamage = 20f;
         [SerializeField] private float _fireballExplosionRadius = 3f;
 
+        [Header("Boss Reward & Victory (Mục 6.3 & 10.2)")]
+        [SerializeField] private GameObject _bossChestPrefab;
+
         [Header("Minion Summoning (Mỗi 20% máu mất ở Phase 2 triệu hồi 2 Imp)")]
         [SerializeField] private GameObject _impMinionPrefab;
         [SerializeField] private Vector3 _bossRoomCenter;
@@ -264,6 +267,37 @@ namespace Hellfire.AI
                 {
                     netObj.Spawn(true);
                 }
+            }
+        }
+
+        protected override void HandleDeath(ulong killerId)
+        {
+            base.HandleDeath(killerId);
+
+            if (!IsServer) return;
+
+            // 1. Sinh Rương Boss (Mục 6.3: 100% rơi bùa lợi, 50% rơi thêm vũ khí)
+            if (_bossChestPrefab != null)
+            {
+                Vector3 chestPos = transform.position + transform.forward * 2f;
+                var chestObj = Instantiate(_bossChestPrefab, chestPos, Quaternion.identity);
+                var netObj = chestObj.GetComponent<NetworkObject>();
+                var chest = chestObj.GetComponent<Hellfire.Items.LootChest>();
+                if (chest != null)
+                {
+                    chest.IsBossChest = true;
+                }
+                if (netObj != null)
+                {
+                    netObj.Spawn(true);
+                }
+                Debug.Log($"[BossStateMachine] Chúa quỷ bị hạ gục! Đã sinh Rương Boss tại {chestPos}");
+            }
+
+            // 2. Kích hoạt trạng thái Victory trên GameManager (Mục 10.2)
+            if (Hellfire.Networking.GameManager.Instance != null)
+            {
+                Hellfire.Networking.GameManager.Instance.TriggerVictory();
             }
         }
     }

@@ -1,9 +1,10 @@
 // Script: GameplayHUD.cs
-// Mục đích: Quản lý toàn bộ giao diện HUD chiến đấu (Máu, Đạn, Tên vũ khí, Hitmarker, Trạng thái Gục & Hồi sinh) bằng uGUI Canvas (Mục 3, 6, 7).
+// Mục đích: Quản lý toàn bộ giao diện HUD chiến đấu, Menu Pause, Khiên bảo vệ, Màn hình Kết quả (Chiến thắng / Thất bại) bằng uGUI Canvas (Mục 3, 6, 7, 10.1 & 10.2).
 // Môi trường thực thi: Client-only.
 
 using System.Collections;
 using Hellfire.Combat;
+using Hellfire.Items;
 using Hellfire.Networking;
 using Hellfire.Player;
 using TMPro;
@@ -27,6 +28,11 @@ namespace Hellfire.UI
         [SerializeField] private GameObject _downedOverlayPanel;
         [SerializeField] private TextMeshProUGUI _downedTimerText;
 
+        [Header("Guardian Shield & Buffs (Mục 6.2)")]
+        [SerializeField] private GameObject _shieldIndicatorPanel;
+        [SerializeField] private TextMeshProUGUI _shieldTimerText;
+        [SerializeField] private TextMeshProUGUI _buffToastText;
+
         [Header("Weapon & Ammo UI")]
         [SerializeField] private TextMeshProUGUI _weaponNameText;
         [SerializeField] private TextMeshProUGUI _ammoText;
@@ -37,17 +43,28 @@ namespace Hellfire.UI
         [SerializeField] private TextMeshProUGUI _revivePromptText;
         [SerializeField] private Slider _reviveProgressBar;
 
-        [Header("Pause Menu")]
+        [Header("Pause Menu (Mục 7)")]
         [SerializeField] private GameObject _pauseMenuPanel;
         [SerializeField] private Button _resumeButton;
         [SerializeField] private Button _leaveGameButton;
         [SerializeField] private TextMeshProUGUI _playerInfoText;
 
+        [Header("Result Screens: Victory & Game Over (Mục 10.1 & 10.2)")]
+        [SerializeField] private GameObject _victoryOverlayPanel;
+        [SerializeField] private Button _victoryReturnButton;
+        [SerializeField] private TextMeshProUGUI _victoryWaitingText;
+
+        [SerializeField] private GameObject _gameOverOverlayPanel;
+        [SerializeField] private Button _gameOverReturnButton;
+        [SerializeField] private TextMeshProUGUI _gameOverWaitingText;
+
         private bool _isPaused;
         private Health _localPlayerHealth;
         private WeaponController _localWeaponController;
         private PlayerRevive _localPlayerRevive;
+        private PlayerBuffManager _localBuffManager;
         private Coroutine _hitmarkerCoroutine;
+        private Coroutine _buffToastCoroutine;
 
         private void Awake()
         {
@@ -64,8 +81,18 @@ namespace Hellfire.UI
             if (_downedOverlayPanel != null) _downedOverlayPanel.SetActive(false);
             if (_revivePromptPanel != null) _revivePromptPanel.SetActive(false);
             if (_reloadPromptText != null) _reloadPromptText.gameObject.SetActive(false);
+            if (_shieldIndicatorPanel != null) _shieldIndicatorPanel.SetActive(false);
+            if (_buffToastText != null) _buffToastText.gameObject.SetActive(false);
+            if (_victoryOverlayPanel != null) _victoryOverlayPanel.SetActive(false);
+            if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(false);
 
             UpdatePlayerInfo();
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnGameStateChanged += HandleGameStateChanged;
+                HandleGameStateChanged(GameState.Lobby, GameManager.Instance.CurrentState.Value);
+            }
         }
 
         private void AutoResolveReferences()
@@ -84,6 +111,11 @@ namespace Hellfire.UI
             if (_downedOverlayPanel == null) _downedOverlayPanel = FindInHierarchy(root, "DownedOverlayPanel");
             if (_downedTimerText == null) _downedTimerText = FindComponentInHierarchy<TextMeshProUGUI>(root, "DownedTimerText");
 
+            // Shield & Buffs
+            if (_shieldIndicatorPanel == null) _shieldIndicatorPanel = FindInHierarchy(root, "ShieldIndicatorPanel");
+            if (_shieldTimerText == null) _shieldTimerText = FindComponentInHierarchy<TextMeshProUGUI>(root, "ShieldTimerText");
+            if (_buffToastText == null) _buffToastText = FindComponentInHierarchy<TextMeshProUGUI>(root, "BuffToastText");
+
             // Weapon & Ammo
             if (_weaponNameText == null) _weaponNameText = FindComponentInHierarchy<TextMeshProUGUI>(root, "WeaponNameText");
             if (_ammoText == null) _ammoText = FindComponentInHierarchy<TextMeshProUGUI>(root, "AmmoText");
@@ -99,6 +131,15 @@ namespace Hellfire.UI
             if (_resumeButton == null) _resumeButton = FindComponentInHierarchy<Button>(root, "ResumeButton");
             if (_leaveGameButton == null) _leaveGameButton = FindComponentInHierarchy<Button>(root, "LeaveGameButton");
             if (_playerInfoText == null) _playerInfoText = FindComponentInHierarchy<TextMeshProUGUI>(root, "PlayerInfoText");
+
+            // Victory & GameOver Overlays
+            if (_victoryOverlayPanel == null) _victoryOverlayPanel = FindInHierarchy(root, "VictoryOverlayPanel");
+            if (_victoryReturnButton == null) _victoryReturnButton = FindComponentInHierarchy<Button>(root, "VictoryReturnButton");
+            if (_victoryWaitingText == null) _victoryWaitingText = FindComponentInHierarchy<TextMeshProUGUI>(root, "VictoryWaitingText");
+
+            if (_gameOverOverlayPanel == null) _gameOverOverlayPanel = FindInHierarchy(root, "GameOverOverlayPanel");
+            if (_gameOverReturnButton == null) _gameOverReturnButton = FindComponentInHierarchy<Button>(root, "GameOverReturnButton");
+            if (_gameOverWaitingText == null) _gameOverWaitingText = FindComponentInHierarchy<TextMeshProUGUI>(root, "GameOverWaitingText");
         }
 
         private void RegisterButtonListeners()
@@ -113,6 +154,18 @@ namespace Hellfire.UI
             {
                 _leaveGameButton.onClick.RemoveAllListeners();
                 _leaveGameButton.onClick.AddListener(LeaveGame);
+            }
+
+            if (_victoryReturnButton != null)
+            {
+                _victoryReturnButton.onClick.RemoveAllListeners();
+                _victoryReturnButton.onClick.AddListener(ReturnToLobbyFromHUD);
+            }
+
+            if (_gameOverReturnButton != null)
+            {
+                _gameOverReturnButton.onClick.RemoveAllListeners();
+                _gameOverReturnButton.onClick.AddListener(ReturnToLobbyFromHUD);
             }
         }
 
@@ -141,17 +194,42 @@ namespace Hellfire.UI
                 }
             }
 
+            // Cập nhật Khiên tạm thời (Guardian Shield - 8s)
+            if (_localBuffManager != null && _localBuffManager.HasGuardianShield)
+            {
+                if (_shieldIndicatorPanel != null && !_shieldIndicatorPanel.activeSelf)
+                {
+                    _shieldIndicatorPanel.SetActive(true);
+                }
+                if (_shieldTimerText != null)
+                {
+                    _shieldTimerText.text = $"🛡️ KHIÊN BẢO VỆ: {_localBuffManager.ShieldTimeRemaining:F1}s";
+                }
+            }
+            else
+            {
+                if (_shieldIndicatorPanel != null && _shieldIndicatorPanel.activeSelf)
+                {
+                    _shieldIndicatorPanel.SetActive(false);
+                }
+            }
+
             // Phím ESC mở Pause Menu (Mục 7)
             if (UnityEngine.InputSystem.Keyboard.current != null &&
                 UnityEngine.InputSystem.Keyboard.current.escapeKey.wasPressedThisFrame)
             {
-                TogglePauseMenu();
+                // Chỉ cho phép mở pause menu nếu không ở màn hình kết quả
+                if ((_victoryOverlayPanel == null || !_victoryOverlayPanel.activeSelf) &&
+                    (_gameOverOverlayPanel == null || !_gameOverOverlayPanel.activeSelf))
+                {
+                    TogglePauseMenu();
+                }
             }
         }
 
         private void TryBindLocalPlayer()
         {
-            if (_localPlayerHealth != null && _localWeaponController != null) return;
+            if (_localPlayerHealth != null && _localWeaponController != null && _localBuffManager != null) return;
 
             var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
             if (localPlayer == null) return;
@@ -194,6 +272,99 @@ namespace Hellfire.UI
                     _localPlayerRevive.OnReviveProgressChanged += HandleReviveProgressChanged;
                 }
             }
+
+            if (_localBuffManager == null)
+            {
+                _localBuffManager = localPlayer.GetComponent<PlayerBuffManager>();
+                if (_localBuffManager != null)
+                {
+                    _localBuffManager.OnPowerUpApplied += HandlePowerUpApplied;
+                }
+            }
+        }
+
+        private void HandlePowerUpApplied(PowerUpType type, float value)
+        {
+            string msg = string.Empty;
+            switch (type)
+            {
+                case PowerUpType.MaxHealthUp:
+                    msg = $"<color=#00FF88>+ {value} MÁU TỐI ĐA & HỒI ĐẦY MÁU!</color>";
+                    break;
+                case PowerUpType.SwiftBoots:
+                    msg = $"<color=#00FFFF>+ {(value * 100):0}% TỐC ĐỘ DI CHUYỂN!</color>";
+                    break;
+                case PowerUpType.BerserkerCharm:
+                    msg = $"<color=#FF4444>+ {(value * 100):0}% SÁT THƯƠNG SÚNG!</color>";
+                    break;
+                case PowerUpType.GuardianShield:
+                    msg = "<color=#FFFF00>🛡️ KHIÊN BẢO VỆ KÍCH HOẠT (8 GIÂY BẤT TỬ)!</color>";
+                    break;
+            }
+
+            ShowBuffToast(msg);
+        }
+
+        public void ShowBuffToast(string message)
+        {
+            if (_buffToastText == null) return;
+
+            if (_buffToastCoroutine != null)
+            {
+                StopCoroutine(_buffToastCoroutine);
+            }
+            _buffToastCoroutine = StartCoroutine(BuffToastRoutine(message));
+        }
+
+        private IEnumerator BuffToastRoutine(string message)
+        {
+            _buffToastText.gameObject.SetActive(true);
+            _buffToastText.text = message;
+
+            yield return new WaitForSeconds(3.0f);
+
+            _buffToastText.gameObject.SetActive(false);
+        }
+
+        private void HandleGameStateChanged(GameState prev, GameState next)
+        {
+            bool isHost = NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
+
+            if (next == GameState.Victory)
+            {
+                if (_victoryOverlayPanel != null) _victoryOverlayPanel.SetActive(true);
+                if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(false);
+
+                if (_victoryReturnButton != null) _victoryReturnButton.gameObject.SetActive(isHost);
+                if (_victoryWaitingText != null) _victoryWaitingText.gameObject.SetActive(!isHost);
+
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+            else if (next == GameState.GameOver)
+            {
+                if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(true);
+                if (_victoryOverlayPanel != null) _victoryOverlayPanel.SetActive(false);
+
+                if (_gameOverReturnButton != null) _gameOverReturnButton.gameObject.SetActive(isHost);
+                if (_gameOverWaitingText != null) _gameOverWaitingText.gameObject.SetActive(!isHost);
+
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+            else
+            {
+                if (_victoryOverlayPanel != null) _victoryOverlayPanel.SetActive(false);
+                if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(false);
+            }
+        }
+
+        private void ReturnToLobbyFromHUD()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.ReturnToLobby();
+            }
         }
 
         private void OnDestroy()
@@ -216,6 +387,16 @@ namespace Hellfire.UI
             {
                 _localPlayerRevive.OnRevivePromptChanged -= HandleRevivePromptChanged;
                 _localPlayerRevive.OnReviveProgressChanged -= HandleReviveProgressChanged;
+            }
+
+            if (_localBuffManager != null)
+            {
+                _localBuffManager.OnPowerUpApplied -= HandlePowerUpApplied;
+            }
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
             }
         }
 

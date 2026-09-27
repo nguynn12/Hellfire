@@ -232,6 +232,8 @@ namespace Hellfire.Combat
             Debug.Log($"[Health] Người chơi {NetworkObjectId} đã được hồi sinh với {CurrentHealth.Value}/{_maxHealth} HP!");
         }
 
+        public float MaxHealth => _maxHealth;
+
         public void SetMaxHealth(float maxHealth)
         {
             _maxHealth = Mathf.Max(1f, maxHealth);
@@ -239,6 +241,16 @@ namespace Hellfire.Combat
             {
                 CurrentHealth.Value = _maxHealth;
             }
+        }
+
+        /// <summary>
+        /// Tăng máu tối đa và hồi đầy máu ngay lập tức (Mục 6.2: Bùa Trái tim máu lớn).
+        /// </summary>
+        public void IncreaseMaxHealthAndHeal(float bonus)
+        {
+            if (!IsServer) return;
+            _maxHealth += Mathf.Max(0f, bonus);
+            CurrentHealth.Value = _maxHealth;
         }
 
         private void DisableColliders()

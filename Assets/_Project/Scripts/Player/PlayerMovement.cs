@@ -60,10 +60,10 @@ namespace Hellfire.Player
         public float SprintSpeed => _sprintSpeed;
         public Camera PlayerCamera => _playerCamera;
 
-        // Runtime states
         private float _cameraPitch;
         private float _verticalVelocity;
         private bool _isCursorLocked = true;
+        private PlayerBuffManager _buffManager;
 
         private void Reset()
         {
@@ -92,6 +92,7 @@ namespace Hellfire.Player
             if (_playerBodyMesh == null) _playerBodyMesh = transform.Find("PlayerBodyMesh")?.gameObject;
             if (_weaponViewmodel == null) _weaponViewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel")?.gameObject;
             if (_health == null) _health = GetComponent<Health>();
+            if (_buffManager == null) _buffManager = GetComponent<PlayerBuffManager>();
         }
 
         public override void OnNetworkSpawn()
@@ -283,6 +284,12 @@ namespace Hellfire.Player
             else
             {
                 currentSpeed = _walkSpeed;
+            }
+
+            // Áp dụng hệ số bùa lợi Giày tốc độ (Swift Boots - Mục 6.2)
+            if (_buffManager != null)
+            {
+                currentSpeed *= _buffManager.SpeedMultiplier;
             }
 
             // 3. Tính hướng di chuyển theo local transform

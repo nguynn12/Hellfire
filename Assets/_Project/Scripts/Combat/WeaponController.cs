@@ -44,6 +44,7 @@ namespace Hellfire.Combat
         public WeaponData CurrentWeaponData => _currentWeapon;
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
+        private Player.PlayerBuffManager _buffManager;
 
         private void Awake()
         {
@@ -66,6 +67,7 @@ namespace Hellfire.Combat
                 var viewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel/GunMesh");
                 if (viewmodel != null) _weaponMuzzlePoint = viewmodel;
             }
+            if (_buffManager == null) _buffManager = GetComponent<Player.PlayerBuffManager>();
         }
 
         public override void OnNetworkSpawn()
@@ -140,12 +142,31 @@ namespace Hellfire.Combat
             NotifyWeaponUI();
         }
 
+        public IReadOnlyList<WeaponData> AvailableWeapons => _availableWeapons;
+
+        public bool HasWeapon(WeaponData weapon)
+        {
+            return weapon != null && _availableWeapons.Contains(weapon);
+        }
+
         public void AddAvailableWeapon(WeaponData weapon)
         {
             if (weapon != null && !_availableWeapons.Contains(weapon))
             {
                 _availableWeapons.Add(weapon);
             }
+        }
+
+        public void AddOrSwitchWeapon(WeaponData weapon)
+        {
+            if (weapon == null) return;
+            int index = _availableWeapons.IndexOf(weapon);
+            if (index == -1)
+            {
+                _availableWeapons.Add(weapon);
+                index = _availableWeapons.Count - 1;
+            }
+            SwitchWeapon(index);
         }
 
         private void HandleReloading()
@@ -374,10 +395,12 @@ namespace Hellfire.Combat
 
                     // 2. Kiểm tra Hitbox (Mục 3.2: Head x2.0, Torso x1.0, Limb x0.75)
                     var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
+                    float buffMultiplier = (_buffManager != null) ? _buffManager.DamageMultiplier : 1.0f;
+
                     if (hitbox != null)
                     {
                         float multiplier = weaponToUse.GetMultiplier(hitbox.Type);
-                        float damage = weaponToUse.BaseDamage * multiplier;
+                        float damage = weaponToUse.BaseDamage * multiplier * buffMultiplier;
 
                         hitbox.ForwardDamage(damage, OwnerClientId);
 
@@ -391,7 +414,7 @@ namespace Hellfire.Combat
                         var damageable = hit.collider.GetComponentInParent<IDamageable>();
                         if (damageable != null && !damageable.IsPlayerTarget)
                         {
-                            float damage = weaponToUse.BaseDamage * weaponToUse.GetMultiplier(HitboxType.Torso);
+                            float damage = weaponToUse.BaseDamage * weaponToUse.GetMultiplier(HitboxType.Torso) * buffMultiplier;
                             damageable.TakeDamage(damage, HitboxType.Torso, OwnerClientId);
 
                             NotifyHitConfirmClientRpc(false);
