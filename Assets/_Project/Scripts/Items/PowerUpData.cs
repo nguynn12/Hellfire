@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Hellfire.Items
 {
-    [CreateAssetMenu(fileName = "NewPowerUpData", menuMenuName = "Hellfire/PowerUp Data", order = 2)]
+    [CreateAssetMenu(fileName = "NewPowerUpData", menuName = "Hellfire/PowerUp Data", order = 2)]
     public class PowerUpData : ScriptableObject
     {
         [Header("Identity")]

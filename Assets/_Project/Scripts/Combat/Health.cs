@@ -232,8 +232,6 @@ namespace Hellfire.Combat
             Debug.Log($"[Health] Người chơi {NetworkObjectId} đã được hồi sinh với {CurrentHealth.Value}/{_maxHealth} HP!");
         }
 
-        public float MaxHealth => _maxHealth;
-
         public void SetMaxHealth(float maxHealth)
         {
             _maxHealth = Mathf.Max(1f, maxHealth);
