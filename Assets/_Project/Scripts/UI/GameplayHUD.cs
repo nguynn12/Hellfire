@@ -163,6 +163,7 @@ namespace Hellfire.UI
                 {
                     _localPlayerHealth.OnHealthChanged += HandleHealthChanged;
                     _localPlayerHealth.OnDownedStateChanged += HandleDownedChanged;
+                    _localPlayerHealth.OnDamageTaken += HandleDamageTaken;
                     HandleHealthChanged(_localPlayerHealth.CurrentHealth.Value, _localPlayerHealth.MaxHealth);
                 }
             }
@@ -202,6 +203,7 @@ namespace Hellfire.UI
             {
                 _localPlayerHealth.OnHealthChanged -= HandleHealthChanged;
                 _localPlayerHealth.OnDownedStateChanged -= HandleDownedChanged;
+                _localPlayerHealth.OnDamageTaken -= HandleDamageTaken;
             }
 
             if (_localWeaponController != null)
@@ -229,8 +231,15 @@ namespace Hellfire.UI
 
             if (_healthText != null)
             {
-                _healthText.text = $"HP: {Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)}";
+                _healthText.text = $"HP: {Mathf.RoundToInt(current)} / {Mathf.RoundToInt(max)}";
             }
+        }
+
+        private void HandleDamageTaken(float damage, HitboxType hitbox, ulong attackerId)
+        {
+            int roundedDamage = Mathf.RoundToInt(damage);
+            // Sát thương luôn được làm tròn thành số nguyên (Mục I.3 & II.5)
+            Debug.Log($"[GameplayHUD] Nhận {roundedDamage} sát thương vào {hitbox}.");
         }
 
         private void HandleDownedChanged(bool isDowned)

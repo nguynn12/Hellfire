@@ -23,6 +23,7 @@ namespace Hellfire.Player
         [SerializeField] private GameObject _playerBodyMesh;
         [SerializeField] private GameObject _weaponViewmodel;
         [SerializeField] private Health _health;
+        [SerializeField] private PlayerStats _playerStats;
 
         [Header("Movement Parameters")]
         [Tooltip("Tốc độ đi bộ thông thường (m/s)")]
@@ -92,6 +93,7 @@ namespace Hellfire.Player
             if (_playerBodyMesh == null) _playerBodyMesh = transform.Find("PlayerBodyMesh")?.gameObject;
             if (_weaponViewmodel == null) _weaponViewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel")?.gameObject;
             if (_health == null) _health = GetComponent<Health>();
+            if (_playerStats == null) _playerStats = GetComponent<PlayerStats>();
         }
 
         public override void OnNetworkSpawn()
@@ -284,6 +286,10 @@ namespace Hellfire.Player
             {
                 currentSpeed = _walkSpeed;
             }
+
+            // Áp dụng hệ số tốc độ chạy từ PlayerStats (Mục I.2 & II.2)
+            float speedMultiplier = (_playerStats != null) ? _playerStats.MoveSpeedMultiplier.Value : 1.0f;
+            currentSpeed *= speedMultiplier;
 
             // 3. Tính hướng di chuyển theo local transform
             Vector3 moveDirection = (transform.forward * moveInput.y + transform.right * moveInput.x).normalized;

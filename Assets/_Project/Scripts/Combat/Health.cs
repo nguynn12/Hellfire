@@ -1,9 +1,11 @@
 // Script: Health.cs
-// Mục đích: Quản lý lượng máu, trạng thái Gục (Downed) và Chết (Dead) đồng bộ qua NetworkVariable (Mục 2.4 & 3.3).
+// Mục đích: Quản lý lượng máu, giáp, trạng thái Gục (Downed) và Chết (Dead) đồng bộ qua NetworkVariable (Mục 2.4 & 3.3).
+//           Tính toán sát thương theo công thức giáp chuẩn: DamageFactor = e^(-0.01053605 * EffectiveArmor).
 // Môi trường thực thi: Cả hai (Server-Authoritative tính toán & trừ máu, Client nhận event cập nhật UI).
 
 using System;
 using System.Collections;
+using Hellfire.Player;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -12,9 +14,14 @@ namespace Hellfire.Combat
     [DisallowMultipleComponent]
     public class Health : NetworkBehaviour, IDamageable
     {
-        [Header("Health Settings")]
-        [SerializeField] private float _maxHealth = 100f;
+        [Header("Health Settings (Mục I.2 & II.2)")]
+        [Tooltip("Lượng máu tối đa ban đầu (Cơ bản là 100)")]
+        [SerializeField] private float _baseMaxHealth = 100f;
         [SerializeField] private bool _isPlayer = false;
+
+        [Header("Armor Settings")]
+        [Tooltip("Chỉ số giáp cơ bản (dành cho Quái vật/Boss. Người chơi sẽ ưu tiên lấy từ PlayerStats)")]
+        [SerializeField] private float _baseArmor = 0f;
 
         [Header("Player Downed & Revive Settings (Mục 3.3)")]
         [Tooltip("Thời gian chờ cứu khi gục trước khi chết hẳn (giây)")]
@@ -29,6 +36,12 @@ namespace Hellfire.Combat
 
         // NetworkVariables (Server-Authoritative)
         public NetworkVariable<float> CurrentHealth { get; } = new NetworkVariable<float>(
+            100f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
+        public NetworkVariable<float> MaxHealthNet { get; } = new NetworkVariable<float>(
             100f,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server
@@ -56,48 +69,54 @@ namespace Hellfire.Combat
         bool IDamageable.IsDead => IsDead.Value;
         bool IDamageable.IsDowned => IsDowned.Value;
         float IDamageable.CurrentHealthValue => CurrentHealth.Value;
-        float IDamageable.MaxHealthValue => _maxHealth;
+        float IDamageable.MaxHealthValue => MaxHealthNet.Value;
         bool IDamageable.IsPlayerTarget => _isPlayer;
 
-        public float MaxHealth => _maxHealth;
+        public float MaxHealth => MaxHealthNet.Value;
+        public float BaseArmor => _baseArmor;
         public bool IsPlayer => _isPlayer;
 
         // Local Events
-        public event Action<float, float> OnHealthChanged;      // current, max
-        public event Action<bool> OnDownedStateChanged;         // isDowned
-        public event Action<ulong> OnDied;                      // attackerClientId
+        public event Action<float, float> OnHealthChanged;           // current, max
+        public event Action<bool> OnDownedStateChanged;              // isDowned
+        public event Action<ulong> OnDied;                           // attackerClientId
         public event Action OnRevived;
         public event Action<float, HitboxType, ulong> OnDamageTaken; // damage, hitbox, attacker
 
         private Collider[] _colliders;
+        private PlayerStats _playerStats;
 
         private void Awake()
         {
             _colliders = GetComponentsInChildren<Collider>();
+            _playerStats = GetComponent<PlayerStats>();
         }
 
         public override void OnNetworkSpawn()
         {
             if (IsServer)
             {
-                CurrentHealth.Value = _maxHealth;
+                MaxHealthNet.Value = _baseMaxHealth;
+                CurrentHealth.Value = _baseMaxHealth;
                 IsDowned.Value = false;
                 IsDead.Value = false;
                 DownedTimer.Value = 0f;
             }
 
             CurrentHealth.OnValueChanged += HandleHealthChanged;
+            MaxHealthNet.OnValueChanged += HandleMaxHealthChanged;
             IsDowned.OnValueChanged += HandleDownedChanged;
             IsDead.OnValueChanged += HandleDeadChanged;
 
             // Trigger initial UI update
-            OnHealthChanged?.Invoke(CurrentHealth.Value, _maxHealth);
+            OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
             OnDownedStateChanged?.Invoke(IsDowned.Value);
         }
 
         public override void OnNetworkDespawn()
         {
             CurrentHealth.OnValueChanged -= HandleHealthChanged;
+            MaxHealthNet.OnValueChanged -= HandleMaxHealthChanged;
             IsDowned.OnValueChanged -= HandleDownedChanged;
             IsDead.OnValueChanged -= HandleDeadChanged;
         }
@@ -120,7 +139,12 @@ namespace Hellfire.Combat
 
         private void HandleHealthChanged(float previousValue, float newValue)
         {
-            OnHealthChanged?.Invoke(newValue, _maxHealth);
+            OnHealthChanged?.Invoke(newValue, MaxHealthNet.Value);
+        }
+
+        private void HandleMaxHealthChanged(float previousValue, float newValue)
+        {
+            OnHealthChanged?.Invoke(CurrentHealth.Value, newValue);
         }
 
         private void HandleDownedChanged(bool previousValue, bool newValue)
@@ -142,9 +166,12 @@ namespace Hellfire.Combat
         public bool IsInvulnerable { get; set; }
 
         /// <summary>
-        /// Gây sát thương lên thực thể (Server-Authoritative theo Mục 3.1 & 3.2).
+        /// Gây sát thương lên thực thể (Server-Authoritative theo Mục I.3).
+        /// Áp dụng công thức: EffectiveArmor = TargetArmor - ArmorPenetration,
+        /// Hệ số giảm thương: DamageFactor = e^(-0.01053605 * EffectiveArmor).
         /// </summary>
-        public void TakeDamage(float damage, HitboxType hitboxType, ulong attackerClientId)
+        /// <param name="payload">Gói dữ liệu sát thương bất biến Zero-GC</param>
+        public void TakeDamage(DamagePayload payload)
         {
             if (!IsServer)
             {
@@ -152,7 +179,7 @@ namespace Hellfire.Combat
                 return;
             }
 
-            if (IsInvulnerable || IsDead.Value || damage <= 0f)
+            if (IsInvulnerable || IsDead.Value || payload.RawDamage <= 0f)
             {
                 return;
             }
@@ -163,11 +190,48 @@ namespace Hellfire.Combat
                 return;
             }
 
-            float newHealth = Mathf.Max(0f, CurrentHealth.Value - damage);
+            // 1. Xác định giáp mục tiêu
+            float targetArmor = _baseArmor;
+            if (_isPlayer)
+            {
+                if (_playerStats == null) _playerStats = GetComponent<PlayerStats>();
+                if (_playerStats != null)
+                {
+                    targetArmor = _playerStats.Armor.Value;
+                }
+            }
+
+            // 2. Tính giáp hiệu dụng: EffectiveArmor = TargetArmor - ArmorPenetration (Mục I.3)
+            float effectiveArmor = targetArmor - payload.ArmorPenetration;
+
+            // 3. Hệ số giảm thương chính xác: DamageFactor = e^(-0.01053605 * EffectiveArmor) ~ (0.9)^(EffectiveArmor / 10)
+            // Khi EffectiveArmor âm (xuyên giáp vượt quá giáp): tự động khuếch đại sát thương nhận vào (> 1.0)
+            float damageFactor = Mathf.Exp(-0.01053605f * effectiveArmor);
+
+            // 4. Hệ số nhân vị trí trúng đòn Hitbox
+            float hitboxMultiplier = 1.0f;
+            switch (payload.Hitbox)
+            {
+                case HitboxType.Head:
+                    hitboxMultiplier = 2.0f;
+                    break;
+                case HitboxType.Torso:
+                    hitboxMultiplier = 1.0f;
+                    break;
+                case HitboxType.Limb:
+                    hitboxMultiplier = 0.75f;
+                    break;
+            }
+
+            // 5. Tính sát thương cuối cùng: làm tròn số nguyên gần nhất (Mathf.Round), tối thiểu 1 sát thương
+            float calculatedDamage = payload.RawDamage * damageFactor * hitboxMultiplier;
+            int finalDamage = Mathf.Max(1, Mathf.RoundToInt(calculatedDamage));
+
+            float newHealth = Mathf.Max(0f, CurrentHealth.Value - finalDamage);
             CurrentHealth.Value = newHealth;
 
             // Báo feedback cho mọi client
-            NotifyDamageClientRpc(damage, hitboxType, attackerClientId);
+            NotifyDamageClientRpc(finalDamage, payload.Hitbox, payload.AttackerClientId);
 
             if (CurrentHealth.Value <= 0f)
             {
@@ -183,9 +247,17 @@ namespace Hellfire.Combat
                 {
                     // Quái vật chết ngay khi Health <= 0
                     IsDead.Value = true;
-                    HandleDeathServer(attackerClientId);
+                    HandleDeathServer(payload.AttackerClientId);
                 }
             }
+        }
+
+        /// <summary>
+        /// Phương thức hỗ trợ gọi nhanh tương thích ngược (tự động đóng gói DamagePayload).
+        /// </summary>
+        public void TakeDamage(float damage, HitboxType hitboxType, ulong attackerClientId)
+        {
+            TakeDamage(new DamagePayload(damage, 0f, hitboxType, attackerClientId));
         }
 
         private void HandleDeathServer(ulong attackerClientId)
@@ -209,6 +281,18 @@ namespace Hellfire.Combat
         }
 
         /// <summary>
+        /// Tăng máu tối đa cho người chơi trên Server và đồng thời khôi phục lượng máu tương ứng.
+        /// </summary>
+        public void IncreaseMaxHealthServer(float bonusAmount)
+        {
+            if (!IsServer || bonusAmount <= 0f) return;
+
+            MaxHealthNet.Value += bonusAmount;
+            CurrentHealth.Value = Mathf.Min(MaxHealthNet.Value, CurrentHealth.Value + bonusAmount);
+            Debug.Log($"[Health] Đã tăng MaxHealth cho {gameObject.name}: {MaxHealthNet.Value} HP.");
+        }
+
+        /// <summary>
         /// Server hồi sinh người chơi gục ngã (Mục 3.3).
         /// </summary>
         public void ServerRevive()
@@ -226,19 +310,25 @@ namespace Hellfire.Combat
 
             IsDowned.Value = false;
             DownedTimer.Value = 0f;
-            CurrentHealth.Value = _maxHealth * Mathf.Clamp01(_reviveHealthPercent);
+            CurrentHealth.Value = MaxHealthNet.Value * Mathf.Clamp01(_reviveHealthPercent);
 
             NotifyRevivedClientRpc();
-            Debug.Log($"[Health] Người chơi {NetworkObjectId} đã được hồi sinh với {CurrentHealth.Value}/{_maxHealth} HP!");
+            Debug.Log($"[Health] Người chơi {NetworkObjectId} đã được hồi sinh với {CurrentHealth.Value}/{MaxHealthNet.Value} HP!");
         }
 
         public void SetMaxHealth(float maxHealth)
         {
-            _maxHealth = Mathf.Max(1f, maxHealth);
+            _baseMaxHealth = Mathf.Max(1f, maxHealth);
             if (IsServer)
             {
-                CurrentHealth.Value = _maxHealth;
+                MaxHealthNet.Value = _baseMaxHealth;
+                CurrentHealth.Value = _baseMaxHealth;
             }
+        }
+
+        public void SetBaseArmor(float armor)
+        {
+            _baseArmor = Mathf.Max(0f, armor);
         }
 
         private void DisableColliders()

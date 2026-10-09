@@ -29,8 +29,9 @@ namespace Hellfire.AI
         {
             if (_currentTargetHealth != null && IsTargetAliveAndValid(_currentTargetHealth))
             {
-                // Sát thương 25 DMG
-                _currentTargetHealth.TakeDamage(_attackDamage, HitboxType.Torso, NetworkObjectId);
+                // Sát thương 25 DMG, xuyên giáp 15
+                var payload = new DamagePayload(_attackDamage, 15f, HitboxType.Torso, NetworkObjectId);
+                _currentTargetHealth.TakeDamage(payload);
 
                 // Phát hiệu ứng đòn đánh nặng (rung chấn / stagger) cho client
                 PlayHeavySmashFeedbackClientRpc(transform.position + transform.forward * 1.5f);

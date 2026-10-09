@@ -222,8 +222,9 @@ namespace Hellfire.AI
         {
             if (_currentTargetHealth != null && IsTargetAliveAndValid(_currentTargetHealth))
             {
-                // Gây sát thương cận chiến Server-Authoritative lên người chơi
-                _currentTargetHealth.TakeDamage(_attackDamage, HitboxType.Torso, NetworkObjectId);
+                // Gây sát thương cận chiến Server-Authoritative lên người chơi qua DamagePayload
+                var payload = new DamagePayload(_attackDamage, 0f, HitboxType.Torso, NetworkObjectId);
+                _currentTargetHealth.TakeDamage(payload);
 
                 // Phát hiệu ứng đòn đánh cho client
                 PlayAttackFeedbackClientRpc();

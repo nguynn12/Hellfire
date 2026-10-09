@@ -190,7 +190,8 @@ namespace Hellfire.AI
                 var playerHealth = col.GetComponentInParent<Health>();
                 if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
                 {
-                    playerHealth.TakeDamage(_phase1MeleeDamage, HitboxType.Torso, NetworkObjectId);
+                    var payload = new DamagePayload(_phase1MeleeDamage, 15f, HitboxType.Torso, NetworkObjectId);
+                    playerHealth.TakeDamage(payload);
                 }
             }
         }
@@ -216,7 +217,8 @@ namespace Hellfire.AI
                 var playerHealth = col.GetComponentInParent<Health>();
                 if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
                 {
-                    playerHealth.TakeDamage(_phase2FireballDamage, HitboxType.Torso, NetworkObjectId);
+                    var payload = new DamagePayload(_phase2FireballDamage, 20f, HitboxType.Torso, NetworkObjectId);
+                    playerHealth.TakeDamage(payload);
                 }
             }
         }

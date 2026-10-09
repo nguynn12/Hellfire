@@ -1,5 +1,6 @@
 // Script: WeaponController.cs
-// Mục đích: Quản lý logic bắn súng Hitscan từ tâm camera, hiệu ứng cosmetic client, và Server-Authoritative raycast tính sát thương (Mục 3.1 & 3.4).
+// Mục đích: Quản lý kho vũ khí RuntimeWeapon, thực thi bắn Hitscan và chém cận chiến Melee (Server-Authoritative).
+//           Zero-GC optimization cho vòng lặp chiến đấu và hỗ trợ nâng cấp vũ khí qua Tế đàn (Shrine).
 // Môi trường thực thi: Cả hai (Client dự đoán & phát hiệu ứng, Server xác thực & trừ máu).
 
 using System;
@@ -29,19 +30,27 @@ namespace Hellfire.Combat
         [SerializeField] private float _tracerDuration = 0.05f;
 
         // Runtime states
+        private readonly List<RuntimeWeapon> _runtimeWeapons = new List<RuntimeWeapon>();
         private int _currentAmmo;
         private float _nextFireTime;
         private bool _isReloading;
         private float _reloadTimer;
         private int _currentWeaponIndex = 0;
 
+        // Bộ đệm va chạm cận chiến dùng lại để đạt Zero-GC (Mục I.5)
+        private static readonly Collider[] _meleeHitBuffer = new Collider[32];
+        private static Material _cachedFxMaterial;
+
         // Events for UI HUD
         public event Action<int, int> OnAmmoChanged;              // currentAmmo, magSize
         public event Action<string> OnWeaponChanged;               // weaponName
         public event Action<bool> OnReloadStateChanged;           // isReloading
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
+        public event Action<int> OnWeaponUpgraded;                 // newLevel
 
-        public WeaponData CurrentWeaponData => _currentWeapon;
+        public WeaponData CurrentWeaponData => CurrentRuntimeWeapon != null ? CurrentRuntimeWeapon.BaseData : _currentWeapon;
+        public RuntimeWeapon CurrentRuntimeWeapon => (_runtimeWeapons != null && _currentWeaponIndex >= 0 && _currentWeaponIndex < _runtimeWeapons.Count) ? _runtimeWeapons[_currentWeaponIndex] : null;
+        public IReadOnlyList<RuntimeWeapon> RuntimeWeapons => _runtimeWeapons;
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
 
@@ -72,6 +81,16 @@ namespace Hellfire.Combat
         {
             AutoResolveReferences();
 
+            // Khởi tạo danh sách RuntimeWeapon từ danh sách ScriptableObject tĩnh
+            _runtimeWeapons.Clear();
+            for (int i = 0; i < _availableWeapons.Count; i++)
+            {
+                if (_availableWeapons[i] != null)
+                {
+                    _runtimeWeapons.Add(new RuntimeWeapon(_availableWeapons[i]));
+                }
+            }
+
             if (_availableWeapons.Count > 0 && _currentWeapon == null)
             {
                 _currentWeapon = _availableWeapons[0];
@@ -92,7 +111,7 @@ namespace Hellfire.Combat
         {
             if (!IsOwner) return;
 
-            // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn/nạp đạn (Mục 3.3)
+            // Nếu người chơi đang gục hoặc chết -> Không cho phép tấn công / nạp đạn (Mục 3.3)
             if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
             {
                 if (_isReloading) CancelReload();
@@ -101,7 +120,7 @@ namespace Hellfire.Combat
 
             HandleWeaponSwitching();
             HandleReloading();
-            HandleFiring();
+            HandleAttackInput();
         }
 
         private void HandleWeaponSwitching()
@@ -137,6 +156,26 @@ namespace Hellfire.Combat
             _currentWeapon = newWeapon;
             _currentAmmo = newWeapon.MagSize;
             _isReloading = false;
+
+            // Đồng bộ hoặc tạo RuntimeWeapon mới nếu chưa có
+            bool found = false;
+            for (int i = 0; i < _runtimeWeapons.Count; i++)
+            {
+                if (_runtimeWeapons[i].BaseData == newWeapon)
+                {
+                    _currentWeaponIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                var rw = new RuntimeWeapon(newWeapon);
+                _runtimeWeapons.Add(rw);
+                _currentWeaponIndex = _runtimeWeapons.Count - 1;
+            }
+
             NotifyWeaponUI();
         }
 
@@ -145,11 +184,15 @@ namespace Hellfire.Combat
             if (weapon != null && !_availableWeapons.Contains(weapon))
             {
                 _availableWeapons.Add(weapon);
+                _runtimeWeapons.Add(new RuntimeWeapon(weapon));
             }
         }
 
         private void HandleReloading()
         {
+            // Vũ khí cận chiến không cần nạp đạn
+            if (_currentWeapon != null && _currentWeapon.Type == WeaponType.MeleeWeapon) return;
+
             if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame && !_isReloading && _currentWeapon != null)
             {
                 if (_currentAmmo < _currentWeapon.MagSize)
@@ -197,33 +240,31 @@ namespace Hellfire.Combat
             OnReloadStateChanged?.Invoke(false);
         }
 
-        private void HandleFiring()
+        private void HandleAttackInput()
         {
             if (_currentWeapon == null || _playerCamera == null) return;
 
-            bool fireTriggered = false;
+            bool triggerPressed = false;
 
             if (Mouse.current != null)
             {
                 if (_currentWeapon.IsAutomatic)
                 {
-                    fireTriggered = Mouse.current.leftButton.isPressed;
+                    triggerPressed = Mouse.current.leftButton.isPressed;
                 }
                 else
                 {
-                    fireTriggered = Mouse.current.leftButton.wasPressedThisFrame;
+                    triggerPressed = Mouse.current.leftButton.wasPressedThisFrame;
                 }
             }
 
-            if (!fireTriggered) return;
-
+            if (!triggerPressed) return;
             if (Time.time < _nextFireTime) return;
-
             if (_isReloading) return;
 
-            if (_currentAmmo <= 0)
+            // Xử lý nạp đạn cho súng
+            if (_currentWeapon.Type == WeaponType.RangedGun && _currentAmmo <= 0)
             {
-                // Hết đạn: phát âm thanh rỗng và tự động nạp đạn
                 if (_audioSource != null && _currentWeapon.EmptySound != null)
                 {
                     _audioSource.PlayOneShot(_currentWeapon.EmptySound);
@@ -233,23 +274,141 @@ namespace Hellfire.Combat
                 return;
             }
 
-            // Thực thi bắn
-            ExecuteFire();
+            // Thực thi tấn công theo hình thái vũ khí (Cận chiến hoặc Súng)
+            if (_currentWeapon.Type == WeaponType.MeleeWeapon)
+            {
+                ExecuteMeleeAttack();
+            }
+            else
+            {
+                ExecuteRangedFire();
+            }
         }
 
-        private void ExecuteFire()
-        {
-            _currentAmmo--;
-            _nextFireTime = Time.time + _currentWeapon.FireRate;
-            OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
+        // ================= CẬN CHIẾN (MELEE ATTACK) =================
 
-            // 1. Client Cosmetic Visuals ngay lập tức (Mục 3.1 bước 2)
+        private void ExecuteMeleeAttack()
+        {
+            RuntimeWeapon rw = CurrentRuntimeWeapon;
+            rw.EvaluateFinalStats(out _, out float finalAPS, out _, out _, out _);
+            _nextFireTime = Time.time + (1.0f / Mathf.Max(0.1f, finalAPS));
+
+            // Phát âm thanh chém vung
             if (_audioSource != null && _currentWeapon.FireSound != null)
             {
                 _audioSource.PlayOneShot(_currentWeapon.FireSound);
             }
 
-            // Raycast origin là tâm camera người chơi (Mục 3.1)
+            Vector3 cameraPos = _playerCamera.transform.position;
+            Vector3 cameraForward = _playerCamera.transform.forward;
+
+            // Gửi ServerRpc để Server thực hiện quét OverlapSphereNonAlloc
+            MeleeAttackServerRpc(cameraPos, cameraForward, _currentWeaponIndex);
+        }
+
+        [ServerRpc]
+        private void MeleeAttackServerRpc(Vector3 origin, Vector3 forwardDir, int weaponIndex)
+        {
+            RuntimeWeapon rw = GetRuntimeWeaponByIndex(weaponIndex);
+            if (rw == null) return;
+
+            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            {
+                return;
+            }
+
+            rw.EvaluateFinalStats(
+                out _,
+                out _,
+                out float armorPen,
+                out _,
+                out _
+            );
+
+            float range = rw.BaseData.MeleeRange;
+            float maxAngle = rw.BaseData.MeleeSwingAngle * 0.5f;
+
+            // Quét hình cầu không cấp phát bộ nhớ (Zero-GC)
+            int hitCount = Physics.OverlapSphereNonAlloc(origin, range, _meleeHitBuffer);
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider hitCol = _meleeHitBuffer[i];
+                if (hitCol == null) continue;
+
+                // Bỏ qua chính bản thân người đánh
+                if (hitCol.transform.IsChildOf(transform) || hitCol.gameObject == gameObject)
+                {
+                    continue;
+                }
+
+                // Kiểm tra góc quét hình nón trước mặt
+                Vector3 toTarget = (hitCol.bounds.center - origin);
+                if (toTarget.sqrMagnitude > 0.001f)
+                {
+                    float angle = Vector3.Angle(forwardDir, toTarget.normalized);
+                    if (angle > maxAngle)
+                    {
+                        continue;
+                    }
+                }
+
+                // Kiểm tra Friendly Fire với đồng đội
+                if (hitCol.CompareTag("Player") || hitCol.GetComponentInParent<PlayerMovement>() != null)
+                {
+                    var hitHealth = hitCol.GetComponentInParent<Health>();
+                    if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
+                    {
+                        continue; // Không gây sát thương cho đồng đội
+                    }
+                }
+
+                // Tính sát thương (xét tỷ lệ chí mạng Crit)
+                float strikeDamage = rw.CalculateAttackDamage(out bool isCrit);
+
+                var hitbox = hitCol.GetComponent<HitboxIdentifier>();
+                if (hitbox != null)
+                {
+                    var payload = new DamagePayload(strikeDamage, armorPen, hitbox.Type, OwnerClientId);
+                    hitbox.ForwardDamage(payload);
+
+                    rw.NotifyHit(payload, hitbox.Damageable);
+                    NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
+                    SpawnImpactEffectClientRpc(hitCol.bounds.center, Vector3.up, true);
+                }
+                else
+                {
+                    var damageable = hitCol.GetComponentInParent<IDamageable>();
+                    if (damageable != null && !damageable.IsPlayerTarget)
+                    {
+                        var payload = new DamagePayload(strikeDamage, armorPen, HitboxType.Torso, OwnerClientId);
+                        damageable.TakeDamage(payload);
+
+                        rw.NotifyHit(payload, damageable);
+                        NotifyHitConfirmClientRpc(false);
+                        SpawnImpactEffectClientRpc(hitCol.bounds.center, Vector3.up, true);
+                    }
+                }
+            }
+        }
+
+        // ================= SÚNG BẮN (RANGED HITSCAN) =================
+
+        private void ExecuteRangedFire()
+        {
+            RuntimeWeapon rw = CurrentRuntimeWeapon;
+            rw.EvaluateFinalStats(out _, out float finalAPS, out _, out _, out _);
+
+            _currentAmmo--;
+            _nextFireTime = Time.time + (1.0f / Mathf.Max(0.1f, finalAPS));
+            OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
+
+            // 1. Client Cosmetic Visuals ngay lập tức
+            if (_audioSource != null && _currentWeapon.FireSound != null)
+            {
+                _audioSource.PlayOneShot(_currentWeapon.FireSound);
+            }
+
             Vector3 cameraPos = _playerCamera.transform.position;
             Vector3 cameraForward = _playerCamera.transform.forward;
 
@@ -262,7 +421,6 @@ namespace Hellfire.Combat
                 Vector3 spreadDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
                 Vector3 endPoint = cameraPos + spreadDir * _currentWeapon.Range;
 
-                // Client raycast tạm để vẽ tracer chạm tường/vật thể
                 if (Physics.Raycast(cameraPos, spreadDir, out var hit, _currentWeapon.Range))
                 {
                     endPoint = hit.point;
@@ -271,8 +429,134 @@ namespace Hellfire.Combat
                 DrawCosmeticTracer(GetMuzzlePosition(), endPoint);
             }
 
-            // 2. Gửi ServerRpc yêu cầu Server xác thực độc lập (Mục 3.1 bước 4)
+            // 2. Gửi ServerRpc yêu cầu Server xác thực độc lập
             FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+        }
+
+        [ServerRpc]
+        private void FireServerRpc(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
+        {
+            RuntimeWeapon rw = GetRuntimeWeaponByIndex(weaponIndex);
+            if (rw == null) return;
+
+            WeaponData weaponToUse = rw.BaseData;
+
+            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            {
+                return;
+            }
+
+            rw.EvaluateFinalStats(
+                out _,
+                out _,
+                out float armorPen,
+                out _,
+                out _
+            );
+
+            int pellets = weaponToUse.PelletCount;
+            float range = weaponToUse.Range;
+
+            for (int i = 0; i < pellets; i++)
+            {
+                Vector3 shootDir = CalculateSpreadDirection(baseDirection, weaponToUse.Spread, seed + i);
+
+                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range))
+                {
+                    // 1. Kiểm tra Friendly Fire
+                    if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)
+                    {
+                        var hitHealth = hit.collider.GetComponentInParent<Health>();
+                        if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
+                        {
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                            continue;
+                        }
+                    }
+
+                    // 2. Tính sát thương (xét Crit)
+                    float attackDamage = rw.CalculateAttackDamage(out bool isCrit);
+
+                    // 3. Đóng gói DamagePayload gửi sang mục tiêu
+                    var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
+                    if (hitbox != null)
+                    {
+                        var payload = new DamagePayload(attackDamage, armorPen, hitbox.Type, OwnerClientId);
+                        hitbox.ForwardDamage(payload);
+
+                        rw.NotifyHit(payload, hitbox.Damageable);
+                        NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
+                        SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                    }
+                    else
+                    {
+                        var damageable = hit.collider.GetComponentInParent<IDamageable>();
+                        if (damageable != null && !damageable.IsPlayerTarget)
+                        {
+                            var payload = new DamagePayload(attackDamage, armorPen, HitboxType.Torso, OwnerClientId);
+                            damageable.TakeDamage(payload);
+
+                            rw.NotifyHit(payload, damageable);
+                            NotifyHitConfirmClientRpc(false);
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                        }
+                        else
+                        {
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        private RuntimeWeapon GetRuntimeWeaponByIndex(int index)
+        {
+            if (_runtimeWeapons != null && index >= 0 && index < _runtimeWeapons.Count)
+            {
+                return _runtimeWeapons[index];
+            }
+            return CurrentRuntimeWeapon;
+        }
+
+        // ================= NÂNG CẤP VŨ KHÍ TỪ TẾ ĐÀN (SHRINE UPGRADE) =================
+
+        /// <summary>
+        /// Nâng cấp vũ khí hiện tại của người chơi trên Server.
+        /// </summary>
+        /// <param name="levels">Số cấp tăng</param>
+        public void UpgradeCurrentWeaponServer(int levels = 1)
+        {
+            if (!IsServer)
+            {
+                Debug.LogWarning("[WeaponController] Chỉ Server mới có quyền nâng cấp vũ khí!");
+                return;
+            }
+
+            RuntimeWeapon rw = CurrentRuntimeWeapon;
+            if (rw != null)
+            {
+                rw.ApplyLevelUpgrade(levels);
+                NotifyWeaponUpgradedClientRpc(_currentWeaponIndex, rw.UpgradeLevel);
+            }
+        }
+
+        [ClientRpc]
+        private void NotifyWeaponUpgradedClientRpc(int weaponIndex, int newLevel)
+        {
+            if (weaponIndex >= 0 && weaponIndex < _runtimeWeapons.Count)
+            {
+                int diff = newLevel - _runtimeWeapons[weaponIndex].UpgradeLevel;
+                if (diff > 0)
+                {
+                    _runtimeWeapons[weaponIndex].ApplyLevelUpgrade(diff);
+                }
+            }
+
+            if (IsOwner)
+            {
+                NotifyWeaponUI();
+                OnWeaponUpgraded?.Invoke(newLevel);
+            }
         }
 
         private Vector3 GetMuzzlePosition()
@@ -315,96 +599,12 @@ namespace Hellfire.Combat
             line.SetPosition(0, start);
             line.SetPosition(1, end);
 
-            // Màu vàng cam vệt đạn
-            line.material = new Material(Shader.Find("Sprites/Default"));
+            line.material = GetOrCreateFxMaterial();
             line.startColor = new Color(1f, 0.9f, 0.4f, 0.9f);
             line.endColor = new Color(1f, 0.4f, 0.1f, 0.1f);
 
             yield return new WaitForSeconds(_tracerDuration);
             Destroy(tracerObj);
-        }
-
-        // ================= SERVER RPC & VALIDATION =================
-
-        [ServerRpc]
-        private void FireServerRpc(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
-        {
-            // Xác định WeaponData trên Server
-            WeaponData weaponToUse = _currentWeapon;
-            if (_availableWeapons != null && weaponIndex >= 0 && weaponIndex < _availableWeapons.Count && _availableWeapons[weaponIndex] != null)
-            {
-                weaponToUse = _availableWeapons[weaponIndex];
-            }
-
-            if (weaponToUse == null)
-            {
-                Debug.LogWarning("[WeaponController] ServerRpc: WeaponData không hợp lệ!");
-                return;
-            }
-
-            // Kiểm tra trạng thái của người bắn trên Server
-            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
-            {
-                return;
-            }
-
-            // Server-Authoritative Raycast độc lập (Mục 3.1 bước 5)
-            int pellets = weaponToUse.PelletCount;
-            float range = weaponToUse.Range;
-
-            for (int i = 0; i < pellets; i++)
-            {
-                Vector3 shootDir = CalculateSpreadDirection(baseDirection, weaponToUse.Spread, seed + i);
-
-                // Raycast toàn bộ layer va chạm
-                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range))
-                {
-                    // 1. Kiểm tra Friendly Fire (Mục 3.4 — ĐÃ CHỐT: TẮT)
-                    if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)
-                    {
-                        var hitHealth = hit.collider.GetComponentInParent<Health>();
-                        // Nếu bắn trúng đồng đội (cùng tag Player và không phải chính mình):
-                        if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
-                        {
-                            // Đạn dừng lại tại người chơi đồng đội (chặn đường đạn), NHƯNG KHÔNG trừ máu!
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
-                            continue;
-                        }
-                    }
-
-                    // 2. Kiểm tra Hitbox (Mục 3.2: Head x2.0, Torso x1.0, Limb x0.75)
-                    var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
-                    if (hitbox != null)
-                    {
-                        float multiplier = weaponToUse.GetMultiplier(hitbox.Type);
-                        float damage = weaponToUse.BaseDamage * multiplier;
-
-                        hitbox.ForwardDamage(damage, OwnerClientId);
-
-                        // Gửi hit confirm về cho người bắn
-                        NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
-                        SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
-                    }
-                    else
-                    {
-                        // Kiểm tra IDamageable trực tiếp (nếu không gắn HitboxIdentifier chi tiết)
-                        var damageable = hit.collider.GetComponentInParent<IDamageable>();
-                        if (damageable != null && !damageable.IsPlayerTarget)
-                        {
-                            float damage = weaponToUse.BaseDamage * weaponToUse.GetMultiplier(HitboxType.Torso);
-                            damageable.TakeDamage(damage, HitboxType.Torso, OwnerClientId);
-
-                            NotifyHitConfirmClientRpc(false);
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
-                        }
-                        else
-                        {
-                            // Bắn trúng môi trường / tường
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
-                        }
-                    }
-                }
-            }
         }
 
         [ClientRpc]
@@ -419,7 +619,6 @@ namespace Hellfire.Combat
         [ClientRpc]
         private void SpawnImpactEffectClientRpc(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh)
         {
-            // Hiệu ứng tia lửa hoặc máu tại điểm trúng thực tế do Server xác thực
             StartCoroutine(ImpactEffectRoutine(hitPoint, hitNormal, isFlesh));
         }
 
@@ -434,7 +633,7 @@ namespace Hellfire.Combat
             var rend = spark.GetComponent<Renderer>();
             if (rend != null)
             {
-                rend.material = new Material(Shader.Find("Sprites/Default"));
+                rend.sharedMaterial = GetOrCreateFxMaterial();
                 rend.material.color = isFlesh ? new Color(0.9f, 0.1f, 0.1f, 1f) : new Color(1f, 0.8f, 0.2f, 1f);
             }
 
@@ -442,11 +641,27 @@ namespace Hellfire.Combat
             Destroy(spark);
         }
 
+        private static Material GetOrCreateFxMaterial()
+        {
+            if (_cachedFxMaterial == null)
+            {
+                var s = Shader.Find("Sprites/Default");
+                if (s != null) _cachedFxMaterial = new Material(s);
+            }
+            return _cachedFxMaterial;
+        }
+
         private void NotifyWeaponUI()
         {
             if (_currentWeapon != null)
             {
-                OnWeaponChanged?.Invoke(_currentWeapon.WeaponName);
+                string displayName = _currentWeapon.WeaponName;
+                if (CurrentRuntimeWeapon != null && CurrentRuntimeWeapon.UpgradeLevel > 0)
+                {
+                    displayName += $" +{CurrentRuntimeWeapon.UpgradeLevel}";
+                }
+
+                OnWeaponChanged?.Invoke(displayName);
                 OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
             }
         }

@@ -117,7 +117,8 @@ namespace Hellfire.AI
                 var playerHealth = hit.collider.GetComponentInParent<Health>();
                 if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
                 {
-                    playerHealth.TakeDamage(_attackDamage, HitboxType.Torso, NetworkObjectId);
+                    var payload = new DamagePayload(_attackDamage, 5f, HitboxType.Torso, NetworkObjectId);
+                    playerHealth.TakeDamage(payload);
                 }
 
                 SpawnRangedTracerClientRpc(shootOrigin, hit.point);
@@ -134,6 +135,8 @@ namespace Hellfire.AI
             StartCoroutine(ArcherTracerRoutine(from, to));
         }
 
+        private static Material _cachedArcherMaterial;
+
         private System.Collections.IEnumerator ArcherTracerRoutine(Vector3 from, Vector3 to)
         {
             var tracerObj = new GameObject("ArcherTracer");
@@ -143,7 +146,13 @@ namespace Hellfire.AI
             lr.positionCount = 2;
             lr.SetPosition(0, from);
             lr.SetPosition(1, to);
-            lr.material = new Material(Shader.Find("Sprites/Default"));
+
+            if (_cachedArcherMaterial == null)
+            {
+                var s = Shader.Find("Sprites/Default");
+                if (s != null) _cachedArcherMaterial = new Material(s);
+            }
+            lr.sharedMaterial = _cachedArcherMaterial;
             lr.startColor = Color.magenta;
             lr.endColor = Color.red;
 
