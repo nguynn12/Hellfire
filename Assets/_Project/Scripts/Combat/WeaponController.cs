@@ -53,6 +53,7 @@ namespace Hellfire.Combat
         public IReadOnlyList<RuntimeWeapon> RuntimeWeapons => _runtimeWeapons;
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
+        private Player.PlayerBuffManager _buffManager;
 
         private void Awake()
         {
@@ -75,6 +76,7 @@ namespace Hellfire.Combat
                 var viewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel/GunMesh");
                 if (viewmodel != null) _weaponMuzzlePoint = viewmodel;
             }
+            if (_buffManager == null) _buffManager = GetComponent<Player.PlayerBuffManager>();
         }
 
         public override void OnNetworkSpawn()
@@ -179,6 +181,13 @@ namespace Hellfire.Combat
             NotifyWeaponUI();
         }
 
+        public IReadOnlyList<WeaponData> AvailableWeapons => _availableWeapons;
+
+        public bool HasWeapon(WeaponData weapon)
+        {
+            return weapon != null && _availableWeapons.Contains(weapon);
+        }
+
         public void AddAvailableWeapon(WeaponData weapon)
         {
             if (weapon != null && !_availableWeapons.Contains(weapon))
@@ -186,6 +195,18 @@ namespace Hellfire.Combat
                 _availableWeapons.Add(weapon);
                 _runtimeWeapons.Add(new RuntimeWeapon(weapon));
             }
+        }
+
+        public void AddOrSwitchWeapon(WeaponData weapon)
+        {
+            if (weapon == null) return;
+            int index = _availableWeapons.IndexOf(weapon);
+            if (index == -1)
+            {
+                _availableWeapons.Add(weapon);
+                index = _availableWeapons.Count - 1;
+            }
+            SwitchWeapon(index);
         }
 
         private void HandleReloading()
@@ -605,6 +626,89 @@ namespace Hellfire.Combat
 
             yield return new WaitForSeconds(_tracerDuration);
             Destroy(tracerObj);
+        }
+
+        // ================= SERVER RPC & VALIDATION =================
+
+        [ServerRpc]
+        private void FireServerRpc(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
+        {
+            // Xác định WeaponData trên Server
+            WeaponData weaponToUse = _currentWeapon;
+            if (_availableWeapons != null && weaponIndex >= 0 && weaponIndex < _availableWeapons.Count && _availableWeapons[weaponIndex] != null)
+            {
+                weaponToUse = _availableWeapons[weaponIndex];
+            }
+
+            if (weaponToUse == null)
+            {
+                Debug.LogWarning("[WeaponController] ServerRpc: WeaponData không hợp lệ!");
+                return;
+            }
+
+            // Kiểm tra trạng thái của người bắn trên Server
+            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            {
+                return;
+            }
+
+            // Server-Authoritative Raycast độc lập (Mục 3.1 bước 5)
+            int pellets = weaponToUse.PelletCount;
+            float range = weaponToUse.Range;
+
+            for (int i = 0; i < pellets; i++)
+            {
+                Vector3 shootDir = CalculateSpreadDirection(baseDirection, weaponToUse.Spread, seed + i);
+
+                // Raycast toàn bộ layer va chạm
+                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range))
+                {
+                    // 1. Kiểm tra Friendly Fire (Mục 3.4 — ĐÃ CHỐT: TẮT)
+                    if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)
+                    {
+                        var hitHealth = hit.collider.GetComponentInParent<Health>();
+                        // Nếu bắn trúng đồng đội (cùng tag Player và không phải chính mình):
+                        if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
+                        {
+                            // Đạn dừng lại tại người chơi đồng đội (chặn đường đạn), NHƯNG KHÔNG trừ máu!
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                            continue;
+                        }
+                    }
+
+                    // 2. Kiểm tra Hitbox (Mục 3.2: Head x2.0, Torso x1.0, Limb x0.75)
+                    var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
+                    if (hitbox != null)
+                    {
+                        float multiplier = weaponToUse.GetMultiplier(hitbox.Type);
+                        float damage = weaponToUse.BaseDamage * multiplier;
+
+                        hitbox.ForwardDamage(damage, OwnerClientId);
+
+                        // Gửi hit confirm về cho người bắn
+                        NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
+                        SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                    }
+                    else
+                    {
+                        // Kiểm tra IDamageable trực tiếp (nếu không gắn HitboxIdentifier chi tiết)
+                        var damageable = hit.collider.GetComponentInParent<IDamageable>();
+                        if (damageable != null && !damageable.IsPlayerTarget)
+                        {
+                            float damage = weaponToUse.BaseDamage * weaponToUse.GetMultiplier(HitboxType.Torso);
+                            damageable.TakeDamage(damage, HitboxType.Torso, OwnerClientId);
+
+                            NotifyHitConfirmClientRpc(false);
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                        }
+                        else
+                        {
+                            // Bắn trúng môi trường / tường
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
+                        }
+                    }
+                }
+            }
         }
 
         [ClientRpc]

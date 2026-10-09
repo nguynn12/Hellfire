@@ -21,6 +21,9 @@ namespace Hellfire.Dungeon
         [Header("Boss Prefab (Mục 5.2)")]
         [SerializeField] private GameObject _bossPrefab;
 
+        [Header("Loot Chest Prefab (Mục 6.3)")]
+        [SerializeField] private GameObject _lootChestPrefab;
+
         [Header("Spawn Balancing (Mục 6.2)")]
         [SerializeField] private int _minEnemiesPerNormalRoom = 2;
         [SerializeField] private int _maxEnemiesPerNormalRoom = 4;
@@ -67,13 +70,25 @@ namespace Hellfire.Dungeon
             // Dùng seed + 100 để random việc bố trí quái vật trong các phòng một cách tất định
             var rng = new System.Random(seed + 100);
 
-            // 1. Sinh quái vật tại các phòng Normal
+            // 1. Sinh quái vật và Rương báu tại các phòng Normal (Mục 6.3)
             foreach (var kvp in grid.Rooms)
             {
                 var room = kvp.Value;
                 if (room.RoomType == DungeonRoomType.Normal)
                 {
                     SpawnEnemiesInRoom(room, rng);
+
+                    // Sinh 1 rương báu thường trong mỗi phòng Normal
+                    if (_lootChestPrefab != null)
+                    {
+                        Vector3 chestSpawnPos = room.WorldCenter + new Vector3(2.5f, 0f, 2.5f);
+                        var chestObj = Instantiate(_lootChestPrefab, chestSpawnPos, Quaternion.identity);
+                        var netObj = chestObj.GetComponent<NetworkObject>();
+                        if (netObj != null)
+                        {
+                            netObj.Spawn(true);
+                        }
+                    }
                 }
             }
 

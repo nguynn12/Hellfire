@@ -61,10 +61,10 @@ namespace Hellfire.Player
         public float SprintSpeed => _sprintSpeed;
         public Camera PlayerCamera => _playerCamera;
 
-        // Runtime states
         private float _cameraPitch;
         private float _verticalVelocity;
         private bool _isCursorLocked = true;
+        private PlayerBuffManager _buffManager;
 
         private void Reset()
         {
