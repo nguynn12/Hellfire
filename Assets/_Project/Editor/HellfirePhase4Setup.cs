@@ -386,9 +386,15 @@ namespace Hellfire.Editor
                 buffManager = playerRoot.AddComponent<PlayerBuffManager>();
             }
 
+            var stats = playerRoot.GetComponent<PlayerStats>();
+            if (stats == null)
+            {
+                stats = playerRoot.AddComponent<PlayerStats>();
+            }
+
             PrefabUtility.SaveAsPrefabAsset(playerRoot, PlayerPrefabPath);
             Object.DestroyImmediate(playerRoot);
-            Debug.Log("[HellfirePhase4Setup] Đã tích hợp PlayerBuffManager vào Player.prefab");
+            Debug.Log("[HellfirePhase4Setup] Đã tích hợp PlayerBuffManager & PlayerStats vào Player.prefab");
         }
 
         public static void UpdateBossPrefabInternal(GameObject bossChestPrefab)

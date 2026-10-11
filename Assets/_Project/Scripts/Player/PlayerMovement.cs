@@ -94,6 +94,7 @@ namespace Hellfire.Player
             if (_weaponViewmodel == null) _weaponViewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel")?.gameObject;
             if (_health == null) _health = GetComponent<Health>();
             if (_playerStats == null) _playerStats = GetComponent<PlayerStats>();
+            if (_buffManager == null) _buffManager = GetComponent<PlayerBuffManager>();
         }
 
         public override void OnNetworkSpawn()
@@ -287,8 +288,12 @@ namespace Hellfire.Player
                 currentSpeed = _walkSpeed;
             }
 
-            // Áp dụng hệ số tốc độ chạy từ PlayerStats (Mục I.2 & II.2)
+            // Áp dụng hệ số tốc độ chạy từ PlayerStats (Mục I.2 & II.2) và Buff Bùa Lợi (SwiftBoots)
             float speedMultiplier = (_playerStats != null) ? _playerStats.MoveSpeedMultiplier.Value : 1.0f;
+            if (_buffManager != null)
+            {
+                speedMultiplier *= _buffManager.SpeedMultiplier;
+            }
             currentSpeed *= speedMultiplier;
 
             // 3. Tính hướng di chuyển theo local transform

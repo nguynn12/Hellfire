@@ -293,6 +293,28 @@ namespace Hellfire.Combat
         }
 
         /// <summary>
+        /// Tăng máu tối đa và hồi đầy máu ngay khi nhặt bùa (Mục 6.2).
+        /// </summary>
+        public void IncreaseMaxHealthAndHeal(float bonusAmount)
+        {
+            if (!IsServer || bonusAmount <= 0f) return;
+
+            MaxHealthNet.Value += bonusAmount;
+            CurrentHealth.Value = MaxHealthNet.Value;
+            Debug.Log($"[Health] Đã tăng MaxHealth và hồi đầy máu cho {gameObject.name}: {MaxHealthNet.Value} HP.");
+        }
+
+        /// <summary>
+        /// Hồi máu cho thực thể trên Server.
+        /// </summary>
+        public void Heal(float amount)
+        {
+            if (!IsServer || amount <= 0f || IsDead.Value) return;
+
+            CurrentHealth.Value = Mathf.Min(MaxHealthNet.Value, CurrentHealth.Value + amount);
+        }
+
+        /// <summary>
         /// Server hồi sinh người chơi gục ngã (Mục 3.3).
         /// </summary>
         public void ServerRevive()

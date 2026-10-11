@@ -199,11 +199,8 @@ namespace Hellfire.Networking
         [ServerRpc(RequireOwnership = false)]
         public void ReturnToLobbyServerRpc(ServerRpcParams rpcParams = default)
         {
-            // Chỉ Host/Server xử lý yêu cầu chuyển scene
-            if (rpcParams.Receive.SenderClientId == NetworkManager.ServerClientId)
-            {
-                ReturnToLobby();
-            }
+            // Server xử lý yêu cầu chuyển scene về Sảnh Lobby cho tất cả người chơi
+            ReturnToLobby();
         }
 
         public bool CanPlayerMove()
