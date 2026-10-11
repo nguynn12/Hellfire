@@ -25,6 +25,7 @@ namespace Hellfire.UI
         [Header("Health & Status UI")]
         [SerializeField] private Slider _healthSlider;
         [SerializeField] private TextMeshProUGUI _healthText;
+        [SerializeField] private TextMeshProUGUI _armorText;
         [SerializeField] private GameObject _downedOverlayPanel;
         [SerializeField] private TextMeshProUGUI _downedTimerText;
 
@@ -63,6 +64,7 @@ namespace Hellfire.UI
         private WeaponController _localWeaponController;
         private PlayerRevive _localPlayerRevive;
         private PlayerBuffManager _localBuffManager;
+        private PlayerStats _localPlayerStats;
         private Coroutine _hitmarkerCoroutine;
         private Coroutine _buffToastCoroutine;
 
@@ -105,9 +107,10 @@ namespace Hellfire.UI
             if (_crosshairImage == null && _crosshairObject != null) _crosshairImage = _crosshairObject.GetComponent<Image>();
             if (_hitmarkerImage == null) _hitmarkerImage = FindComponentInHierarchy<Image>(root, "Hitmarker");
 
-            // Health
+            // Health & Armor
             if (_healthSlider == null) _healthSlider = FindComponentInHierarchy<Slider>(root, "HealthSlider");
             if (_healthText == null) _healthText = FindComponentInHierarchy<TextMeshProUGUI>(root, "HealthText");
+            if (_armorText == null) _armorText = FindComponentInHierarchy<TextMeshProUGUI>(root, "ArmorText");
             if (_downedOverlayPanel == null) _downedOverlayPanel = FindInHierarchy(root, "DownedOverlayPanel");
             if (_downedTimerText == null) _downedTimerText = FindComponentInHierarchy<TextMeshProUGUI>(root, "DownedTimerText");
 
@@ -282,6 +285,16 @@ namespace Hellfire.UI
                     _localBuffManager.OnPowerUpApplied += HandlePowerUpApplied;
                 }
             }
+
+            if (_localPlayerStats == null)
+            {
+                _localPlayerStats = localPlayer.GetComponent<PlayerStats>();
+                if (_localPlayerStats != null)
+                {
+                    _localPlayerStats.OnStatsChanged += HandlePlayerStatsChanged;
+                    HandlePlayerStatsChanged(_localPlayerStats.BonusMaxHealth.Value, _localPlayerStats.Armor.Value, _localPlayerStats.MoveSpeedMultiplier.Value);
+                }
+            }
         }
 
         private void HandlePowerUpApplied(PowerUpType type, float value)
@@ -396,9 +409,23 @@ namespace Hellfire.UI
                 _localBuffManager.OnPowerUpApplied -= HandlePowerUpApplied;
             }
 
+            if (_localPlayerStats != null)
+            {
+                _localPlayerStats.OnStatsChanged -= HandlePlayerStatsChanged;
+            }
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
+            }
+        }
+
+        private void HandlePlayerStatsChanged(float bonusHealth, float armor, float speedMultiplier)
+        {
+            if (_armorText != null)
+            {
+                _armorText.text = $"GIÁP: {Mathf.RoundToInt(armor)} / {Mathf.RoundToInt(PlayerStats.MaxArmorCap)}";
+                _armorText.gameObject.SetActive(armor > 0f);
             }
         }
 
@@ -435,7 +462,7 @@ namespace Hellfire.UI
         {
             if (_ammoText != null)
             {
-                _ammoText.text = $"ĐẠN: {currentAmmo} / {magSize}";
+                _ammoText.text = $"{currentAmmo} / {magSize}";
             }
         }
 
