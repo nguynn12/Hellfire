@@ -52,6 +52,7 @@ namespace Hellfire.UI
             AutoResolveReferences();
             RegisterButtonListeners();
             UpdateUI();
+            AttachButtonFeedbacks();
 
             if (NetworkManager.Singleton != null)
             {
@@ -544,6 +545,18 @@ namespace Hellfire.UI
             }
 
             return results;
+        }
+
+        private void AttachButtonFeedbacks()
+        {
+            var buttons = GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i] != null && buttons[i].GetComponent<UIButtonFeedback>() == null)
+                {
+                    buttons[i].gameObject.AddComponent<UIButtonFeedback>();
+                }
+            }
         }
     }
 }

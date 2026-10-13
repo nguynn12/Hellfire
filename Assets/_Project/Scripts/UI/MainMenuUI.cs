@@ -48,9 +48,14 @@ namespace Hellfire.UI
         [SerializeField] private Button _scanBackButton;
         [SerializeField] private TextMeshProUGUI _scanStatusText;
 
-        [Header("Settings Panel")]
+        [Header("Settings Panel (Mục 16.9)")]
         [SerializeField] private Slider _mouseSensitivitySlider;
         [SerializeField] private TextMeshProUGUI _mouseSensitivityValueText;
+        [SerializeField] private Slider _fovSlider;
+        [SerializeField] private TextMeshProUGUI _fovValueText;
+        [SerializeField] private Slider _masterVolumeSlider;
+        [SerializeField] private TextMeshProUGUI _masterVolumeValueText;
+        [SerializeField] private Toggle _reduceScreenShakeToggle;
         [SerializeField] private Button _settingsBackButton;
 
         [Header("Disconnect Modal")]
@@ -76,6 +81,7 @@ namespace Hellfire.UI
             CheckForDisconnectNotice();
             LoadSettings();
             LoadPlayerName();
+            AttachButtonFeedbacks();
 
             if (LanDiscovery.Instance != null)
             {
@@ -125,6 +131,11 @@ namespace Hellfire.UI
             if (_settingsBackButton == null) _settingsBackButton = FindComponentInHierarchy<Button>(root, "SettingsBackBtn");
             if (_mouseSensitivitySlider == null) _mouseSensitivitySlider = FindComponentInHierarchy<Slider>(root, "SensitivitySlider");
             if (_mouseSensitivityValueText == null) _mouseSensitivityValueText = FindComponentInHierarchy<TextMeshProUGUI>(root, "SensitivityValue");
+            if (_fovSlider == null) _fovSlider = FindComponentInHierarchy<Slider>(root, "FovSlider");
+            if (_fovValueText == null) _fovValueText = FindComponentInHierarchy<TextMeshProUGUI>(root, "FovValue");
+            if (_masterVolumeSlider == null) _masterVolumeSlider = FindComponentInHierarchy<Slider>(root, "VolumeSlider");
+            if (_masterVolumeValueText == null) _masterVolumeValueText = FindComponentInHierarchy<TextMeshProUGUI>(root, "VolumeValue");
+            if (_reduceScreenShakeToggle == null) _reduceScreenShakeToggle = FindComponentInHierarchy<Toggle>(root, "ScreenShakeToggle");
             if (_disconnectReasonText == null) _disconnectReasonText = FindComponentInHierarchy<TextMeshProUGUI>(root, "DisconnectReason");
             if (_disconnectModalOkButton == null) _disconnectModalOkButton = FindComponentInHierarchy<Button>(root, "DisconnectOkBtn");
 
@@ -449,23 +460,98 @@ namespace Hellfire.UI
 
         public void OnMouseSensitivityChanged(float value)
         {
-            PlayerPrefs.SetFloat("MouseSensitivity", value);
+            GameSettings.SetMouseSensitivity(value);
             if (_mouseSensitivityValueText != null)
             {
                 _mouseSensitivityValueText.text = value.ToString("F1");
             }
         }
 
+        public void OnFovChanged(float value)
+        {
+            GameSettings.SetFOV(value);
+            if (_fovValueText != null)
+            {
+                _fovValueText.text = $"{Mathf.RoundToInt(value)}°";
+            }
+        }
+
+        public void OnMasterVolumeChanged(float value)
+        {
+            GameSettings.SetMasterVolume(value);
+            if (_masterVolumeValueText != null)
+            {
+                _masterVolumeValueText.text = $"{Mathf.RoundToInt(value * 100)}%";
+            }
+        }
+
+        public void OnReduceScreenShakeChanged(bool value)
+        {
+            GameSettings.SetReduceScreenShake(value);
+        }
+
         private void LoadSettings()
         {
-            float sensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 2.0f);
+            GameSettings.EnsureInitialized();
+
+            float sensitivity = GameSettings.MouseSensitivity;
             if (_mouseSensitivitySlider != null)
             {
+                _mouseSensitivitySlider.onValueChanged.RemoveAllListeners();
                 _mouseSensitivitySlider.value = sensitivity;
+                _mouseSensitivitySlider.onValueChanged.AddListener(OnMouseSensitivityChanged);
             }
             if (_mouseSensitivityValueText != null)
             {
                 _mouseSensitivityValueText.text = sensitivity.ToString("F1");
+            }
+
+            float fov = GameSettings.FieldOfView;
+            if (_fovSlider != null)
+            {
+                _fovSlider.minValue = GameSettings.MinFOV;
+                _fovSlider.maxValue = GameSettings.MaxFOV;
+                _fovSlider.onValueChanged.RemoveAllListeners();
+                _fovSlider.value = fov;
+                _fovSlider.onValueChanged.AddListener(OnFovChanged);
+            }
+            if (_fovValueText != null)
+            {
+                _fovValueText.text = $"{Mathf.RoundToInt(fov)}°";
+            }
+
+            float volume = GameSettings.MasterVolume;
+            if (_masterVolumeSlider != null)
+            {
+                _masterVolumeSlider.minValue = 0f;
+                _masterVolumeSlider.maxValue = 1f;
+                _masterVolumeSlider.onValueChanged.RemoveAllListeners();
+                _masterVolumeSlider.value = volume;
+                _masterVolumeSlider.onValueChanged.AddListener(OnMasterVolumeChanged);
+            }
+            if (_masterVolumeValueText != null)
+            {
+                _masterVolumeValueText.text = $"{Mathf.RoundToInt(volume * 100)}%";
+            }
+
+            bool reduceShake = GameSettings.ReduceScreenShake;
+            if (_reduceScreenShakeToggle != null)
+            {
+                _reduceScreenShakeToggle.onValueChanged.RemoveAllListeners();
+                _reduceScreenShakeToggle.isOn = reduceShake;
+                _reduceScreenShakeToggle.onValueChanged.AddListener(OnReduceScreenShakeChanged);
+            }
+        }
+
+        private void AttachButtonFeedbacks()
+        {
+            var buttons = GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i] != null && buttons[i].GetComponent<UIButtonFeedback>() == null)
+                {
+                    buttons[i].gameObject.AddComponent<UIButtonFeedback>();
+                }
             }
         }
 

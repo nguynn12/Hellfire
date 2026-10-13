@@ -80,6 +80,7 @@ namespace Hellfire.Combat
         public event Action<bool> OnReloadStateChanged;           // isReloading
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
         public event Action<int> OnWeaponUpgraded;                 // newLevel
+        public event Action OnKillConfirmed;                      // Kill confirmation (Mục 16.7)
 
         public WeaponData CurrentWeaponData => CurrentRuntimeWeapon != null ? CurrentRuntimeWeapon.BaseData : _currentWeapon;
         public RuntimeWeapon CurrentRuntimeWeapon => (_runtimeWeapons != null && _currentWeaponIndex >= 0 && _currentWeaponIndex < _runtimeWeapons.Count) ? _runtimeWeapons[_currentWeaponIndex] : null;
@@ -592,6 +593,15 @@ namespace Hellfire.Combat
             if (IsOwner)
             {
                 OnHitTargetConfirmed?.Invoke(isHeadshot);
+            }
+        }
+
+        [ClientRpc]
+        public void NotifyKillConfirmedClientRpc()
+        {
+            if (IsOwner)
+            {
+                OnKillConfirmed?.Invoke();
             }
         }
 

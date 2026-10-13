@@ -110,11 +110,12 @@ namespace Hellfire.Player
                     _characterController.enabled = true;
                 }
 
-                // Cấu hình Camera cho chính chủ sở hữu (Mục 1.1 & 1.2)
+                // Cấu hình Camera cho chính chủ sở hữu (Mục 1.1, 1.2 & 16.9)
                 if (_playerCamera != null)
                 {
                     _playerCamera.gameObject.SetActive(true);
-                    _playerCamera.fieldOfView = 90.0f;
+                    _playerCamera.fieldOfView = GameSettings.FieldOfView;
+                    GameSettings.OnFOVChanged += HandleFOVChanged;
 
                     // Culling Mask: Ẩn layer PlayerBody của chính mình, hiện layer Viewmodel
                     int bodyLayer = LayerMask.NameToLayer(_playerBodyLayerName);
@@ -176,6 +177,22 @@ namespace Hellfire.Player
                 {
                     _playerBodyMesh.SetActive(true);
                 }
+            }
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (IsOwner)
+            {
+                GameSettings.OnFOVChanged -= HandleFOVChanged;
+            }
+        }
+
+        private void HandleFOVChanged(float newFov)
+        {
+            if (_playerCamera != null && IsOwner)
+            {
+                _playerCamera.fieldOfView = newFov;
             }
         }
 

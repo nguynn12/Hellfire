@@ -313,6 +313,19 @@ namespace Hellfire.AI
                 Hellfire.Player.PlayerWallet.DistributeSoulsToLivingPlayers(_soulsReward);
             }
 
+            // Báo xác nhận hạ gục cho người bắn (Mục 16.7)
+            if (IsServer && NetworkManager.Singleton != null && NetworkManager.Singleton.ConnectedClients.TryGetValue(killerId, out var killerClient))
+            {
+                if (killerClient.PlayerObject != null)
+                {
+                    var wp = killerClient.PlayerObject.GetComponent<WeaponController>();
+                    if (wp != null)
+                    {
+                        wp.NotifyKillConfirmedClientRpc();
+                    }
+                }
+            }
+
             // Tự hủy sau 3 giây
             StartCoroutine(DespawnRoutine(3.0f));
         }
