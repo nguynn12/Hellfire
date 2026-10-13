@@ -44,6 +44,10 @@ namespace Hellfire.UI
         [SerializeField] private TextMeshProUGUI _revivePromptText;
         [SerializeField] private Slider _reviveProgressBar;
 
+        [Header("Teammate HUD & Markers (Mục 16.2 & 16.3)")]
+        [SerializeField] private TeammateHUDPanel _teammatePanel;
+        [SerializeField] private TeammateMarkerManager _teammateMarkerManager;
+
         [Header("Pause Menu (Mục 7)")]
         [SerializeField] private GameObject _pauseMenuPanel;
         [SerializeField] private Button _resumeButton;
@@ -153,6 +157,50 @@ namespace Hellfire.UI
             if (_soulsText == null && canvas != null)
             {
                 _soulsText = CreateSoulsText(canvas.transform);
+            }
+
+            // Teammate Panel (Mục 16.2)
+            if (_teammatePanel == null)
+            {
+                _teammatePanel = FindComponentInHierarchy<TeammateHUDPanel>(root, "TeammatePanel");
+                if (_teammatePanel == null)
+                {
+                    var panelObj = new GameObject("TeammatePanel", typeof(RectTransform), typeof(TeammateHUDPanel));
+                    panelObj.transform.SetParent(root, false);
+                    var pRect = panelObj.GetComponent<RectTransform>();
+                    pRect.anchorMin = new Vector2(0f, 0.45f);
+                    pRect.anchorMax = new Vector2(0f, 0.75f);
+                    pRect.pivot = new Vector2(0f, 0.5f);
+                    pRect.anchoredPosition = new Vector2(25f, 0f);
+                    pRect.sizeDelta = new Vector2(240f, 180f);
+
+                    var vlg = panelObj.AddComponent<VerticalLayoutGroup>();
+                    vlg.spacing = 10f;
+                    vlg.childControlWidth = true;
+                    vlg.childControlHeight = false;
+                    vlg.childForceExpandWidth = true;
+                    vlg.childForceExpandHeight = false;
+
+                    _teammatePanel = panelObj.GetComponent<TeammateHUDPanel>();
+                }
+            }
+
+            // Teammate Markers (Mục 16.3)
+            if (_teammateMarkerManager == null)
+            {
+                _teammateMarkerManager = FindComponentInHierarchy<TeammateMarkerManager>(root, "TeammateMarkerManager");
+                if (_teammateMarkerManager == null)
+                {
+                    var markerObj = new GameObject("TeammateMarkerManager", typeof(RectTransform), typeof(TeammateMarkerManager));
+                    markerObj.transform.SetParent(root, false);
+                    var mRect = markerObj.GetComponent<RectTransform>();
+                    mRect.anchorMin = Vector2.zero;
+                    mRect.anchorMax = Vector2.one;
+                    mRect.offsetMin = Vector2.zero;
+                    mRect.offsetMax = Vector2.zero;
+
+                    _teammateMarkerManager = markerObj.GetComponent<TeammateMarkerManager>();
+                }
             }
         }
 
