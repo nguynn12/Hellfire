@@ -39,6 +39,10 @@ namespace Hellfire.AI
         private float _phase2RangedTimer;
         private bool _isPhase2RangedMode = false;
 
+        public static BossStateMachine ActiveBoss { get; private set; }
+        public static event System.Action<BossStateMachine> OnBossSpawned;
+        public static event System.Action OnBossDespawned;
+
         public BossPhase CurrentPhase => _currentPhase;
 
         protected override void Awake()
@@ -57,10 +61,24 @@ namespace Hellfire.AI
         {
             base.OnNetworkSpawn();
 
+            ActiveBoss = this;
+            OnBossSpawned?.Invoke(this);
+
             if (IsServer)
             {
                 _bossRoomCenter = transform.position;
                 _lastSummonHealthThreshold = 400f; // Bắt đầu theo dõi ngưỡng mất 20% từ mốc 50% (400 HP)
+            }
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            base.OnNetworkDespawn();
+
+            if (ActiveBoss == this)
+            {
+                ActiveBoss = null;
+                OnBossDespawned?.Invoke();
             }
         }
 
@@ -95,11 +113,30 @@ namespace Hellfire.AI
             base.Update();
         }
 
+        protected override void SetState(EnemyState newState)
+        {
+            base.SetState(newState);
+
+            if (IsServer && (newState == EnemyState.Chase || newState == EnemyState.Attack))
+            {
+                if (Networking.GameManager.Instance != null && Networking.GameManager.Instance.CurrentState.Value == Networking.GameState.Playing)
+                {
+                    Networking.GameManager.Instance.SetState(Networking.GameState.BossFight);
+                }
+            }
+        }
+
         protected override void HandleDamageTaken(float dmg, HitboxType hitbox, ulong attackerId)
         {
             base.HandleDamageTaken(dmg, hitbox, attackerId);
 
             if (!IsServer || CurrentState == EnemyState.Dead) return;
+
+            // Kích hoạt BossFight nếu chưa kích hoạt
+            if (Networking.GameManager.Instance != null && Networking.GameManager.Instance.CurrentState.Value == Networking.GameState.Playing)
+            {
+                Networking.GameManager.Instance.SetState(Networking.GameState.BossFight);
+            }
 
             float currentHp = _health.CurrentHealth.Value;
             float maxHp = _health.MaxHealth;
@@ -141,7 +178,7 @@ namespace Hellfire.AI
                 _navAgent.SetDestination(_bossRoomCenter);
             }
 
-            // Báo hiệu cho các Client biết boss đang chuyển phase (gầm thét / hiệu ứng)
+            // Báo hiệu cho các Client biết boss đang chuyển phase (gầm thét / hiệu ứng / rung màn hình / banner PHA 2)
             NotifyPhaseTransitionClientRpc();
 
             yield return new WaitForSeconds(2.0f);
@@ -161,6 +198,12 @@ namespace Hellfire.AI
         private void NotifyPhaseTransitionClientRpc()
         {
             StartCoroutine(FlashMaterialRoutine(Color.yellow, 2.0f));
+
+            // Rung màn hình ~0.5s tuân theo công tắc Giảm rung màn hình (Mục 16.6 & 16.9)
+            Player.PlayerMovement.TriggerLocalPlayerScreenShake(0.5f, 0.35f);
+
+            // Bật biểu ngữ "PHA 2" (Mục 16.6)
+            UI.BossHealthBarUI.Instance?.ShowPhase2Banner();
         }
 
         [ClientRpc]

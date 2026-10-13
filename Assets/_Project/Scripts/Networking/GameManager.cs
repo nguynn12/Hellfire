@@ -176,7 +176,7 @@ namespace Hellfire.Networking
         }
 
         /// <summary>
-        /// Bắt đầu lượt chơi từ Lobby sang Generating (Cổng chờ Mục 15.1).
+        /// Bắt đầu lượt chơi từ Lobby sang Generating (Mục 15.1 & 16.4).
         /// </summary>
         public void StartGameFromLobby()
         {

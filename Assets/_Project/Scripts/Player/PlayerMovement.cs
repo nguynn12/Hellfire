@@ -66,6 +66,8 @@ namespace Hellfire.Player
         private float _verticalVelocity;
         private bool _isCursorLocked = true;
         private PlayerBuffManager _buffManager;
+        private Vector3 _originalCamLocalPos;
+        private Coroutine _shakeCoroutine;
 
         private void Reset()
         {
@@ -96,6 +98,11 @@ namespace Hellfire.Player
             if (_health == null) _health = GetComponent<Health>();
             if (_playerStats == null) _playerStats = GetComponent<PlayerStats>();
             if (_buffManager == null) _buffManager = GetComponent<PlayerBuffManager>();
+
+            if (_playerCamera != null)
+            {
+                _originalCamLocalPos = _playerCamera.transform.localPosition;
+            }
         }
 
         public override void OnNetworkSpawn()
@@ -382,6 +389,50 @@ namespace Hellfire.Player
             if (_characterController != null)
             {
                 _characterController.enabled = true;
+            }
+        }
+
+        public void TriggerScreenShake(float duration = 0.5f, float intensity = 0.25f)
+        {
+            if (GameSettings.ReduceScreenShake) return;
+            if (_playerCamera == null) return;
+
+            if (_shakeCoroutine != null)
+            {
+                StopCoroutine(_shakeCoroutine);
+                _playerCamera.transform.localPosition = _originalCamLocalPos;
+            }
+
+            _shakeCoroutine = StartCoroutine(ScreenShakeRoutine(duration, intensity));
+        }
+
+        private IEnumerator ScreenShakeRoutine(float duration, float intensity)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float currentIntensity = Mathf.Lerp(intensity, 0f, elapsed / duration);
+                Vector3 offset = UnityEngine.Random.insideUnitSphere * currentIntensity;
+                offset.z = 0f;
+                _playerCamera.transform.localPosition = _originalCamLocalPos + offset;
+                yield return null;
+            }
+
+            _playerCamera.transform.localPosition = _originalCamLocalPos;
+            _shakeCoroutine = null;
+        }
+
+        public static void TriggerLocalPlayerScreenShake(float duration = 0.5f, float intensity = 0.25f)
+        {
+            var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            if (localPlayer != null)
+            {
+                var movement = localPlayer.GetComponent<PlayerMovement>();
+                if (movement != null)
+                {
+                    movement.TriggerScreenShake(duration, intensity);
+                }
             }
         }
     }

@@ -249,6 +249,14 @@ namespace Hellfire.UI
                 arrowObj.SetActive(false);
             }
 
+            // Boss Health Bar UI (Mục 16.6)
+            var bossUI = GetComponentInChildren<BossHealthBarUI>(true);
+            if (bossUI == null)
+            {
+                var bObj = new GameObject("BossHealthBarUI", typeof(RectTransform), typeof(BossHealthBarUI));
+                bObj.transform.SetParent(root, false);
+            }
+
             // AudioSource cho phản hồi chiến đấu (Mục 16.7)
             if (_combatAudioSource == null)
             {
