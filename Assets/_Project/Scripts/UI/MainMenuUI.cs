@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using Hellfire.Networking;
+using Hellfire.Player;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -59,6 +60,9 @@ namespace Hellfire.UI
         [Header("Status Feedback")]
         [SerializeField] private TextMeshProUGUI _statusMessageText;
 
+        [Header("Player Identity (Mục 16.1)")]
+        [SerializeField] private TMP_InputField _playerNameInput;
+
         private void Awake()
         {
             AutoResolveReferences();
@@ -71,6 +75,7 @@ namespace Hellfire.UI
             ShowMainPanel();
             CheckForDisconnectNotice();
             LoadSettings();
+            LoadPlayerName();
 
             if (LanDiscovery.Instance != null)
             {
@@ -125,6 +130,30 @@ namespace Hellfire.UI
 
             // Status
             if (_statusMessageText == null) _statusMessageText = FindComponentInHierarchy<TextMeshProUGUI>(root, "StatusText");
+
+            // Player Identity (Mục 16.1)
+            if (_playerNameInput == null) _playerNameInput = FindComponentInHierarchy<TMP_InputField>(root, "PlayerNameInput");
+            if (_playerNameInput == null && _hostRoomNameInput != null && _mainPanel != null)
+            {
+                // Tự động tạo PlayerNameInput dựa trên style của input field có sẵn
+                var nameObj = Instantiate(_hostRoomNameInput.gameObject, _mainPanel.transform);
+                nameObj.name = "PlayerNameInput";
+                _playerNameInput = nameObj.GetComponent<TMP_InputField>();
+                if (_playerNameInput != null)
+                {
+                    _playerNameInput.characterLimit = PlayerIdentity.MaxNameLength;
+                    var rect = nameObj.GetComponent<RectTransform>();
+                    if (rect != null)
+                    {
+                        rect.anchoredPosition = new Vector2(0f, 150f);
+                        rect.sizeDelta = new Vector2(280f, 40f);
+                    }
+                    if (_playerNameInput.placeholder is TextMeshProUGUI placeholder)
+                    {
+                        placeholder.text = "Tên người chơi (16 ký tự)...";
+                    }
+                }
+            }
         }
 
         private GameObject FindInHierarchy(Transform parent, string targetName)
@@ -296,6 +325,7 @@ namespace Hellfire.UI
 
         public void OnClickHost()
         {
+            SavePlayerName();
             string roomName = _hostRoomNameInput != null ? _hostRoomNameInput.text : "Hellfire LAN Match";
             ushort port = 7777;
             if (_hostPortInput != null && ushort.TryParse(_hostPortInput.text, out var p))
@@ -320,6 +350,7 @@ namespace Hellfire.UI
 
         public void OnClickJoinDirectIp()
         {
+            SavePlayerName();
             string ip = _joinIpInput != null ? _joinIpInput.text : "127.0.0.1";
             ushort port = 7777;
             if (_joinPortInput != null && ushort.TryParse(_joinPortInput.text, out var p))
@@ -397,6 +428,7 @@ namespace Hellfire.UI
                 var capturedRoom = room;
                 btn.onClick.AddListener(() =>
                 {
+                    SavePlayerName();
                     SetStatus($"Đang tham gia phòng {capturedRoom.RoomName}...");
                     if (NetworkConnectManager.Instance != null)
                     {
@@ -435,6 +467,35 @@ namespace Hellfire.UI
             {
                 _mouseSensitivityValueText.text = sensitivity.ToString("F1");
             }
+        }
+
+        private void LoadPlayerName()
+        {
+            string savedName = PlayerPrefs.GetString(PlayerIdentity.PlayerNamePrefKey, "Player");
+            if (_playerNameInput != null)
+            {
+                _playerNameInput.text = savedName;
+                _playerNameInput.characterLimit = PlayerIdentity.MaxNameLength;
+                _playerNameInput.onValueChanged.RemoveAllListeners();
+                _playerNameInput.onValueChanged.AddListener((val) => SavePlayerName(val));
+            }
+        }
+
+        public void SavePlayerName(string explicitName = null)
+        {
+            string nameToSave = explicitName != null ? explicitName : (_playerNameInput != null ? _playerNameInput.text : string.Empty);
+            nameToSave = nameToSave.Trim();
+            if (nameToSave.Length > PlayerIdentity.MaxNameLength)
+            {
+                nameToSave = nameToSave.Substring(0, PlayerIdentity.MaxNameLength).Trim();
+            }
+            if (string.IsNullOrEmpty(nameToSave))
+            {
+                nameToSave = "Player";
+            }
+
+            PlayerPrefs.SetString(PlayerIdentity.PlayerNamePrefKey, nameToSave);
+            PlayerPrefs.Save();
         }
 
         private void CheckForDisconnectNotice()
