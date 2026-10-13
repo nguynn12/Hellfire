@@ -250,6 +250,11 @@ namespace Hellfire.AI
 
         protected virtual void HandleDamageTaken(float dmg, HitboxType hitbox, ulong attackerId)
         {
+            if (IsServer && attackerId != ulong.MaxValue)
+            {
+                Networking.MatchSummaryManager.RecordDamage(attackerId, dmg);
+            }
+
             // Khi bị bắn trúng: dù chưa thấy cũng lập tức chuyển sang Chase và nhắm vào người bắn (Mục 5.1)
             if (_currentState != EnemyState.Dead && NetworkManager.Singleton != null)
             {
@@ -311,6 +316,12 @@ namespace Hellfire.AI
             if (IsServer && _soulsReward > 0)
             {
                 Hellfire.Player.PlayerWallet.DistributeSoulsToLivingPlayers(_soulsReward);
+            }
+
+            // Ghi nhận chỉ số hạ gục cho tổng kết lượt chơi (Mục 16.11)
+            if (IsServer && killerId != ulong.MaxValue)
+            {
+                Networking.MatchSummaryManager.RecordKill(killerId);
             }
 
             // Báo xác nhận hạ gục cho người bắn (Mục 16.7)

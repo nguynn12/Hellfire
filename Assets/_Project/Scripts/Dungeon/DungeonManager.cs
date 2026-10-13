@@ -109,6 +109,7 @@ namespace Hellfire.Dungeon
 
         public override void OnNetworkSpawn()
         {
+            ClearedRoomsClient.Clear();
             DungeonSeed.OnValueChanged += HandleSeedChanged;
 
             if (IsServer)
@@ -732,12 +733,19 @@ namespace Hellfire.Dungeon
             }
         }
 
+        public static readonly HashSet<Vector2Int> ClearedRoomsClient = new HashSet<Vector2Int>();
+
         [ClientRpc]
         public void SetRoomGatesClientRpc(Vector2Int roomGrid, bool closed)
         {
             if (_generator != null)
             {
                 _generator.SetRoomGates(roomGrid, closed);
+            }
+
+            if (!closed)
+            {
+                ClearedRoomsClient.Add(roomGrid);
             }
         }
 

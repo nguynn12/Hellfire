@@ -78,6 +78,13 @@ namespace Hellfire.UI
         [Header("Souls (Mục 17.7)")]
         [SerializeField] private TextMeshProUGUI _soulsText;
 
+        [Header("Dungeon Map (Mục 16.8)")]
+        [SerializeField] private DungeonMapUI _dungeonMapUI;
+
+        [Header("Match Summary Stats (Mục 16.11)")]
+        [SerializeField] private TextMeshProUGUI _victoryStatsText;
+        [SerializeField] private TextMeshProUGUI _gameOverStatsText;
+
         private bool _isPaused;
         private Health _localPlayerHealth;
         private WeaponController _localWeaponController;
@@ -114,6 +121,8 @@ namespace Hellfire.UI
             if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(false);
 
             UpdatePlayerInfo();
+
+            MatchSummaryManager.OnMatchSummaryReceived += HandleMatchSummaryReceived;
 
             if (GameManager.Instance != null)
             {
@@ -255,6 +264,53 @@ namespace Hellfire.UI
             {
                 var bObj = new GameObject("BossHealthBarUI", typeof(RectTransform), typeof(BossHealthBarUI));
                 bObj.transform.SetParent(root, false);
+            }
+
+            // Dungeon Map UI (Mục 16.8)
+            if (_dungeonMapUI == null)
+            {
+                _dungeonMapUI = GetComponentInChildren<DungeonMapUI>(true);
+                if (_dungeonMapUI == null)
+                {
+                    var mapObj = new GameObject("DungeonMapUI", typeof(RectTransform), typeof(DungeonMapUI));
+                    mapObj.transform.SetParent(root, false);
+                    _dungeonMapUI = mapObj.GetComponent<DungeonMapUI>();
+                }
+            }
+
+            // Match Summary Stats Text (Mục 16.11)
+            if (_victoryStatsText == null && _victoryOverlayPanel != null)
+            {
+                _victoryStatsText = FindComponentInHierarchy<TextMeshProUGUI>(_victoryOverlayPanel.transform, "VictoryStatsText");
+                if (_victoryStatsText == null)
+                {
+                    var sObj = new GameObject("VictoryStatsText", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    sObj.transform.SetParent(_victoryOverlayPanel.transform, false);
+                    var sRect = sObj.GetComponent<RectTransform>();
+                    sRect.anchorMin = new Vector2(0.5f, 0.45f);
+                    sRect.anchorMax = new Vector2(0.5f, 0.45f);
+                    sRect.sizeDelta = new Vector2(850f, 220f);
+                    _victoryStatsText = sObj.GetComponent<TextMeshProUGUI>();
+                    _victoryStatsText.fontSize = 17;
+                    _victoryStatsText.alignment = TextAlignmentOptions.Center;
+                }
+            }
+
+            if (_gameOverStatsText == null && _gameOverOverlayPanel != null)
+            {
+                _gameOverStatsText = FindComponentInHierarchy<TextMeshProUGUI>(_gameOverOverlayPanel.transform, "GameOverStatsText");
+                if (_gameOverStatsText == null)
+                {
+                    var sObj = new GameObject("GameOverStatsText", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    sObj.transform.SetParent(_gameOverOverlayPanel.transform, false);
+                    var sRect = sObj.GetComponent<RectTransform>();
+                    sRect.anchorMin = new Vector2(0.5f, 0.45f);
+                    sRect.anchorMax = new Vector2(0.5f, 0.45f);
+                    sRect.sizeDelta = new Vector2(850f, 220f);
+                    _gameOverStatsText = sObj.GetComponent<TextMeshProUGUI>();
+                    _gameOverStatsText.fontSize = 17;
+                    _gameOverStatsText.alignment = TextAlignmentOptions.Center;
+                }
             }
 
             // AudioSource cho phản hồi chiến đấu (Mục 16.7)
@@ -592,6 +648,35 @@ namespace Hellfire.UI
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
+            }
+
+            MatchSummaryManager.OnMatchSummaryReceived -= HandleMatchSummaryReceived;
+        }
+
+        private void HandleMatchSummaryReceived(PlayerMatchStats[] stats, float duration)
+        {
+            int mins = Mathf.FloorToInt(duration / 60f);
+            int secs = Mathf.FloorToInt(duration % 60f);
+            string summaryText = $"<b>⏱️ THỜI GIAN LƯỢT CHƠI: {mins:00}:{secs:00}</b>\n\n";
+
+            summaryText += "<size=16><b>NGƯỜI CHƠI                   HẠ GỤC       SÁT THƯƠNG       CỨU       GỤC</b></size>\n";
+            summaryText += "─────────────────────────────────────────────────────────────\n";
+
+            foreach (var stat in stats)
+            {
+                Color pColor = PlayerPalette.GetColor(stat.ColorIndex);
+                string hex = ColorUtility.ToHtmlStringRGB(pColor);
+                string nameCol = $"<color=#{hex}><b>[P{stat.ColorIndex + 1}] {stat.PlayerName}</b></color>";
+                summaryText += $"{nameCol,-28} {stat.Kills,7}       {Mathf.RoundToInt(stat.DamageDealt),10}       {stat.Revives,5}       {stat.TimesDowned,5}\n";
+            }
+
+            if (_victoryStatsText != null)
+            {
+                _victoryStatsText.text = summaryText;
+            }
+            if (_gameOverStatsText != null)
+            {
+                _gameOverStatsText.text = summaryText;
             }
         }
 

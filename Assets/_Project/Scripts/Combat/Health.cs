@@ -260,6 +260,7 @@ namespace Hellfire.Combat
                     IsDowned.Value = true;
                     DownedTimer.Value = _downedDuration;
                     NotifyDownedClientRpc();
+                    Networking.MatchSummaryManager.RecordDowned(OwnerClientId);
                     Debug.Log($"[Health] Người chơi {NetworkObjectId} đã gục! Bắt đầu đếm ngược {_downedDuration}s để cứu.");
                 }
                 else

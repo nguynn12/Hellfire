@@ -64,6 +64,11 @@ namespace Hellfire.Networking
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            if (GetComponent<MatchSummaryManager>() == null)
+            {
+                gameObject.AddComponent<MatchSummaryManager>();
+            }
         }
 
         public override void OnNetworkSpawn()
