@@ -137,6 +137,7 @@ namespace Hellfire.Editor
             soHp.FindProperty("_value").floatValue = 25f;
             soHp.FindProperty("_duration").floatValue = 0f;
             soHp.FindProperty("_pickupColor").colorValue = new Color(0.1f, 0.9f, 0.3f);
+            soHp.FindProperty("_shopPrice").intValue = 50;
             soHp.ApplyModifiedProperties();
             list.Add(hpData);
 
@@ -155,6 +156,7 @@ namespace Hellfire.Editor
             soSpeed.FindProperty("_value").floatValue = 0.20f;
             soSpeed.FindProperty("_duration").floatValue = 0f;
             soSpeed.FindProperty("_pickupColor").colorValue = new Color(0.1f, 0.8f, 1.0f);
+            soSpeed.FindProperty("_shopPrice").intValue = 50;
             soSpeed.ApplyModifiedProperties();
             list.Add(speedData);
 
@@ -173,6 +175,7 @@ namespace Hellfire.Editor
             soDmg.FindProperty("_value").floatValue = 0.30f;
             soDmg.FindProperty("_duration").floatValue = 0f;
             soDmg.FindProperty("_pickupColor").colorValue = new Color(1.0f, 0.2f, 0.2f);
+            soDmg.FindProperty("_shopPrice").intValue = 50;
             soDmg.ApplyModifiedProperties();
             list.Add(dmgData);
 
@@ -191,6 +194,7 @@ namespace Hellfire.Editor
             soShield.FindProperty("_value").floatValue = 0f;
             soShield.FindProperty("_duration").floatValue = 8.0f;
             soShield.FindProperty("_pickupColor").colorValue = new Color(1.0f, 0.9f, 0.1f);
+            soShield.FindProperty("_shopPrice").intValue = 30;
             soShield.ApplyModifiedProperties();
             list.Add(shieldData);
 

@@ -23,6 +23,8 @@ namespace Hellfire.Combat
         [SerializeField] private string _weaponId = "pistol";
         [SerializeField] private Sprite _weaponIcon;
         [SerializeField] private WeaponType _weaponType = WeaponType.RangedGun;
+        [Tooltip("Giá mua tại Shop Station (Linh hồn) (Mục 17.8)")]
+        [SerializeField] private int _shopPrice = 80;
 
         [Header("Offensive Stats & Combat (Mục I.2 & II.2)")]
         [Tooltip("Sát thương gốc mỗi đòn đánh/phát bắn")]
@@ -112,6 +114,7 @@ namespace Hellfire.Combat
 
         public int MagSize => _magSize;
         public float ReloadTime => _reloadTime;
+        public int ShopPrice => _shopPrice;
 
         public float MeleeRange => _meleeRange;
         public float MeleeSwingAngle => _meleeSwingAngle;
