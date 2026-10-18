@@ -299,9 +299,12 @@ namespace Hellfire.Dungeon
                 {
                     if (client.PlayerObject != null)
                     {
-                        // Xếp so le vị trí các người chơi trong phòng spawn
+                        // Xếp so le vị trí các người chơi trong phòng spawn và kiểm tra NavMesh (Mục 15.2)
                         Vector3 offset = new Vector3((index % 2 == 0 ? 1f : -1f) * 2f, 0f, (index > 1 ? 2f : -2f));
-                        Vector3 targetPos = spawnCenter + offset;
+                        Vector3 proposedPos = spawnCenter + offset;
+                        Vector3 targetPos = DungeonEnemySpawner.GetValidSpawnPosition(
+                            proposedPos, spawnCenter, "Phòng Spawn (Vị trí Player)", 3.0f
+                        );
 
                         var movement = client.PlayerObject.GetComponent<PlayerMovement>();
                         if (movement != null)

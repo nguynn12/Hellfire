@@ -261,7 +261,10 @@ namespace Hellfire.AI
             for (int i = 0; i < count; i++)
             {
                 Vector3 spawnOffset = new Vector3((i == 0 ? 3f : -3f), 0.5f, 3f);
-                Vector3 spawnPos = transform.position + spawnOffset;
+                Vector3 proposedPos = transform.position + spawnOffset;
+                Vector3 spawnPos = Hellfire.Dungeon.DungeonEnemySpawner.GetValidSpawnPosition(
+                    proposedPos, _bossRoomCenter, "Triệu hồi Imp của Boss", 3.0f
+                );
 
                 var imp = Instantiate(_impMinionPrefab, spawnPos, Quaternion.identity);
                 var netObj = imp.GetComponent<NetworkObject>();
@@ -281,7 +284,10 @@ namespace Hellfire.AI
             // 1. Sinh Rương Boss (Mục 6.3: 100% rơi bùa lợi, 50% rơi thêm vũ khí)
             if (_bossChestPrefab != null)
             {
-                Vector3 chestPos = transform.position + transform.forward * 2f;
+                Vector3 chestProposed = transform.position + transform.forward * 2f;
+                Vector3 chestPos = Hellfire.Dungeon.DungeonEnemySpawner.GetValidSpawnPosition(
+                    chestProposed, _bossRoomCenter, "Rương Boss", 3.0f
+                );
                 var chestObj = Instantiate(_bossChestPrefab, chestPos, Quaternion.identity);
                 var netObj = chestObj.GetComponent<NetworkObject>();
                 var chest = chestObj.GetComponent<Hellfire.Items.LootChest>();

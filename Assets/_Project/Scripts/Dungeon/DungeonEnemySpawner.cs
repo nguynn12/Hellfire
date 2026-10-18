@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using Hellfire.AI;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace Hellfire.Dungeon
 {
@@ -27,6 +28,10 @@ namespace Hellfire.Dungeon
         [Header("Spawn Balancing (Mục 6.2)")]
         [SerializeField] private int _minEnemiesPerNormalRoom = 2;
         [SerializeField] private int _maxEnemiesPerNormalRoom = 4;
+
+        [Header("Spawn Validation (Mục 15.2)")]
+        [Tooltip("Khoảng cách tìm kiếm tối đa trên NavMesh khi spawn đối tượng (m)")]
+        [SerializeField] private float _maxNavMeshSampleDistance = 3.0f;
 
         private DungeonManager _dungeonManager;
         private readonly List<GameObject> _spawnedEnemies = new List<GameObject>();
@@ -78,10 +83,11 @@ namespace Hellfire.Dungeon
                 {
                     SpawnEnemiesInRoom(room, rng);
 
-                    // Sinh 1 rương báu thường trong mỗi phòng Normal
+                    // Sinh 1 rương báu thường trong mỗi phòng Normal (Mục 15.2: kiểm tra NavMesh)
                     if (_lootChestPrefab != null)
                     {
-                        Vector3 chestSpawnPos = room.WorldCenter + new Vector3(2.5f, 0f, 2.5f);
+                        Vector3 chestProposed = room.WorldCenter + new Vector3(2.5f, 0f, 2.5f);
+                        Vector3 chestSpawnPos = GetValidSpawnPosition(chestProposed, room.WorldCenter, $"Phòng {room.GridPosition}", _maxNavMeshSampleDistance);
                         var chestObj = Instantiate(_lootChestPrefab, chestSpawnPos, Quaternion.identity);
                         var netObj = chestObj.GetComponent<NetworkObject>();
                         if (netObj != null)
@@ -92,10 +98,11 @@ namespace Hellfire.Dungeon
                 }
             }
 
-            // 2. Sinh Boss tại phòng Boss xa nhất (Mục 4.1 & 5.2)
+            // 2. Sinh Boss tại phòng Boss xa nhất (Mục 4.1, 5.2, 15.2)
             if (grid.BossRoom != null && _bossPrefab != null)
             {
-                Vector3 bossSpawnPos = grid.BossRoom.WorldCenter + Vector3.up * 0.5f;
+                Vector3 bossProposed = grid.BossRoom.WorldCenter + Vector3.up * 0.5f;
+                Vector3 bossSpawnPos = GetValidSpawnPosition(bossProposed, grid.BossRoom.WorldCenter, "Phòng Boss", _maxNavMeshSampleDistance);
                 var bossObj = Instantiate(_bossPrefab, bossSpawnPos, Quaternion.identity);
                 var netObj = bossObj.GetComponent<NetworkObject>();
                 if (netObj != null)
@@ -128,10 +135,11 @@ namespace Hellfire.Dungeon
                 if (prefabToSpawn == null) prefabToSpawn = _impPrefab;
                 if (prefabToSpawn == null) continue;
 
-                // Vị trí spawn trong phòng
+                // Vị trí spawn trong phòng (Mục 15.2: kiểm tra NavMesh hợp lệ)
                 float offsetX = (float)(rng.NextDouble() * 8.0 - 4.0);
                 float offsetZ = (float)(rng.NextDouble() * 8.0 - 4.0);
-                Vector3 spawnPos = room.WorldCenter + new Vector3(offsetX, 0.5f, offsetZ);
+                Vector3 proposedPos = room.WorldCenter + new Vector3(offsetX, 0.5f, offsetZ);
+                Vector3 spawnPos = GetValidSpawnPosition(proposedPos, room.WorldCenter, $"Phòng {room.GridPosition}", _maxNavMeshSampleDistance);
 
                 var enemyObj = Instantiate(prefabToSpawn, spawnPos, Quaternion.Euler(0f, rng.Next(360), 0f));
                 var netObj = enemyObj.GetComponent<NetworkObject>();
@@ -141,6 +149,28 @@ namespace Hellfire.Dungeon
                     _spawnedEnemies.Add(enemyObj);
                 }
             }
+        }
+
+        /// <summary>
+        /// Xác thực vị trí spawn hợp lệ qua NavMesh.SamplePosition, có fallback về tâm phòng (Mục 15.2).
+        /// </summary>
+        public static Vector3 GetValidSpawnPosition(Vector3 proposedPos, Vector3 roomCenter, string roomName, float maxDistance = 3.0f)
+        {
+            // 1. Thử sample vị trí đề xuất trên NavMesh
+            if (NavMesh.SamplePosition(proposedPos, out var hit, maxDistance, NavMesh.AllAreas))
+            {
+                return hit.position;
+            }
+
+            // 2. Thất bại: thử sample tại tâm phòng
+            if (NavMesh.SamplePosition(roomCenter, out var centerHit, maxDistance, NavMesh.AllAreas))
+            {
+                return centerHit.position;
+            }
+
+            // 3. Tâm phòng cũng thất bại: cảnh báo và fallback về tâm phòng (không được bỏ qua)
+            Debug.LogWarning($"[SpawnValidation] Không thể tìm vị trí NavMesh hợp lệ tại '{roomName}' (đề xuất: {proposedPos}, tâm: {roomCenter}). Dùng tâm phòng làm fallback.");
+            return roomCenter;
         }
     }
 }
