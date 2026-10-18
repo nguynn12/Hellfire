@@ -34,7 +34,7 @@
 ```
 Player (root, có NetworkObject + CharacterController)
 ├── CameraPivot (điểm xoay pitch, đặt tại ~1.6m tính từ chân)
-│   └── PlayerCamera (Camera, Field of View mặc định 90 độ, chỉ active trên client sở hữu — IsOwner)
+│   └── PlayerCamera (Camera, Field of View mặc định 90 độ, người chơi chỉnh được 70–110 trong Settings theo mục 16.9, chỉ active trên client sở hữu — IsOwner)
 │       └── WeaponViewmodel (model tay + súng, layer "Viewmodel", chỉ camera của chủ sở hữu render layer này)
 ├── PlayerBodyMesh (mô hình toàn thân, layer "PlayerBody", camera chủ sở hữu KHÔNG render layer này, camera người khác PHẢI render)
 ├── HitboxRoot (các collider để tính trúng đạn: Head, Torso, Limbs — xem mục 3)
@@ -95,6 +95,20 @@ Client (bao gồm cả client chạy trên máy Host) chỉ có quyền:
 - Gửi **input** của người chơi (không gửi kết quả, không tự tính sát thương final).
 - Dự đoán (predict) chuyển động của chính nhân vật mình để cảm giác mượt (client-side prediction), nhưng vị trí cuối PHẢI được reconcile theo dữ liệu do server xác nhận nếu lệch quá ngưỡng (khuyến nghị dùng `NetworkTransform` với Interpolation bật sẵn của NGO cho các object không phải nhân vật do client điều khiển).
 - Hiển thị hiệu ứng hình ảnh/âm thanh ngay lập tức phía client để giảm cảm giác trễ (ví dụ: tracer đường đạn, âm thanh súng nổ hiện ngay khi bấm chuột, không đợi server xác nhận) — nhưng sát thương thực tế vẫn phải chờ server xác nhận.
+
+### 2.1.1 Ngoại lệ DUY NHẤT: di chuyển người chơi là Owner-Authoritative — ĐÃ CHỐT
+
+**Lý do**: `PlayerMovement` cho chủ sở hữu di chuyển cục bộ bằng `CharacterController` và không gửi input lên Server. Nếu `NetworkTransform` của Player ở chế độ Server-authoritative (mặc định), Server và các máy khác sẽ không bao giờ thấy client di chuyển (đứng yên ở điểm spawn). Vì game chỉ chơi LAN giữa bạn bè (không có yếu tố gian lận cạnh tranh), dự án chọn để **chủ sở hữu quyết định vị trí nhân vật của chính mình**.
+
+Quy định BẮT BUỘC:
+
+1. `NetworkTransform` trên **root của `Player.prefab`** PHẢI đặt `AuthorityMode = Owner`. Mọi `NetworkTransform` khác (quái vật, boss, vật phẩm rơi) GIỮ NGUYÊN `AuthorityMode = Server`.
+2. Ngoại lệ này **CHỈ áp dụng cho vị trí/góc xoay của nhân vật người chơi**. Mọi thứ còn lại vẫn theo mục 2.1: máu, sát thương, trạng thái Downed/Dead, revive, AI, vật phẩm, rương, `GameState`.
+3. **Dịch chuyển người chơi bởi Server** (ví dụ đưa về phòng spawn): Server KHÔNG được gán trực tiếp `transform.position` của người chơi (vì Server không còn là authority của transform này). Thay vào đó, Server gọi một `ClientRpc` có `ClientRpcParams` nhắm đúng `TargetClientIds = { clientId của chủ nhân }`; trên máy chủ nhân, handler PHẢI theo đúng thứ tự: (a) tắt `CharacterController`, (b) đặt `transform.position`/`rotation`, (c) gọi `NetworkTransform.Teleport(...)` để các máy khác nhảy ngay tới vị trí mới thay vì nội suy, (d) bật lại `CharacterController`. Bỏ bước (a) sẽ làm `CharacterController` ghi đè vị trí vừa đặt.
+4. Với `ServerRpc` bắn súng (mục 3.1), Server **NÊN** kiểm tra origin do client gửi lên cách vị trí người chơi đó trên Server không quá 3 mét (giá trị `[SerializeField]`), nếu quá thì bỏ qua phát bắn. Đây là kiểm tra hợp lý rẻ tiền, không phải chống gian lận toàn diện.
+5. Các kiểm tra khoảng cách do Server thực hiện (revive trong 2m, mở rương, nhặt vật phẩm, AI chọn người chơi gần nhất) dùng vị trí người chơi mà Server nhận được qua `NetworkTransform` — sau thay đổi này các giá trị đó mới chính xác với mọi client.
+
+**Tiêu chí nghiệm thu (test bằng 2 máy hoặc 2 instance)**: Client đi một vòng → màn hình Host thấy nhân vật Client di chuyển tương ứng; quái chọn đúng Client làm mục tiêu khi Client gần nhất; Client đứng cạnh đồng đội đang gục giữ phím revive thì hồi sinh được.
 
 ### 2.2 Thiết lập kết nối LAN
 
@@ -199,7 +213,7 @@ Hệ số sát thương nhân thêm mặc định (điều chỉnh trong file c�
 4. Đặt phòng đầu tiên (phòng xuất phát/spawn) tại vị trí cố định hoặc gần trung tâm lưới.
 5. Lặp: chọn một phòng đã đặt, chọn hướng ngẫu nhiên (Bắc/Nam/Đông/Tây) bằng `rng`, đặt phòng mới liền kề nếu ô đó còn trống, nối 2 phòng bằng một hành lang (corridor prefab).
 6. Sau khi đủ số phòng, chọn 1 phòng xa nhất tính theo đường đi (BFS/Dijkstra trên lưới) so với phòng spawn làm **phòng trùm cuối (boss room)**.
-7. Random hóa loại phòng (phòng thường/phòng có rương vật phẩm) cho các phòng còn lại bằng `rng`, theo tỷ lệ cấu hình được (ví dụ 30% phòng có rương).
+7. **(ĐÃ THAY THẾ bởi mục 17.1)** Gán loại phòng Spawn / Combat / Upgrade / Treasure / Shop / Boss theo quy tắc ở mục 17.1. Không còn khái niệm "phòng có rương 30%".
 8. Sau khi có sơ đồ logic (dữ liệu 2D, chưa phải GameObject), mới tiến hành **Instantiate** prefab phòng/hành lang tương ứng vào đúng vị trí thế giới thực (world position) — bước dựng hình học này chạy độc lập trên từng máy, dùng cùng dữ liệu logic đã sinh từ cùng seed nên kết quả hình học giống hệt nhau.
 
 ### 4.2 Bake NavMesh lúc chạy (Runtime NavMesh Baking)
@@ -303,9 +317,9 @@ Trạng thái FSM riêng của boss (bổ sung vào `EnemyStateMachine.cs` hoặ
 
 **Tỷ lệ rơi đồ — ĐÃ CHỐT:**
 
-| Loại rương | Tỷ lệ xuất hiện trong màn (mục 4.1 bước 7) | Kết quả mở ra |
+| Loại rương | Vị trí xuất hiện | Kết quả mở ra |
 |---|---|---|
-| Rương thường | ~70% số rương trong màn (theo tỷ lệ cấu hình ở mục 4.1) | 40% → 1 bùa lợi ngẫu nhiên (trong 4 loại ở mục 6.2)<br>60% → 1 vũ khí ngẫu nhiên (trong 4 khẩu ở mục 6.2) |
+| Rương thường | Chỉ trong phòng Treasure (mục 17.6) | 40% → 1 bùa lợi ngẫu nhiên (trong 4 loại ở mục 6.2)<br>60% → 1 vũ khí ngẫu nhiên (trong 4 khẩu ở mục 6.2) |
 | Rương boss | Đúng 1 rương, spawn khi boss chết (mục 5.2) | 100% → ít nhất 1 bùa lợi, cộng tỷ lệ rơi thêm 1 vũ khí (con số % cụ thể cho phần "rơi thêm vũ khí" ở rương boss vẫn để nhóm quyết định sau, xem mục 13) |
 
 **NÊN** khi Server chọn vũ khí ngẫu nhiên rơi ra từ rương thường, loại trừ khẩu vũ khí người chơi đang cầm ra khỏi danh sách chọn (tránh rơi trùng vũ khí đã có) — nếu người chơi đã sở hữu hết cả 4 khẩu, cho phép rơi trùng bình thường. *(Đây là đề xuất mặc định hợp lý, chưa phải quyết định cứng — nhóm có thể đổi nếu muốn cho rơi hoàn toàn ngẫu nhiên kể cả trùng vũ khí đang cầm.)*
@@ -313,6 +327,8 @@ Trạng thái FSM riêng của boss (bổ sung vào `EnemyStateMachine.cs` hoặ
 ---
 
 ## 7. Giao diện người dùng (UI/HUD)
+
+> Mục này là HUD cơ bản. Các phần mở rộng (panel/marker đồng đội, loading, boss bar, bản đồ, cài đặt, hiệu ứng nút...) nằm ở **mục 16**; nếu hai mục mâu thuẫn thì **mục 16 thắng**.
 
 **Công nghệ UI — ĐÃ CHỐT: uGUI (Canvas truyền thống).** **KHÔNG dùng UI Toolkit** cho bất kỳ màn hình nào trong dự án — toàn bộ HUD, menu, pause screen **BẮT BUỘC** dựng bằng Canvas + `Image`/`Text`/`Button` chuẩn của uGUI để giữ nhất quán, tránh trộn lẫn 2 hệ thống UI khác nhau trong cùng dự án.
 
@@ -401,7 +417,7 @@ Enum `GameState` **BẮT BUỘC** có các giá trị sau, đúng thứ tự chu
 ```
 Lobby → Generating (đang sinh bản đồ + bake NavMesh, xem mục 4)
      → Playing (người chơi đang khám phá/chiến đấu)
-     → BossFight (đã vào phòng boss — kích hoạt nhạc/UI riêng theo mục 9.3)
+     → BossFight (đã vào phòng boss — kích hoạt nhạc/UI riêng theo mục 9.3); đúng lúc phòng boss chuyển sang `Locked` theo mục 17.4
      → Victory (đã hạ boss)      → quay lại Lobby cho lượt chơi mới (seed mới)
      → GameOver (toàn đội chết)  → quay lại Lobby cho lượt chơi mới (seed mới)
 ```
@@ -456,6 +472,10 @@ Nhóm **NÊN** cân nhắc dùng thêm ruleset [Ponytail](https://github.com/Die
 2. **Tỷ lệ % cụ thể cho phần "rơi thêm vũ khí" ở rương boss** (mục 6.3) — hiện chỉ chốt "rương boss đảm bảo 100% có ít nhất 1 bùa lợi", chưa có con số % cho khả năng rơi thêm vũ khí đi kèm. Đây là điểm duy nhất còn thiếu số liệu cụ thể trong toàn bộ hệ thống vật phẩm.
 3. Cách chọn vũ khí ngẫu nhiên có loại trừ khẩu đang cầm hay không (đề xuất mặc định ở mục 6.3 là có loại trừ, nhưng đánh dấu "chưa phải quyết định cứng") — nhóm nên xác nhận lại nếu muốn đổi.
 
+4. Các số mặc định MỚI do đề xuất, chưa playtest (chỉnh bằng `[SerializeField]`/`ScriptableObject`, không cần sửa code): hệ số cân bằng theo số người (mục 15.3), `readyTimeoutSeconds` 30 giây (15.1), `maxDistance` SamplePosition 3 m (15.2), phòng boss luôn hiện trên bản đồ (16.8), các thông số hiệu ứng ở mục 16.
+
+5. Các số mặc định MỚI ở mục 17 chưa playtest (chỉnh bằng `[SerializeField]`/`ScriptableObject`): ô lưới 26 m, 0–4 cột, thưởng Linh hồn (5/8/15, +20 dọn phòng), giá shop (80/50/50/50/30), số rương Treasure (2), độ trễ spawn quái 0.8 s, thời gian hạ/nâng cổng (0.6 s/0.8 s).
+
 *(Các mục về thông số revive và bảng số liệu vũ khí/quái vật/bùa lợi/boss đã được chốt là số liệu chính thức để code — xem mục 3.3, 5.2, 6.2. Vẫn có thể chỉnh lại con số này sau khi playtest vì toàn bộ nằm trong `[SerializeField]`/`ScriptableObject`, không cần sửa code logic.)*
 
 ---
@@ -484,3 +504,271 @@ Danh sách nhanh để kiểm tra khi code hoặc review code — nếu vi phạ
 - [ ] Chuyển Scene `Lobby → Gameplay` dùng `NetworkManager.SceneManager`, không dùng `SceneManager.LoadScene()` gọi độc lập từng client.
 - [ ] Phong cách hình ảnh là **địa ngục tối tăm cổ điển**, không phải liminal space/Backrooms.
 - [ ] Boss có đúng 3 trạng thái FSM: `Phase1 → PhaseTransition (bất tử 2s) → Phase2`, không bỏ qua bước bất tử tạm thời khi chuyển pha.
+- [ ] `Player.prefab`: `NetworkTransform` ở root có `AuthorityMode = Owner` (ngoại lệ mục 2.1.1); mọi NetworkTransform khác giữ `Server`.
+- [ ] Server không gán trực tiếp `transform.position` của người chơi; dịch chuyển người chơi chỉ qua `ClientRpc` nhắm chủ nhân (tắt CharacterController → đặt vị trí → `Teleport` → bật lại).
+- [ ] Quái/rương/boss chỉ được spawn SAU KHI mọi client báo `DungeonReady` (mục 15.1); mọi vị trí spawn đều qua `NavMesh.SamplePosition` (mục 15.2).
+- [ ] Số quái và máu boss nhân theo số người chơi lúc vào `Generating` và giữ cố định cả lượt (mục 15.3).
+- [ ] Màu người chơi chỉ lấy từ bảng 4 màu ở mục 16.1, không dùng màu đỏ cho người chơi.
+- [ ] Scene Gameplay không còn `ArenaFloor`/`Pillar_*`; `HellfirePhase1Setup` không tạo lại chúng (mục 17.0).
+- [ ] `DungeonRoomType` có đúng 6 loại (Spawn, Combat, Upgrade, Treasure, Shop, Boss); phòng Upgrade/Treasure/Shop ưu tiên nhánh cụt ngoài đường chính; phòng an toàn không có quái, cổng, cột (mục 17.1).
+- [ ] Hành lang không có quái, không khóa; chỉ phòng Combat có 0–4 cột đặt ở 4 ô góc (mục 17.2, 17.3).
+- [ ] Cổng sắt chỉ có ở phòng Combat/Boss; collider bật khi đóng và tắt khi mở; Server quyết định khóa/mở; mỗi phòng chỉ khóa một lần (mục 17.4).
+- [ ] Quái chỉ spawn khi phòng chuyển `Locked`; boss chỉ spawn khi phòng boss `Locked` (mục 17.5).
+- [ ] Linh hồn là `NetworkVariable<int>` do Server ghi, mỗi người một ví, reset mỗi lượt (mục 17.7).
+- [ ] Shop: 5 món giống nhau cho mọi người; tập "đã mua" tách riêng từng người; Server xác thực mọi giao dịch (mục 17.8).
+
+---
+
+## 15. Bổ sung nền tảng — Giai đoạn 4.4 (làm TRƯỚC UI nâng cao)
+
+> Các mục 15.1–15.3 sửa/bổ sung cho các hệ thống đã làm ở Giai đoạn 2–4. Cùng với ngoại lệ ở mục 2.1.1, đây là **gói nền tảng phải xong và test được bằng 2 máy** trước khi làm mục 16.
+
+### 15.1 Cổng chờ đủ máy (Loading Gate) — BẮT BUỘC
+
+**Vấn đề**: mỗi máy tự dựng bản đồ từ seed rồi tự bake NavMesh (mục 2.3, 4.2) với tốc độ khác nhau. `NetworkSceneManager.OnLoadEventCompleted` chỉ báo mọi máy đã tải xong **scene**, không báo bản đồ đã dựng xong. Nếu Server spawn quái hoặc dịch chuyển người chơi sớm, máy chậm hơn sẽ thấy quái/người rơi xuống khoảng trống.
+
+Luồng BẮT BUỘC:
+
+1. Khi Host bấm bắt đầu: `GameManager` chuyển `CurrentState = Generating` (trạng thái này đã có trong enum nhưng hiện chưa được dùng).
+2. Mỗi máy (kể cả Host) sau khi **dựng xong hình học VÀ bake xong NavMesh** gọi `DungeonReadyServerRpc()`.
+3. Server giữ `HashSet<ulong> readyClients` và `NetworkVariable<int> ReadyCount` (Server ghi, mọi client đọc để hiển thị loading).
+4. Khi `readyClients` chứa đủ mọi client đang kết nối → Server mới được: (a) dịch chuyển người chơi về phòng spawn (theo mục 2.1.1), (b) spawn quái/rương/boss, (c) chuyển `CurrentState = Playing`. **Đúng thứ tự (a) → (b) → (c).**
+5. Timeout `readyTimeoutSeconds` (`[SerializeField]`, mặc định **30 giây**): hết hạn mà còn client chưa sẵn sàng → Server ngắt kết nối các client đó với lý do "Tải bản đồ quá lâu" rồi tiếp tục với số client còn lại.
+6. Trong `Generating`, người chơi KHÔNG được di chuyển/bắn (`CanPlayerMove()` trả về false), AI không chạy.
+7. Nếu một client ngắt kết nối giữa lúc `Generating`, Server loại client đó khỏi tập chờ để không bị kẹt.
+
+### 15.2 Kiểm tra vị trí spawn hợp lệ — BẮT BUỘC
+
+Hiện quái spawn lệch ngẫu nhiên quanh tâm phòng và rương đặt ở offset cố định, không kiểm tra có đứng trên NavMesh hay không (nguy cơ kẹt tường/ngoài sàn).
+
+- Mọi vị trí spawn do Server quyết định (quái thường, boss, quái do boss triệu hồi, rương, vị trí xếp người chơi ở phòng spawn) PHẢI qua `NavMesh.SamplePosition(pos, out hit, maxDistance, NavMesh.AllAreas)`; `maxDistance` là `[SerializeField]` mặc định **3.0 m**.
+- Nếu thất bại: dùng tâm phòng đã sample; nếu tâm phòng cũng thất bại thì `Debug.LogWarning` kèm tên phòng và vẫn spawn tại tâm phòng (không được bỏ qua việc spawn boss/rương khiến vòng chơi bị kẹt).
+- Logic này chạy **chỉ trên Server** (mọi spawn là của Server).
+
+### 15.3 Cân bằng theo số người chơi — BẮT BUỘC
+
+- Tạo `ScriptableObject` `DifficultyScalingData` chứa 2 mảng 4 phần tử, chỉ số theo số người chơi 1/2/3/4:
+
+| Số người | Hệ số số lượng quái thường | Hệ số máu tối đa của boss |
+|---|---|---|
+| 1 | 0.7 | 0.6 |
+| 2 | 1.0 | 1.0 |
+| 3 | 1.4 | 1.5 |
+| 4 | 1.8 | 2.0 |
+
+  Đây là **số khởi điểm** để code, chỉnh lại sau playtest (Giai đoạn 5) trực tiếp trên asset, không sửa code.
+- Số người chơi được **chốt một lần** khi vào `Generating` (số client đang kết nối) và giữ nguyên cả lượt, kể cả có người thoát.
+- Số quái mỗi phòng = `max(1, round(số quái đã roll theo mục 6.2 × hệ số))`. Máu tối đa boss = `800 × hệ số`, `CurrentHealth` khởi tạo bằng máu tối đa. Quái Imp do boss triệu hồi (mục 5.2) KHÔNG nhân hệ số. Sát thương quái KHÔNG đổi theo số người.
+
+---
+
+## 16. UI nâng cao và cảm giác chơi — Giai đoạn 4.5
+
+> Toàn bộ UI vẫn là **uGUI** (mục 7), không thêm package/thư viện mới (không DOTween; dùng coroutine + `AnimationCurve`). Mọi thông số bên dưới là `[SerializeField]`. Chia làm 2 đợt giao việc: **4.5A** = 16.1, 16.2, 16.3, 16.10; **4.5B** = 16.4 → 16.9 và 16.11.
+
+### 16.1 Danh tính người chơi: tên, màu, số — ĐÃ CHỐT
+
+- Component `PlayerIdentity.cs` trên `Player.prefab` với: `NetworkVariable<FixedString32Bytes> PlayerName`, `NetworkVariable<int> ColorIndex` (0–3), `NetworkVariable<bool> IsReady` — **chỉ Server ghi**.
+- **Tên**: người chơi nhập ở Main Menu (tối đa 16 ký tự, cắt khoảng trắng đầu/cuối), lưu `PlayerPrefs` khóa `PlayerName`; rỗng thì dùng "Player N" (N = ColorIndex + 1). Sau khi spawn, chủ nhân gửi tên cho Server bằng `ServerRpc`; Server kiểm tra/cắt độ dài rồi ghi vào `PlayerName`.
+- **Màu**: Server gán `ColorIndex` = chỉ số nhỏ nhất chưa dùng trong 0–3 khi người chơi spawn, cố định suốt lượt chơi. Bảng màu **BẮT BUỘC** dùng đúng 4 màu (lấy từ bảng Okabe-Ito thân thiện mù màu):
+
+| ColorIndex | Số hiển thị | Màu | Hex |
+|---|---|---|---|
+| 0 | 1 | Xanh da trời | `#56B4E9` |
+| 1 | 2 | Cam | `#E69F00` |
+| 2 | 3 | Xanh lục | `#009E73` |
+| 3 | 4 | Tím hồng | `#CC79A7` |
+
+- **KHÔNG ĐƯỢC** dùng màu đỏ hoặc vàng cho màu người chơi (đỏ dành cho sát thương/kẻ địch, vàng đang dùng cho crosshair/hitmarker). Mọi nơi hiển thị màu người chơi PHẢI kèm **số 1–4** để người mù màu vẫn phân biệt được.
+- Tạo lớp tĩnh `PlayerPalette` (một nơi duy nhất giữ bảng màu); mọi UI lấy màu từ đây, không hardcode.
+- Lobby: danh sách slot hiển thị chip màu + số + tên + dấu ✓ khi `IsReady` (thay cho cách tô xanh/trắng hiện tại).
+
+### 16.2 Panel đồng đội trên HUD — ĐÃ CHỐT
+
+- Đặt ở cạnh trái màn hình, xếp dọc, tối đa 3 mục (mọi người chơi trừ bản thân); ẩn khi chơi một mình.
+- Mỗi mục: chip màu + số, tên, thanh máu (`CurrentHealth / MaxHealth`).
+- Trạng thái: **Bình thường** (thanh máu); **Gục** (`IsDowned`): thanh máu thay bằng đếm ngược `DownedTimer` dạng `mm:ss`, biểu tượng nhấp nháy; **Chết** (`IsDead`): làm xám, hiện dấu X.
+- Cập nhật qua callback `OnValueChanged` của `NetworkVariable` (không dò mỗi frame). Khi có người vào/ra, panel tự thêm/xóa mục.
+
+### 16.3 Marker vị trí đồng đội — ĐÃ CHỐT
+
+- Dùng Canvas Screen Space Overlay, các phần tử UI tạo sẵn theo dạng pool (không Instantiate liên tục).
+- Mỗi đồng đội chưa chết có 1 marker: icon màu + số, đặt ở điểm đầu nhân vật cộng 0.5 m, dùng `Camera.WorldToScreenPoint`. **Hiện xuyên tường** (không raycast che khuất). Hiển thị khoảng cách làm tròn mét.
+- Ngoài màn hình hoặc nằm sau lưng camera (`z < 0` → lật hướng): kẹp marker vào mép màn hình (chừa lề 5%) kèm mũi tên chỉ hướng.
+- Kích thước thu nhỏ dần theo khoảng cách (từ 1.0 ở gần xuống 0.6 từ 40 m trở lên).
+- Đồng đội **Gục**: marker nhấp nháy (khoảng 2 lần/giây) kèm số giây còn lại. **Chết**: bỏ marker. Không hiện marker cho chính mình.
+
+### 16.4 Màn hình loading và chuyển cảnh — ĐÃ CHỐT
+
+- Panel toàn màn hình hiện khi `GameState == Generating` (và trong lúc tải scene Lobby → Gameplay): spinner xoay 360°/giây, dòng chữ "Đang tạo hầm ngục... {ReadyCount}/{số người} sẵn sàng" (dùng `ReadyCount` ở mục 15.1), và mẹo chơi đổi mỗi 4 giây (tối thiểu 6 mẹo tiếng Việt, ví dụ về revive, về bắn đầu, về bùa lợi).
+- Khi vào `Playing`: mờ dần panel trong 0.5 giây rồi tắt. Chuyển giữa các scene: fade đen 0.3 giây.
+
+### 16.5 Hiệu ứng nút — ĐÃ CHỐT
+
+- Component `UIButtonFeedback.cs` gắn vào mọi `Button`: hover phóng 1.05× trong 0.1 giây, nhấn thu 0.95× trong 0.05 giây rồi trở lại; phát tiếng click 2D. Dùng `Time.unscaledDeltaTime`, coroutine + `AnimationCurve`.
+
+### 16.6 Thanh máu boss — ĐÃ CHỐT
+
+- Giữa trên màn hình, hiện khi `GameState == BossFight`: tên "CHÚA TỂ ĐỊA NGỤC", thanh máu, vạch đánh dấu ở 50%.
+- Khi boss vào `PhaseTransition`: Server gọi `ClientRpc` để mọi máy rung màn hình ~0.5 giây và hiện chữ "PHA 2" ngắn. Rung màn hình PHẢI tuân theo công tắc "Giảm rung màn hình" (mục 16.9).
+
+### 16.7 Phản hồi chiến đấu — ĐÃ CHỐT
+
+- **Hitmarker** (đã có): giữ thời lượng trong khoảng 50–100 ms. **Headshot**: hình/màu khác + âm thanh riêng. **Hạ gục**: marker lớn hơn + âm thanh riêng; Server báo xác nhận hạ gục tới đúng người bắn bằng `ClientRpc` nhắm chủ nhân.
+- **Bị đánh**: viền đỏ (vignette bằng UI Image) hiện rồi mờ dần ~0.4 giây, độ đậm theo lượng sát thương; mũi tên chỉ hướng kẻ tấn công (Server gửi vị trí kẻ tấn công cho nạn nhân bằng `ClientRpc` nhắm chủ nhân).
+- **Máu thấp** (< 30%): viền đỏ nhịp ~1.2 lần/giây kèm âm thanh tim đập; tắt khi hồi máu hoặc khi vào trạng thái Gục.
+
+### 16.8 Bản đồ hầm ngục (Tab) — ĐÃ CHỐT
+
+- Nhấn **Tab** bật/tắt bản đồ toàn màn hình (không phải minimap góc). Vẽ từ dữ liệu `DungeonGrid` đã có: mỗi phòng là 1 ô vuông, hành lang là đoạn nối.
+- Phòng đã có ít nhất một người chơi đi vào: sáng. Phòng kề phòng đã đi qua: mờ (đã lộ). Phòng khác: ẩn. Danh sách phòng đã đi qua là hợp của mọi người chơi, **mỗi client tự tính** từ vị trí các người chơi mà nó nhận được (không cần đồng bộ thêm qua mạng).
+- **Phòng boss luôn hiện** với biểu tượng đầu lâu (công tắc `revealBossRoom` mặc định bật, để người chơi không bị lạc).
+- Đồng đội hiện bằng chấm đúng màu/số theo mục 16.1; bản thân hiện bằng mũi tên chỉ hướng nhìn.
+
+### 16.9 Cài đặt (Settings) — ĐÃ CHỐT
+
+- **FOV**: thanh trượt 70–110, mặc định **90**, lưu `PlayerPrefs` khóa `FieldOfView`, áp dụng ngay cho camera người chơi (thay cho việc cố định 90 ở mục 1.2/`PlayerMovement`).
+- **Âm lượng tổng**: thanh trượt 0–1, áp dụng `AudioListener.volume`, lưu `PlayerPrefs`. (Tách riêng nhạc/hiệu ứng là việc của bản sau.)
+- **Giảm rung màn hình**: công tắc, khi bật thì mọi hiệu ứng rung màn hình (mục 16.6, và các rung khác nếu có) bị tắt hoặc giảm tối thiểu.
+- Độ nhạy chuột giữ nguyên như hiện tại.
+
+### 16.10 Lobby: sẵn sàng (Ready-up) và hiển thị IP — ĐÃ CHỐT
+
+- Mỗi người chơi **không phải Host** có nút bật/tắt "Sẵn sàng" (ghi `PlayerIdentity.IsReady` thông qua `ServerRpc`). Host mặc định coi như sẵn sàng.
+- Nút "Bắt đầu" của Host chỉ bấm được khi mọi người chơi khác đã sẵn sàng; cho phép bắt đầu khi chỉ có một mình Host (số người = 1 theo mục 15.3).
+- Lobby hiển thị **IP LAN của Host** dạng `x.x.x.x:cổng` kèm nút sao chép, lấy IPv4 thuộc dải riêng (192.168.x.x, 10.x.x.x, 172.16–31.x.x) từ `Dns.GetHostEntry`; nếu có nhiều địa chỉ thì hiển thị tối đa 3 để người dùng chọn đúng card mạng.
+- **NÊN**: ở Main Menu, khi Client bấm vào phòng mà quá 10 giây chưa kết nối được thì hiện thông báo lỗi rõ ràng và cho thử lại (thay vì chỉ hiện "Đang kết nối..." mãi).
+
+### 16.11 Tổng kết lượt chơi — ĐÃ CHỐT nhưng ƯU TIÊN THẤP
+
+- **Chỉ làm khi mọi mục khác của 16 đã test xong.** Server ghi nhận theo từng người chơi: số quái hạ, tổng sát thương, số lần cứu đồng đội, số lần bị gục, và thời gian cả lượt. Khi chuyển sang `Victory`/`GameOver`, Server gửi bảng này cho mọi client bằng `ClientRpc` (dùng struct `INetworkSerializable`), hiển thị trên màn hình kết quả với màu/số/tên theo mục 16.1.
+
+### 16.12 Chưa làm ở bản này (giới hạn phạm vi có chủ đích)
+
+Hệ thống ping, kill feed, damage numbers, bảng điểm trực tiếp, minimap có đánh dấu quái, tách âm lượng nhạc/hiệu ứng, độ giật súng/đèn nháy nòng súng. AI/lập trình viên **KHÔNG ĐƯỢC** tự thêm các mục này; muốn thêm phải cập nhật đặc tả trước.
+
+---
+
+## 17. Phòng, cổng sắt và cửa hàng — Giai đoạn 4.6
+
+> **Điều kiện tiên quyết**: Giai đoạn 4.4 đã xong (mục 2.1.1 và 15), vì mọi kiểm tra "người chơi đang ở trong phòng / gần cửa hàng" của Server dùng vị trí người chơi do `NetworkTransform` gửi lên; và nhánh `feature/shrine-and-stats` đã được merge vào `main` (mục 17.6 dùng lại `InteractiveShrine`). Nếu mục 17 mâu thuẫn với mục 4.1 (bước 7), 6.3, 10.2 hoặc 16.12 thì **mục 17 thắng**.
+
+### 17.0 Dọn đấu trường test — BẮT BUỘC làm đầu tiên
+
+- Scene `Gameplay` đang còn sót đấu trường test do `HellfirePhase1Setup` tạo: `ArenaFloor` (Plane 50×50 tại gốc tọa độ) và **16** khối `Pillar_{x}_{z}` (2×4×2, x và z thuộc {-15, -5, 5, 15}; điều kiện "bỏ ô (0,0)" trong vòng lặp không bao giờ đúng nên đủ 16 khối). Chúng nằm chồng lên phòng/hành lang của hầm ngục sinh ngẫu nhiên và có mặt sàn trùng độ cao y=0 với sàn phòng.
+- **Xóa** `ArenaFloor` và mọi `Pillar_*` khỏi scene; **xóa đoạn code tạo chúng** trong `HellfirePhase1Setup` (và bất kỳ script Editor nào khác tạo lại) để chạy lại setup không sinh lại.
+- Sau khi dọn, không còn mesh/collider nào nằm ngoài `DungeonGeometryRoot` tham gia bake NavMesh, ngoại trừ người chơi, quái, vật phẩm, ánh sáng và UI.
+
+### 17.1 Loại phòng và cách phân bổ — BẮT BUỘC
+
+`enum DungeonRoomType` PHẢI có đúng 6 giá trị và thay hẳn các giá trị cũ:
+
+| Loại | Số lượng mỗi lượt | An toàn? | Nội dung |
+|---|---|---|---|
+| `Spawn` | 1 | Có | Phòng xuất phát, không quái, không cổng |
+| `Combat` | Phần còn lại (3–9 phòng khi có 8–14 phòng) | Không | Khóa cổng, quái spawn khi vào (mục 17.4, 17.5), 0–4 cột (mục 17.3) |
+| `Upgrade` | 1 | Có | 1 tế đàn chọn 1 trong 3 (mục 17.6) |
+| `Treasure` | 1 | Có | Rương kho báu (mục 17.6) |
+| `Shop` | 1 | Có | Cửa hàng 5 món (mục 17.8) |
+| `Boss` | 1 | Không | Khóa cổng, boss spawn khi vào (mục 17.4) |
+
+Phòng `Spawn`, `Upgrade`, `Treasure`, `Shop` **không có quái, không có cổng, không có cột**.
+
+Thuật toán phân bổ (chạy sau khi đã có sơ đồ logic và đã xác định phòng boss theo mục 4.1 bước 6). BẮT BUỘC dùng một `System.Random` **riêng** dựng từ seed (ví dụ `new System.Random(dungeonSeed ^ 0x2F6B)`), để không làm thay đổi sơ đồ phòng hiện có và để kết quả giống hệt nhau trên mọi máy:
+
+1. Lấy "đường chính" = đường đi ngắn nhất Spawn → Boss (BFS đã có trong `DungeonGrid`).
+2. Ứng viên ưu tiên 1: phòng cụt (đúng 1 kết nối), không phải Spawn/Boss, không nằm trên đường chính.
+3. Nếu chưa đủ 3 ứng viên: thêm ứng viên ưu tiên 2 = phòng không nằm trên đường chính (không phải Spawn/Boss), kể cả phòng không cụt.
+4. Nếu vẫn chưa đủ: lấy phòng bất kỳ còn lại không phải Spawn/Boss, ưu tiên phòng xa Spawn nhất; ghi `Debug.LogWarning`.
+5. Xáo thứ tự ứng viên bằng rng riêng, lần lượt gán `Upgrade`, `Treasure`, `Shop`. Mọi phòng còn lại là `Combat`.
+
+### 17.2 Hành lang và khả năng nhìn thấy
+
+- Hành lang **không bao giờ có quái và không bao giờ khóa**. Quái chỉ spawn trong phạm vi sàn phòng `Combat`/`Boss` (mục 17.5).
+- `_gridCellSize` đổi mặc định từ 20 lên **26** (phòng vẫn 14 m; theo công thức hiện tại `khoảng cách − roomSize + 1`, hành lang dài khoảng 13 m).
+- Hành lang PHẢI nhìn thấy rõ từ trong phòng: (a) sàn hành lang dùng chất liệu khác sàn phòng (tối hơn) qua `_corridorFloorMaterial` mới, (b) mỗi hành lang có 2 đèn điểm ở 1/3 và 2/3 chiều dài, nháy nhẹ theo mục 9.1, (c) mỗi cửa phòng có khung cửa (2 trụ + 1 dầm) để nhận ra lối đi. Mọi thông số là `[SerializeField]`.
+
+### 17.3 Cột (chướng ngại vật) trong phòng Combat
+
+- Chỉ phòng `Combat` có cột. Số cột = `rng.Next(0, 5)` (0–4) dùng rng riêng ở mục 17.1 (hoặc một rng riêng khác dựng từ seed, giống nhau trên mọi máy).
+- Vị trí cột chỉ lấy từ **4 ô góc cục bộ** `(±4, 0, ±4)` của phòng (không bao giờ nằm trên trục cửa hay tâm phòng), mỗi ô tối đa 1 cột.
+- Kích thước 2×4×2, có collider, là con của `DungeonGeometryRoot`, dựng **trước** khi bake NavMesh.
+- KHÔNG dùng chướng ngại nào khác (thùng, tường chắn thêm...).
+
+### 17.4 Cổng sắt và khóa phòng — BẮT BUỘC
+
+Áp dụng cho phòng `Combat` và `Boss`. **Server là chủ trạng thái.** Mỗi phòng có trạng thái `Idle` → `Locked` → `Cleared` (một chiều; `Cleared` là vĩnh viễn, không bao giờ khóa lại, quái không respawn). Phòng được nhận diện bằng tọa độ lưới; trạng thái cổng được đồng bộ bằng `ClientRpc` `SetRoomGatesClientRpc(Vector2Int roomGrid, bool closed)` để mỗi máy hạ/nâng cổng trên bản đồ mà nó tự dựng từ seed (không cần NetworkObject cho phòng).
+
+Luồng:
+
+1. Server mỗi 0,2 giây kiểm tra các phòng đang `Idle`: nếu có ít nhất 1 người chơi **còn sống và không `Downed`** có vị trí (theo Server) nằm trong vùng "lõi" của phòng — hình vuông cạnh `roomSize − 3` (thụt vào 1,5 m mỗi phía để không kích hoạt khi mới đứng ở ngưỡng cửa) — thì kích hoạt khóa.
+2. Khi khóa, Server theo thứ tự: (a) đặt `Locked`; (b) dịch chuyển vào trong phòng 2 m mọi người chơi đang đứng trong vùng ngưỡng cửa (cách mặt tường dưới 1,5 m, theo bề rộng cửa) bằng `ClientRpc` nhắm chủ nhân theo mục 2.1.1 điểm 3, để không ai bị kẹt trong collider cổng; (c) gọi `SetRoomGatesClientRpc(roomGrid, true)`; (d) sau **0,8 giây** (cổng đã hạ xong) spawn quái theo mục 17.5. Với phòng `Boss`: đặt `GameState = BossFight` và spawn boss ở bước (d).
+3. Điều kiện mở: mọi quái thuộc phòng đó đã chết, kể cả quái do boss triệu hồi (phòng `Boss`: khi boss chết thì Server tự hạ mọi quái còn sống của phòng). Khi đó Server đặt `Cleared`, gọi `SetRoomGatesClientRpc(roomGrid, false)` và trao thưởng (mục 17.7). Với phòng `Boss` tiếp tục luồng `Victory` như mục 10.2.
+4. Người chơi đứng ngoài lúc cổng hạ bị chặn bên ngoài cho đến khi phòng `Cleared` (chấp nhận được). Người chơi `Downed` bên trong vẫn được đồng đội bên trong revive. Nếu mọi người chơi còn sống đều `Downed`/`Dead` thì luật `GameOver` ở mục 3.3 và 10.2 áp dụng như cũ (cổng không thay đổi luật này).
+
+Cổng (đặt ở **mọi** cửa của phòng `Combat`/`Boss`, kể cả cửa người chơi vừa đi vào):
+
+- **Hình**: hàng song sắt đứng (khối mảnh khoảng 0,15 × chiều cao tường × 0,15, cách nhau khoảng 0,4 m) cộng thanh ngang trên và dưới, bề ngang bằng `_corridorWidth`, đặt đúng mặt phẳng tường chứa cửa; chất liệu sắt tối qua `_gateMaterial`.
+- **Chuyển động**: đóng = hạ từ trên xuống trong 0,6 giây; mở = nâng lên trong 0,8 giây (lên trên đỉnh tường), bằng coroutine + `AnimationCurve`. Phát âm thanh đóng/mở (chưa có clip thì để `// TODO(cần xác nhận)`).
+- **Va chạm**: `BoxCollider` phủ khoảng cửa, **bật khi đóng và TẮT khi mở** (bắt buộc, nếu không người chơi không đi qua được). Thêm `NavMeshObstacle` (carve bật) hoạt động khi đóng.
+- Bản MVP: cổng đóng chặn cả đạn lẫn tầm nhìn của AI (đạn xuyên song sắt là việc của bản sau).
+
+### 17.5 Quái spawn theo phòng (thay cho spawn toàn bản đồ lúc bắt đầu)
+
+- Quái **KHÔNG** còn được spawn hàng loạt khi vào `Playing`. `DungeonEnemySpawner` chỉ spawn khi một phòng chuyển sang `Locked`; boss chỉ spawn khi phòng `Boss` `Locked`. Không bao giờ có quái trong hành lang hoặc phòng an toàn.
+- Số quái phòng `Combat` = `max(1, round(N × hệ số mục 15.3))`, với N là số quái mỗi phòng mà `DungeonEnemySpawner` đang roll hiện nay (giữ nguyên khoảng giá trị và cách chọn loại Imp/Archer/Brute hiện có; chỗ nào không rõ thì để `// TODO(cần xác nhận)`, không tự bịa số).
+- Vị trí: trong vùng sàn phòng, cách tường tối thiểu 2 m, qua `NavMesh.SamplePosition` (mục 15.2), không trùng vị trí cột; **NÊN** tránh bán kính 4 m quanh người chơi nếu còn chỗ.
+- Server đếm `aliveEnemies` theo từng phòng; quái chết hoặc despawn đều giảm bộ đếm. Quái rơi ra ngoài bản đồ (y < -10) coi như đã chết để phòng không bị kẹt khóa mãi.
+- Chỉ **một đợt** quái mỗi phòng.
+
+### 17.6 Phòng Upgrade và Treasure
+
+- **Upgrade**: đúng 1 `InteractiveShrine` ở tâm phòng, dùng lại hệ thống tế đàn 3 lựa chọn của nhóm (mỗi người chơi dùng một lần mỗi tế đàn, đúng cơ chế `_usedShrineIds` hiện có). `ShrineId` xác định theo tọa độ lưới của phòng để giống nhau trên mọi máy.
+- **Treasure**: `treasureChestCount` (mặc định **2**) `LootChest` thường đặt đối xứng quanh tâm phòng, mở theo luật mục 6.3 (40% bùa lợi / 60% vũ khí). Rương dùng chung (ai mở trước thì nhận), giữ như hiện tại.
+- Rương **chỉ** xuất hiện ở phòng `Treasure` (và rương boss); không còn rương rải trong phòng khác.
+
+### 17.7 Tiền "Linh hồn" (Souls)
+
+- `PlayerWallet.cs` trên `Player.prefab` với `NetworkVariable<int> Souls`: **chỉ Server ghi**, chỉ chủ nhân đọc (`NetworkVariableReadPermission.Owner`). Bắt đầu mỗi lượt chơi = 0 (không giữ giữa các lượt).
+- **Nhận tiền (chia sẻ)**: khi một quái chết, **mọi người chơi còn sống (không `Dead`) cùng nhận đủ mức thưởng**, để không tranh đòn kết liễu. Mức mặc định: Imp 5, Archer 8, Brute 15, Imp do boss triệu hồi 0, boss 0. Khi phòng `Combat` chuyển `Cleared`: mỗi người chơi còn sống nhận thêm **+20** (`roomClearBonus`). Các số là `[SerializeField]`.
+- HUD: một bộ đếm "Linh hồn: N" ở góc trên phải.
+
+### 17.8 Phòng Shop — mua riêng từng người, bày chung — ĐÃ CHỐT
+
+- `ShopStation.cs` (NetworkObject) ở tâm phòng `Shop`, hiện gợi ý `[E]` khi người chơi trong 3 m.
+- **5 món bày bán, giống hệt nhau với mọi người chơi**: Server chọn một lần khi phòng được dựng (rng riêng theo seed) 5 món **khác nhau** từ nhóm 8 món: 4 vũ khí (Pistol, SMG, Shotgun, Rifle) và 4 bùa lợi (Max Health Up, Swift Boots, Berserker Charm, Guardian Shield). Lưu thành `NetworkList<int> OfferIds` để mọi máy hiển thị cùng 5 món. KHÔNG dùng vật phẩm ngoài nhóm 8 món này.
+- **Mua là riêng của từng người, hiển thị là chung**: Server giữ `Dictionary<ulong, HashSet<int>> purchased` (clientId → các món đã mua). Mua không làm món biến mất với người khác. Ví dụ shop bán A, B, C, D, E: người 1 mua A và B thì người 1 thấy A, B ở trạng thái "ĐÃ MUA", còn người 2 vẫn thấy và mua được cả A, B, C, D, E. Một người mua được **nhiều món** miễn đủ Linh hồn, mỗi món tối đa **1 lần cho mỗi người**.
+- **Giá mặc định** (thêm trường `ShopPrice` kiểu int, `[SerializeField]`, vào `WeaponData` và `PowerUpData`): vũ khí 80; Max Health Up 50; Swift Boots 50; Berserker Charm 50; Guardian Shield 30.
+- **Luồng**: bấm `[E]` mở `ShopModalUI` (uGUI, cục bộ, giống modal tế đàn; Esc để đóng; không pause game) với 5 thẻ gồm icon, tên, mô tả, giá và trạng thái ("ĐÃ MUA" / "KHÔNG ĐỦ LINH HỒN"). Bấm mua gọi `BuyOfferServerRpc(int offerIndex)` (`RequireOwnership = false`, dùng clientId của người gửi). Server kiểm tra theo thứ tự: người gửi còn sống và không `Downed`; đứng trong 3 m (theo vị trí Server); `GameState` là `Playing` hoặc `BossFight`; `offerIndex` hợp lệ; người này chưa mua món đó; đủ Linh hồn; nếu là vũ khí thì người này chưa sở hữu khẩu đó (nếu đã có: từ chối, **không trừ tiền**, báo "Bạn đã có vũ khí này"). Hợp lệ thì trừ Linh hồn, trao món qua **đúng đường trao vật phẩm đang có** (vũ khí như `ItemPickup`; bùa lợi qua `PlayerBuffManager`, kể cả Guardian Shield kích hoạt ngay), đánh dấu đã mua và gửi kết quả cho đúng người mua bằng `ClientRpc` nhắm chủ nhân. Không hợp lệ thì chỉ báo lỗi cho người đó, không đổi trạng thái nào.
+- KHÔNG có: bán lại đồ, làm mới kho, giá đổi theo số lần mua.
+
+### 17.9 Bản đồ (mục 16.8) — cập nhật nhỏ
+
+- Phòng đã lộ hiển thị biểu tượng theo loại: `Boss` đầu lâu (đã có), `Upgrade` tế đàn, `Treasure` rương, `Shop` đồng xu, `Combat` chưa dọn có ổ khóa nhỏ (biến mất khi `Cleared`). `Spawn` không biểu tượng.
+
+### 17.10 Chưa làm ở bản này
+
+Nhiều đợt quái trong một phòng, phòng mini-boss, phòng bí mật, chìa khóa, tiền vĩnh viễn giữa các lượt (kiểu Gears của Hellhole), bán lại đồ, làm mới kho shop, đạn/tầm nhìn xuyên song sắt, cắt cảnh khi vào phòng boss. AI/lập trình viên KHÔNG ĐƯỢC tự thêm các mục này.
+
+### 17.11 Tiêu chí nghiệm thu (test 2–4 máy)
+
+1. Gameplay không còn cột/sàn test; sàn không nhấp nháy.
+2. Hành lang nhìn thấy được từ cửa phòng (đèn, khung cửa, sàn khác màu) và không có quái trong hành lang.
+3. Vào phòng `Combat`: cổng hạ ở mọi cửa, quái xuất hiện và không ra khỏi phòng; diệt hết thì cổng mở; vào lại không bị khóa.
+4. Người đứng ngoài lúc cổng hạ bị chặn đến khi phòng mở; revive đồng đội gục bên trong vẫn được.
+5. Phòng `Boss`: khóa khi bước vào, boss mới spawn, `GameState = BossFight`; boss chết thì mở cổng và `Victory`.
+6. Loại phòng và cột **giống hệt** trên mọi máy cùng seed; các phòng Upgrade/Treasure/Shop nằm ở nhánh cụt khi có thể.
+7. Upgrade: mỗi người dùng tế đàn đúng 1 lần. Treasure: có 2 rương.
+8. Shop: 5 món giống nhau trên mọi máy; người 1 mua A, B thì người 2 vẫn mua được A, B; mua thiếu tiền / mua lại / đứng xa / sai trạng thái đều bị Server từ chối.
+9. Linh hồn: hạ quái cả đội cùng được cộng; reset về 0 khi lượt mới.
+
+---
+
+## 18. Ghi nhận thay đổi của nhóm so với đặc tả gốc (đã có trong nhánh `feature/shrine-and-stats`)
+
+- Bỏ vũ khí cận chiến; mọi vũ khí là súng bắn xa.
+- Đạn dự trữ vô hạn; băng đạn (`MagSize`) vẫn có giới hạn, HUD hiển thị `đạn hiện tại / băng đạn`.
+- Nâng cấp súng toàn cục giữ nguyên khi đổi súng; modifier qua `WeaponModifierData`; `PlayerStats` (máu cộng thêm, giáp, tốc chạy). Chi tiết công thức giáp xem `Documentation/Hellfire_Bao_Cao_Kien_Truc_Va_Tac_Dong.md`.
+- Tế đàn chọn 1 trong 3 (`InteractiveShrine`), mỗi người chơi dùng một lần mỗi tế đàn.
+
+Các điểm này **được công nhận là đúng** và thắng các mô tả cũ ở mục 3, 6.1, 6.2 nếu mâu thuẫn (ví dụ về "đạn dự trữ"). AI/lập trình viên KHÔNG ĐƯỢC hoàn nguyên chúng.

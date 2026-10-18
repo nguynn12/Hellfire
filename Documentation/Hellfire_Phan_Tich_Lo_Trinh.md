@@ -49,6 +49,11 @@
 
 💡 **Đề xuất bổ sung — Nên gắn mốc thời gian cụ thể** cho từng giai đoạn (ví dụ theo tuần) để dễ theo dõi tiến độ, thay vì chỉ liệt kê đầu việc. Có thể dùng bảng Kanban đơn giản (Trello/Notion) để 3 người theo dõi lẫn nhau.
 
+* Giai đoạn 4.4 - Bổ sung nền tảng (làm trước 4.5) Chuyển di chuyển người chơi sang owner-authoritative (đặc tả mục 2.1.1), cổng chờ đủ máy khi sinh bản đồ, kiểm tra vị trí spawn trên NavMesh, cân bằng quái/boss theo số người chơi (đặc tả mục 15). Test bằng 2 máy trước khi đi tiếp.
+* Giai đoạn 4.5 - UI nâng cao và cảm giác chơi (đặc tả mục 16) Chia 2 đợt: 4.5A (tên/màu/số người chơi, panel và marker đồng đội, Ready-up và IP ở Lobby), 4.5B (loading, hiệu ứng nút, thanh máu boss, phản hồi chiến đấu, bản đồ Tab, cài đặt FOV/âm lượng, tổng kết lượt chơi).
+
+* Giai đoạn 4.6 - Phòng, cổng sắt và cửa hàng (đặc tả mục 17) Dọn đấu trường test, 6 loại phòng (Spawn/Combat/Upgrade/Treasure/Shop/Boss), cột ít, hành lang không quái, cổng sắt khóa phòng, quái spawn theo phòng, tiền Linh hồn, shop 5 món mua riêng từng người. Thứ tự khuyến nghị: 4.4 -> 4.6 -> 4.5. Chia 2 đợt: 4.6A (17.0-17.5), 4.6B (17.6-17.9).
+
 ## 4. Phân bổ nhân sự
 
 - **Tạ Nhật Nguyên**: Chịu trách nhiệm thiết lập nền tảng mạng LAN, lập trình bộ điều khiển nhân vật và thuật toán sinh bản đồ ngục tối ngẫu nhiên.
