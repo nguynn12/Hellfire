@@ -41,6 +41,11 @@ namespace Hellfire.Dungeon
         [Tooltip("Thưởng Linh hồn cho mỗi người chơi còn sống khi phòng Combat Cleared (Mục 17.7)")]
         [SerializeField] private int _combatRoomClearSoulsBonus = 20;
 
+        [Header("Special Rooms (Mục 17.6)")]
+        [SerializeField] private GameObject _shrinePrefab;
+        [SerializeField] private GameObject _lootChestPrefab;
+        [SerializeField] private int _treasureChestCount = 2;
+
         [Header("Debug / Fallback Seed")]
         [Tooltip("Nếu > 0, Server sẽ dùng seed này để test bản đồ cố định")]
         [SerializeField] private int _overrideSeed = 0;
@@ -260,17 +265,121 @@ namespace Hellfire.Dungeon
             // (a) Dịch chuyển người chơi về phòng spawn (Mục 2.1.1)
             PositionPlayersAtSpawn();
 
-            // (b) Spawn quái / rương / boss (Mục 15.1)
+            // (b) Spawn phòng đặc biệt: Upgrade (InteractiveShrine) & Treasure (LootChest) (Mục 17.6)
+            SpawnSpecialRoomsContents();
+
+            // (c) Spawn quái / rương / boss (Mục 15.1)
             OnAllClientsReady?.Invoke(DungeonSeed.Value);
 
-            // (c) Chuyển CurrentState = Playing
+            // (d) Chuyển CurrentState = Playing
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.SetState(GameState.Playing);
             }
 
-            // (d) Khởi tạo trạng thái phòng và cổng sắt (Mục 17.4)
+            // (e) Khởi tạo trạng thái phòng và cổng sắt (Mục 17.4)
             InitializeRoomGatesAndLockStates();
+        }
+
+        /// <summary>
+        /// Sinh nội dung cho các phòng đặc biệt (Upgrade, Treasure) theo mục 17.6.
+        /// </summary>
+        private void SpawnSpecialRoomsContents()
+        {
+            if (!IsServer || _generator == null || _generator.ActiveGrid == null) return;
+
+            var grid = _generator.ActiveGrid;
+
+            foreach (var kvp in grid.Rooms)
+            {
+                var room = kvp.Value;
+                if (room == null) continue;
+
+                if (room.RoomType == DungeonRoomType.Upgrade)
+                {
+                    SpawnUpgradeRoomShrine(room);
+                }
+                else if (room.RoomType == DungeonRoomType.Treasure)
+                {
+                    SpawnTreasureRoomChests(room);
+                }
+            }
+        }
+
+        private void SpawnUpgradeRoomShrine(DungeonRoomNode room)
+        {
+            if (_shrinePrefab == null)
+            {
+                Debug.LogWarning("[DungeonManager] Thiếu _shrinePrefab khi tạo phòng Upgrade!");
+                return;
+            }
+
+            Vector3 shrinePos = room.WorldCenter;
+            if (UnityEngine.AI.NavMesh.SamplePosition(shrinePos, out var hit, 3.0f, UnityEngine.AI.NavMesh.AllAreas))
+            {
+                shrinePos = hit.position;
+            }
+
+            var shrineObj = Instantiate(_shrinePrefab, shrinePos, Quaternion.identity);
+            int shrineId = room.GridPosition.x * 1000 + room.GridPosition.y;
+
+            var shrine = shrineObj.GetComponent<Hellfire.Items.InteractiveShrine>();
+            if (shrine != null)
+            {
+                shrine.SetShrineId(shrineId);
+            }
+
+            var netObj = shrineObj.GetComponent<NetworkObject>();
+            if (netObj != null)
+            {
+                netObj.Spawn(true);
+            }
+
+            Debug.Log($"[DungeonManager] Đã spawn InteractiveShrine (ID: {shrineId}) tại tâm phòng Upgrade {room.GridPosition} ({shrinePos})");
+        }
+
+        private void SpawnTreasureRoomChests(DungeonRoomNode room)
+        {
+            if (_lootChestPrefab == null)
+            {
+                Debug.LogWarning("[DungeonManager] Thiếu _lootChestPrefab khi tạo phòng Treasure!");
+                return;
+            }
+
+            int count = Mathf.Max(1, _treasureChestCount);
+            float spacing = 2.5f;
+
+            for (int i = 0; i < count; i++)
+            {
+                // Đặt đối xứng quanh tâm phòng (Mục 17.6)
+                float xOffset = (i == 0) ? -spacing : spacing;
+                Vector3 proposedPos = room.WorldCenter + new Vector3(xOffset, 0f, 0f);
+                Vector3 chestPos = proposedPos;
+
+                if (UnityEngine.AI.NavMesh.SamplePosition(proposedPos, out var hit, 3.0f, UnityEngine.AI.NavMesh.AllAreas))
+                {
+                    chestPos = hit.position;
+                }
+
+                Vector3 lookDir = (room.WorldCenter - chestPos);
+                lookDir.y = 0;
+                Quaternion rot = (lookDir.sqrMagnitude > 0.01f) ? Quaternion.LookRotation(lookDir) : Quaternion.identity;
+
+                var chestObj = Instantiate(_lootChestPrefab, chestPos, rot);
+                var chest = chestObj.GetComponent<Hellfire.Items.LootChest>();
+                if (chest != null)
+                {
+                    chest.IsBossChest = false;
+                }
+
+                var netObj = chestObj.GetComponent<NetworkObject>();
+                if (netObj != null)
+                {
+                    netObj.Spawn(true);
+                }
+
+                Debug.Log($"[DungeonManager] Đã spawn LootChest {i + 1}/{count} tại phòng Treasure {room.GridPosition} ({chestPos})");
+            }
         }
 
         private IEnumerator LoadingGateTimeoutRoutine()

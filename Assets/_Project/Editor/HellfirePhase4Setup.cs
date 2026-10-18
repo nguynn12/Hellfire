@@ -87,6 +87,28 @@ namespace Hellfire.Editor
             }
         }
 
+        [MenuItem("Hellfire/Phase 4.6B/Setup Special Rooms (Shrine, Chests, Pickups)", false, 2)]
+        public static void SetupSpecialRoomsAssets()
+        {
+            EnsureDirectories();
+
+            var powerUps = CreatePowerUpDataAssetsInternal();
+            var weapons = LoadAllWeaponDataAssets();
+            var itemPickupPrefab = CreateItemPickupPrefabInternal(powerUps, weapons);
+            var normalChestPrefab = CreateLootChestPrefabInternal("LootChest", false, powerUps, weapons, itemPickupPrefab);
+            var bossChestPrefab = CreateLootChestPrefabInternal("BossLootChest", true, powerUps, weapons, itemPickupPrefab);
+            var shrinePrefab = CreateInteractiveShrinePrefabInternal();
+
+            UpdateBossPrefabInternal(bossChestPrefab);
+            RegisterPrefabsToNetworkManagerInternal(itemPickupPrefab, normalChestPrefab, bossChestPrefab, shrinePrefab);
+            RegisterToDefaultNetworkPrefabsInternal(itemPickupPrefab, normalChestPrefab, bossChestPrefab, shrinePrefab);
+            UpdateDungeonManagerSpecialRoomsInScene(shrinePrefab, normalChestPrefab);
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[HellfirePhase4Setup] Hoàn tất thiết lập Special Rooms (Shrine, Chests, Pickups)!");
+        }
+
         private static void EnsureDirectories()
         {
             if (!Directory.Exists(PowerUpDataDir)) Directory.CreateDirectory(PowerUpDataDir);
@@ -372,6 +394,83 @@ namespace Hellfire.Editor
             return prefab;
         }
 
+        public static GameObject CreateInteractiveShrinePrefabInternal()
+        {
+            string path = $"{PrefabDir}/InteractiveShrine.prefab";
+            var root = new GameObject("InteractiveShrine");
+            root.AddComponent<NetworkObject>();
+
+            var col = root.AddComponent<BoxCollider>();
+            col.isTrigger = true;
+            col.center = new Vector3(0f, 1.0f, 0f);
+            col.size = new Vector3(2.5f, 2.0f, 2.5f);
+
+            var audioSource = root.AddComponent<AudioSource>();
+            audioSource.spatialBlend = 1.0f;
+            audioSource.playOnAwake = false;
+
+            // Pedestal Base
+            var baseObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            baseObj.name = "AltarBase";
+            baseObj.transform.SetParent(root.transform);
+            baseObj.transform.localPosition = new Vector3(0f, 0.4f, 0f);
+            baseObj.transform.localScale = new Vector3(1.6f, 0.4f, 1.6f);
+            Object.DestroyImmediate(baseObj.GetComponent<Collider>());
+            var stoneMat = new Material(Shader.Find("Standard"));
+            stoneMat.color = new Color(0.25f, 0.25f, 0.3f);
+            baseObj.GetComponent<Renderer>().material = stoneMat;
+
+            // Glowing Flame / Core
+            var flameObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            flameObj.name = "FlameVisual";
+            flameObj.transform.SetParent(root.transform);
+            flameObj.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+            flameObj.transform.localScale = new Vector3(0.5f, 0.7f, 0.5f);
+            Object.DestroyImmediate(flameObj.GetComponent<Collider>());
+            var flameMat = new Material(Shader.Find("Standard"));
+            flameMat.color = new Color(0.2f, 0.8f, 1f);
+            flameMat.EnableKeyword("_EMISSION");
+            flameMat.SetColor("_EmissionColor", new Color(0.2f, 0.8f, 1f) * 2f);
+            flameObj.GetComponent<Renderer>().material = flameMat;
+
+            // Point Light
+            var lightObj = new GameObject("ShrineLight");
+            lightObj.transform.SetParent(root.transform);
+            lightObj.transform.localPosition = new Vector3(0f, 1.5f, 0f);
+            var light = lightObj.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 5.0f;
+            light.intensity = 2.0f;
+            light.color = new Color(0.3f, 0.85f, 1f);
+
+            // Prompt Text
+            var promptObj = new GameObject("PromptText");
+            promptObj.transform.SetParent(root.transform);
+            promptObj.transform.localPosition = new Vector3(0f, 2.2f, 0f);
+            var promptTmp = promptObj.AddComponent<TextMeshPro>();
+            promptTmp.text = "[E] Cầu Nguyện Tế Đàn";
+            promptTmp.fontSize = 3.5f;
+            promptTmp.alignment = TextAlignmentOptions.Center;
+            promptTmp.rectTransform.sizeDelta = new Vector2(5f, 1.5f);
+            promptObj.SetActive(false);
+
+            var shrine = root.AddComponent<InteractiveShrine>();
+            var so = new SerializedObject(shrine);
+            so.FindProperty("_shrineType").enumValueIndex = (int)ShrineType.BodyShrine;
+            so.FindProperty("_interactionDistance").floatValue = 3.0f;
+            so.FindProperty("_promptText").objectReferenceValue = promptTmp;
+            so.FindProperty("_flameVisual").objectReferenceValue = flameObj;
+            so.FindProperty("_shrineLight").objectReferenceValue = light;
+            so.FindProperty("_shrineRenderer").objectReferenceValue = flameObj.GetComponent<Renderer>();
+            so.FindProperty("_audioSource").objectReferenceValue = audioSource;
+            so.ApplyModifiedProperties();
+
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
+            Object.DestroyImmediate(root);
+            Debug.Log($"[HellfirePhase4Setup] Đã tạo Prefab {path}");
+            return prefab;
+        }
+
         public static void UpdatePlayerPrefabInternal()
         {
             var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
@@ -452,6 +551,45 @@ namespace Hellfire.Editor
 
             PrefabUtility.SaveAsPrefabAsset(nmObj, NetworkManagerPrefabPath);
             Object.DestroyImmediate(nmObj);
+        }
+
+        public static void RegisterToDefaultNetworkPrefabsInternal(params GameObject[] prefabs)
+        {
+            var list = AssetDatabase.LoadAssetAtPath<Unity.Netcode.NetworkPrefabsList>("Assets/DefaultNetworkPrefabs.asset");
+            if (list != null)
+            {
+                foreach (var p in prefabs)
+                {
+                    if (p == null) continue;
+                    if (!list.Contains(p))
+                    {
+                        list.Add(new NetworkPrefab { Prefab = p });
+                        Debug.Log($"[HellfirePhase4Setup] Đã thêm {p.name} vào DefaultNetworkPrefabs.asset");
+                    }
+                }
+                EditorUtility.SetDirty(list);
+            }
+        }
+
+        public static void UpdateDungeonManagerSpecialRoomsInScene(GameObject shrinePrefab, GameObject chestPrefab)
+        {
+            var scene = EditorSceneManager.OpenScene(GameplayScenePath, OpenSceneMode.Single);
+            var dungeonManagerObj = GameObject.Find("DungeonManager");
+            if (dungeonManagerObj != null)
+            {
+                var dm = dungeonManagerObj.GetComponent<DungeonManager>();
+                if (dm != null)
+                {
+                    var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                    typeof(DungeonManager).GetField("_shrinePrefab", flags)?.SetValue(dm, shrinePrefab);
+                    typeof(DungeonManager).GetField("_lootChestPrefab", flags)?.SetValue(dm, chestPrefab);
+                    typeof(DungeonManager).GetField("_treasureChestCount", flags)?.SetValue(dm, 2);
+                    EditorUtility.SetDirty(dm);
+                    Debug.Log("[HellfirePhase4Setup] Đã cấu hình _shrinePrefab và _lootChestPrefab cho DungeonManager trong Scene Gameplay");
+                }
+            }
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
         }
 
         public static void UpdateGameplaySceneInternal(GameObject lootChestPrefab)

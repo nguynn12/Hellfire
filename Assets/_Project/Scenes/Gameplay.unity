@@ -559,6 +559,8 @@ MonoBehaviour:
   _bossPrefab: {fileID: 5937095992736994228, guid: d3e9d3ba396165e4a9237c2794c12a48, type: 3}
   _minEnemiesPerNormalRoom: 2
   _maxEnemiesPerNormalRoom: 4
+  _maxNavMeshSampleDistance: 3
+  _scalingData: {fileID: 0}
 --- !u!114 &56814010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -574,7 +576,13 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _generator: {fileID: 0}
   _navMeshBaker: {fileID: 0}
+  _enemySpawner: {fileID: 0}
+  _combatRoomClearSoulsBonus: 20
+  _shrinePrefab: {fileID: 3307499296855584155, guid: 85e113e7b6b8c416386ee9842f992597, type: 3}
+  _lootChestPrefab: {fileID: 8559227056804521236, guid: d42d19d74d03140f0b38397a1eaa3d46, type: 3}
+  _treasureChestCount: 2
   _overrideSeed: 0
+  _readyTimeoutSeconds: 30
 --- !u!114 &56814011
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -642,6 +650,12 @@ MonoBehaviour:
   _wallMaterial: {fileID: 0}
   _spawnFloorMaterial: {fileID: 0}
   _bossFloorMaterial: {fileID: 0}
+  _corridorFloorMaterial: {fileID: 0}
+  _doorFrameMaterial: {fileID: 0}
+  _doorFramePostWidth: 0.35
+  _doorFramePostDepth: 1.2
+  _doorFrameLintelHeight: 0.4
+  _gateMaterial: {fileID: 0}
   _dungeonRoot: {fileID: 0}
 --- !u!1 &100988745
 GameObject:
@@ -1093,7 +1107,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4278512639
   m_fontColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -1106,7 +1120,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -2226,8 +2240,12 @@ MonoBehaviour:
   _hitmarkerImage: {fileID: 567592443}
   _healthSlider: {fileID: 195085889}
   _healthText: {fileID: 1256777776}
+  _armorText: {fileID: 0}
   _downedOverlayPanel: {fileID: 1192755082}
   _downedTimerText: {fileID: 379209005}
+  _shieldIndicatorPanel: {fileID: 0}
+  _shieldTimerText: {fileID: 0}
+  _buffToastText: {fileID: 0}
   _weaponNameText: {fileID: 764677033}
   _ammoText: {fileID: 244407627}
   _reloadPromptText: {fileID: 448724196}
@@ -2238,6 +2256,13 @@ MonoBehaviour:
   _resumeButton: {fileID: 1456293480}
   _leaveGameButton: {fileID: 927923796}
   _playerInfoText: {fileID: 191228618}
+  _victoryOverlayPanel: {fileID: 0}
+  _victoryReturnButton: {fileID: 0}
+  _victoryWaitingText: {fileID: 0}
+  _gameOverOverlayPanel: {fileID: 0}
+  _gameOverReturnButton: {fileID: 0}
+  _gameOverWaitingText: {fileID: 0}
+  _soulsText: {fileID: 0}
 --- !u!1 &764677031
 GameObject:
   m_ObjectHideFlags: 0
@@ -2317,7 +2342,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -3723,7 +3748,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4278255360
   m_fontColor: {r: 0, g: 1, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -3736,7 +3761,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
