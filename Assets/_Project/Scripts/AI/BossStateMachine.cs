@@ -271,6 +271,10 @@ namespace Hellfire.AI
                 if (netObj != null)
                 {
                     netObj.Spawn(true);
+                    if (Hellfire.Dungeon.DungeonEnemySpawner.Instance != null)
+                    {
+                        Hellfire.Dungeon.DungeonEnemySpawner.Instance.RegisterBossSummon(imp);
+                    }
                 }
             }
         }
@@ -280,6 +284,12 @@ namespace Hellfire.AI
             base.HandleDeath(killerId);
 
             if (!IsServer) return;
+
+            // Thông báo DungeonManager mở cổng phòng boss và dọn sạch quái triệu hồi (Mục 17.4)
+            if (Hellfire.Dungeon.DungeonManager.Instance != null)
+            {
+                Hellfire.Dungeon.DungeonManager.Instance.NotifyBossDied();
+            }
 
             // 1. Sinh Rương Boss (Mục 6.3: 100% rơi bùa lợi, 50% rơi thêm vũ khí)
             if (_bossChestPrefab != null)

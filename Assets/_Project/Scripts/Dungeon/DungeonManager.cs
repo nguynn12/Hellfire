@@ -5,6 +5,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Hellfire.Combat;
 using Hellfire.Networking;
 using Hellfire.Player;
 using Unity.Netcode;
@@ -12,6 +13,13 @@ using UnityEngine;
 
 namespace Hellfire.Dungeon
 {
+    public enum RoomLockState
+    {
+        Idle = 0,
+        Locked = 1,
+        Cleared = 2
+    }
+
     [DisallowMultipleComponent]
     [RequireComponent(typeof(NetworkObject))]
     public class DungeonManager : NetworkBehaviour
@@ -21,6 +29,13 @@ namespace Hellfire.Dungeon
         [Header("Components")]
         [SerializeField] private DungeonGenerator _generator;
         [SerializeField] private RuntimeNavMeshBaker _navMeshBaker;
+        [SerializeField] private DungeonEnemySpawner _enemySpawner;
+
+        public DungeonGenerator Generator => _generator;
+        public DungeonEnemySpawner EnemySpawner => _enemySpawner;
+
+        private readonly Dictionary<Vector2Int, RoomLockState> _roomLockStates = new Dictionary<Vector2Int, RoomLockState>();
+        private Coroutine _roomLockRoutine;
 
         [Header("Debug / Fallback Seed")]
         [Tooltip("Nếu > 0, Server sẽ dùng seed này để test bản đồ cố định")]
@@ -76,6 +91,11 @@ namespace Hellfire.Dungeon
             {
                 _navMeshBaker = GetComponent<RuntimeNavMeshBaker>() ?? GetComponentInChildren<RuntimeNavMeshBaker>();
             }
+
+            if (_enemySpawner == null)
+            {
+                _enemySpawner = GetComponent<DungeonEnemySpawner>() ?? GetComponentInChildren<DungeonEnemySpawner>();
+            }
         }
 
         public override void OnNetworkSpawn()
@@ -124,6 +144,12 @@ namespace Hellfire.Dungeon
                 {
                     StopCoroutine(_loadingGateTimeoutCoroutine);
                     _loadingGateTimeoutCoroutine = null;
+                }
+
+                if (_roomLockRoutine != null)
+                {
+                    StopCoroutine(_roomLockRoutine);
+                    _roomLockRoutine = null;
                 }
             }
         }
@@ -238,6 +264,9 @@ namespace Hellfire.Dungeon
             {
                 GameManager.Instance.SetState(GameState.Playing);
             }
+
+            // (d) Khởi tạo trạng thái phòng và cổng sắt (Mục 17.4)
+            InitializeRoomGatesAndLockStates();
         }
 
         private IEnumerator LoadingGateTimeoutRoutine()
@@ -341,5 +370,259 @@ namespace Hellfire.Dungeon
             }
             return Vector3.zero;
         }
+
+        #region Room Locking & Gates (Mục 17.4 & 17.5)
+
+        private void InitializeRoomGatesAndLockStates()
+        {
+            if (!IsServer) return;
+
+            _roomLockStates.Clear();
+            if (_generator != null && _generator.ActiveGrid != null)
+            {
+                foreach (var kvp in _generator.ActiveGrid.Rooms)
+                {
+                    var room = kvp.Value;
+                    if (room.RoomType == DungeonRoomType.Combat || room.RoomType == DungeonRoomType.Boss)
+                    {
+                        _roomLockStates[room.GridPosition] = RoomLockState.Idle;
+                    }
+                }
+            }
+
+            if (_roomLockRoutine != null)
+            {
+                StopCoroutine(_roomLockRoutine);
+            }
+            _roomLockRoutine = StartCoroutine(RoomLockEvaluationRoutine());
+        }
+
+        private IEnumerator RoomLockEvaluationRoutine()
+        {
+            var wait = new WaitForSeconds(0.2f);
+
+            while (true)
+            {
+                yield return wait;
+
+                if (!IsServer || _generator == null || _generator.ActiveGrid == null) continue;
+
+                var state = GameManager.Instance != null ? GameManager.Instance.CurrentState.Value : GameState.Generating;
+                if (state != GameState.Playing && state != GameState.BossFight) continue;
+
+                // Duyệt qua các phòng Combat và Boss
+                foreach (var kvp in _generator.ActiveGrid.Rooms)
+                {
+                    var room = kvp.Value;
+                    if (room.RoomType != DungeonRoomType.Combat && room.RoomType != DungeonRoomType.Boss) continue;
+
+                    if (!_roomLockStates.TryGetValue(room.GridPosition, out var lockState))
+                    {
+                        _roomLockStates[room.GridPosition] = RoomLockState.Idle;
+                        lockState = RoomLockState.Idle;
+                    }
+
+                    if (lockState == RoomLockState.Idle)
+                    {
+                        // 1. Server mỗi 0.2s kiểm tra các phòng đang Idle: nếu có ít nhất 1 người chơi còn sống
+                        // và không Downed có vị trí nằm trong vùng "lõi" của phòng (roomSize - 3) thì khóa (Mục 17.4)
+                        if (IsAnyAlivePlayerInRoomCore(room))
+                        {
+                            LockRoom(room);
+                        }
+                    }
+                    else if (lockState == RoomLockState.Locked)
+                    {
+                        // 3. Điều kiện mở: mọi quái thuộc phòng đó đã chết (Mục 17.4 & 17.5)
+                        int aliveCount = _enemySpawner != null ? _enemySpawner.GetAliveEnemyCountInRoom(room.GridPosition) : 0;
+                        if (aliveCount == 0)
+                        {
+                            ClearRoom(room);
+                        }
+                    }
+                }
+            }
+        }
+
+        private bool IsAnyAlivePlayerInRoomCore(DungeonRoomNode room)
+        {
+            if (NetworkManager.Singleton == null || _generator == null) return false;
+
+            float halfCore = (_generator.RoomSize - 3f) * 0.5f; // thụt vào 1.5m mỗi phía (Mục 17.4)
+            Vector3 roomCenter = room.WorldCenter;
+
+            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+            {
+                if (client.PlayerObject == null) continue;
+                var player = client.PlayerObject;
+                var health = player.GetComponent<Health>();
+                if (health == null || health.IsDead.Value || health.IsDowned.Value) continue;
+
+                Vector3 pPos = player.transform.position;
+                if (Mathf.Abs(pPos.x - roomCenter.x) <= halfCore && Mathf.Abs(pPos.z - roomCenter.z) <= halfCore)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void LockRoom(DungeonRoomNode room)
+        {
+            // (a) Đặt Locked
+            _roomLockStates[room.GridPosition] = RoomLockState.Locked;
+            Debug.Log($"[DungeonManager] Kích hoạt khóa phòng {room.GridPosition} ({room.RoomType})!");
+
+            // (b) Dịch chuyển vào trong phòng 2m mọi người chơi đang đứng trong vùng ngưỡng cửa (Mục 17.4)
+            TeleportThresholdPlayersIntoRoom(room);
+
+            // (c) Gọi SetRoomGatesClientRpc(roomGrid, true)
+            SetRoomGatesClientRpc(room.GridPosition, true);
+
+            // (d) Sau 0.8 giây (cổng đã hạ xong) spawn quái hoặc boss (Mục 17.4 & 17.5)
+            StartCoroutine(DelayedRoomSpawnRoutine(room));
+        }
+
+        private void TeleportThresholdPlayersIntoRoom(DungeonRoomNode room)
+        {
+            if (NetworkManager.Singleton == null || _generator == null) return;
+
+            float halfRoom = _generator.RoomSize * 0.5f;
+            float halfCorridor = 4f * 0.5f; // Bề rộng cửa bằng _corridorWidth (4m)
+
+            foreach (var dir in DungeonGrid.CardinalDirections)
+            {
+                Vector2Int neighborCoord = room.GridPosition + dir;
+                if (!room.HasConnection(neighborCoord)) continue;
+
+                Vector3 wallCenter = room.WorldCenter + new Vector3(dir.x * halfRoom, 0f, dir.y * halfRoom);
+                bool isZAxisWall = (dir.y != 0);
+
+                foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+                {
+                    if (client.PlayerObject == null) continue;
+                    var player = client.PlayerObject;
+                    var health = player.GetComponent<Health>();
+                    if (health == null || health.IsDead.Value || health.IsDowned.Value) continue;
+
+                    Vector3 pPos = player.transform.position;
+                    bool inThreshold = false;
+                    Vector3 targetPos = pPos;
+
+                    if (isZAxisWall)
+                    {
+                        // Ngưỡng cửa trục Z: khoảng cách tới mặt tường <= 1.5m, bề rộng cửa theo trục X <= 2.0m
+                        if (Mathf.Abs(pPos.x - wallCenter.x) <= halfCorridor && Mathf.Abs(pPos.z - wallCenter.z) <= 1.5f)
+                        {
+                            inThreshold = true;
+                            // Dịch chuyển vào trong phòng 2m (hướng ngược lại với dir)
+                            targetPos = new Vector3(pPos.x, pPos.y, wallCenter.z - Mathf.Sign(dir.y) * 2f);
+                        }
+                    }
+                    else
+                    {
+                        // Ngưỡng cửa trục X: khoảng cách tới mặt tường <= 1.5m, bề rộng cửa theo trục Z <= 2.0m
+                        if (Mathf.Abs(pPos.z - wallCenter.z) <= halfCorridor && Mathf.Abs(pPos.x - wallCenter.x) <= 1.5f)
+                        {
+                            inThreshold = true;
+                            // Dịch chuyển vào trong phòng 2m (hướng ngược lại với dir)
+                            targetPos = new Vector3(wallCenter.x - Mathf.Sign(dir.x) * 2f, pPos.y, pPos.z);
+                        }
+                    }
+
+                    if (inThreshold)
+                    {
+                        Vector3 validatedPos = DungeonEnemySpawner.GetValidSpawnPosition(
+                            targetPos, room.WorldCenter, $"Ngưỡng cửa phòng {room.GridPosition}", 3f
+                        );
+                        var movement = player.GetComponent<PlayerMovement>();
+                        if (movement != null)
+                        {
+                            var rpcParams = new ClientRpcParams
+                            {
+                                Send = new ClientRpcSendParams
+                                {
+                                    TargetClientIds = new[] { client.ClientId }
+                                }
+                            };
+                            movement.TeleportOwnerClientRpc(validatedPos, player.transform.rotation, rpcParams);
+                            Debug.Log($"[DungeonManager] Đã dịch chuyển người chơi {client.ClientId} vào trong phòng {room.GridPosition} 2m để tránh kẹt cổng (Mục 17.4).");
+                        }
+                    }
+                }
+            }
+        }
+
+        private IEnumerator DelayedRoomSpawnRoutine(DungeonRoomNode room)
+        {
+            // Chờ 0.8 giây cho cổng hạ xong (Mục 17.4)
+            yield return new WaitForSeconds(0.8f);
+
+            if (!IsServer) yield break;
+
+            if (room.RoomType == DungeonRoomType.Combat)
+            {
+                if (_enemySpawner != null)
+                {
+                    _enemySpawner.SpawnEnemiesForRoom(room);
+                }
+            }
+            else if (room.RoomType == DungeonRoomType.Boss)
+            {
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.SetState(GameState.BossFight);
+                }
+
+                if (_enemySpawner != null)
+                {
+                    _enemySpawner.SpawnBossForRoom(room);
+                }
+            }
+        }
+
+        private void ClearRoom(DungeonRoomNode room)
+        {
+            _roomLockStates[room.GridPosition] = RoomLockState.Cleared;
+            SetRoomGatesClientRpc(room.GridPosition, false);
+            Debug.Log($"[DungeonManager] Phòng {room.GridPosition} ({room.RoomType}) đã dọn sạch quái (Cleared)! Cổng nâng lên.");
+
+            if (room.RoomType == DungeonRoomType.Boss)
+            {
+                if (_enemySpawner != null)
+                {
+                    _enemySpawner.ClearAllEnemiesInRoom(room.GridPosition);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Được gọi khi Boss chết để mở cổng phòng Boss và dọn sạch quái triệu hồi còn sót (Mục 17.4).
+        /// </summary>
+        public void NotifyBossDied()
+        {
+            if (!IsServer) return;
+
+            if (_generator != null && _generator.ActiveGrid != null && _generator.ActiveGrid.BossRoom != null)
+            {
+                var bossRoom = _generator.ActiveGrid.BossRoom;
+                if (_roomLockStates.TryGetValue(bossRoom.GridPosition, out var state) && state != RoomLockState.Cleared)
+                {
+                    ClearRoom(bossRoom);
+                }
+            }
+        }
+
+        [ClientRpc]
+        public void SetRoomGatesClientRpc(Vector2Int roomGrid, bool closed)
+        {
+            if (_generator != null)
+            {
+                _generator.SetRoomGates(roomGrid, closed);
+            }
+        }
+
+        #endregion
     }
 }

@@ -43,12 +43,18 @@ namespace Hellfire.Dungeon
         [SerializeField] private float _doorFramePostDepth = 1.2f;
         [SerializeField] private float _doorFrameLintelHeight = 0.4f;
 
+        [Header("Gate Settings (Mục 17.4)")]
+        [Tooltip("Vật liệu sắt tối cho cổng phòng Combat và Boss")]
+        [SerializeField] private Material _gateMaterial;
+
         [Header("Hierarchy Root")]
         [SerializeField] private Transform _dungeonRoot;
 
         private DungeonGrid _activeGrid;
+        private readonly Dictionary<Vector2Int, List<RoomGate>> _roomGates = new Dictionary<Vector2Int, List<RoomGate>>();
 
         public DungeonGrid ActiveGrid => _activeGrid;
+        public IReadOnlyDictionary<Vector2Int, List<RoomGate>> RoomGates => _roomGates;
         public float GridCellSize => _gridCellSize;
         public float RoomSize => _roomSize;
 
@@ -167,10 +173,27 @@ namespace Hellfire.Dungeon
             {
                 DestroyImmediate(_dungeonRoot.GetChild(i).gameObject);
             }
+
+            _roomGates.Clear();
+        }
+
+        public void SetRoomGates(Vector2Int roomCoord, bool closed)
+        {
+            if (_roomGates.TryGetValue(roomCoord, out var gates))
+            {
+                foreach (var gate in gates)
+                {
+                    if (gate != null)
+                    {
+                        gate.SetClosed(closed);
+                    }
+                }
+            }
         }
 
         private void BuildDungeonGeometry(DungeonGrid grid, int dungeonSeed)
         {
+            _roomGates.Clear();
             if (_dungeonRoot == null)
             {
                 var newRoot = new GameObject("DungeonGeometryRoot");
@@ -312,6 +335,12 @@ namespace Hellfire.Dungeon
 
                 // Dựng khung cửa (2 trụ + 1 dầm) ở mỗi cửa phòng (Mục 17.2)
                 BuildDoorFrame(parent, dir, wallPos);
+
+                // Dựng cổng sắt cho phòng Combat và Boss (Mục 17.4)
+                if (room.RoomType == DungeonRoomType.Combat || room.RoomType == DungeonRoomType.Boss)
+                {
+                    BuildRoomGate(parent, room, dir, wallPos);
+                }
             }
         }
 
@@ -390,6 +419,140 @@ namespace Hellfire.Dungeon
                 if (_doorFrameMaterial != null)
                 {
                     renderer.sharedMaterial = _doorFrameMaterial;
+                }
+                else if (_wallMaterial != null)
+                {
+                    renderer.sharedMaterial = _wallMaterial;
+                }
+            }
+        }
+
+        private void BuildRoomGate(Transform parent, DungeonRoomNode room, Vector2Int dir, Vector3 wallPos)
+        {
+            var gateObj = new GameObject($"Gate_{dir}");
+            gateObj.transform.SetParent(parent);
+            gateObj.transform.localPosition = new Vector3(wallPos.x, 0f, wallPos.z);
+
+            var roomGate = gateObj.AddComponent<RoomGate>();
+
+            var visualRoot = new GameObject("VisualRoot");
+            visualRoot.transform.SetParent(gateObj.transform);
+            visualRoot.transform.localPosition = Vector3.zero;
+
+            bool isZAxisWall = (dir.y != 0);
+
+            if (isZAxisWall)
+            {
+                // Song sắt đứng dọc theo trục X (cách nhau khoảng 0.4m)
+                for (float x = -1.6f; x <= 1.61f; x += 0.4f)
+                {
+                    var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    bar.name = $"Bar_{x:F1}";
+                    bar.transform.SetParent(visualRoot.transform);
+                    bar.transform.localPosition = new Vector3(x, _wallHeight * 0.5f, 0f);
+                    bar.transform.localScale = new Vector3(0.15f, _wallHeight, 0.15f);
+                    ApplyGateMaterial(bar);
+                    var col = bar.GetComponent<Collider>();
+                    if (col != null) DestroyImmediate(col);
+                }
+
+                // Thanh ngang trên
+                var topBar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                topBar.name = "Bar_Top";
+                topBar.transform.SetParent(visualRoot.transform);
+                topBar.transform.localPosition = new Vector3(0f, _wallHeight - 0.08f, 0f);
+                topBar.transform.localScale = new Vector3(_corridorWidth, 0.15f, 0.15f);
+                ApplyGateMaterial(topBar);
+                var topCol = topBar.GetComponent<Collider>();
+                if (topCol != null) DestroyImmediate(topCol);
+
+                // Thanh ngang dưới
+                var btmBar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                btmBar.name = "Bar_Bottom";
+                btmBar.transform.SetParent(visualRoot.transform);
+                btmBar.transform.localPosition = new Vector3(0f, 0.08f, 0f);
+                btmBar.transform.localScale = new Vector3(_corridorWidth, 0.15f, 0.15f);
+                ApplyGateMaterial(btmBar);
+                var btmCol = btmBar.GetComponent<Collider>();
+                if (btmCol != null) DestroyImmediate(btmCol);
+
+                // BoxCollider phủ toàn bộ cửa
+                var boxCol = gateObj.AddComponent<BoxCollider>();
+                boxCol.center = new Vector3(0f, _wallHeight * 0.5f, 0f);
+                boxCol.size = new Vector3(_corridorWidth, _wallHeight, 0.4f);
+
+                // NavMeshObstacle carve khi đóng
+                var navObs = gateObj.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+                navObs.center = new Vector3(0f, _wallHeight * 0.5f, 0f);
+                navObs.size = new Vector3(_corridorWidth, _wallHeight, 0.4f);
+                navObs.carving = true;
+
+                roomGate.Initialize(visualRoot.transform, boxCol, navObs, _wallHeight);
+            }
+            else
+            {
+                // Song sắt đứng dọc theo trục Z (cách nhau khoảng 0.4m)
+                for (float z = -1.6f; z <= 1.61f; z += 0.4f)
+                {
+                    var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    bar.name = $"Bar_{z:F1}";
+                    bar.transform.SetParent(visualRoot.transform);
+                    bar.transform.localPosition = new Vector3(0f, _wallHeight * 0.5f, z);
+                    bar.transform.localScale = new Vector3(0.15f, _wallHeight, 0.15f);
+                    ApplyGateMaterial(bar);
+                    var col = bar.GetComponent<Collider>();
+                    if (col != null) DestroyImmediate(col);
+                }
+
+                // Thanh ngang trên
+                var topBar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                topBar.name = "Bar_Top";
+                topBar.transform.SetParent(visualRoot.transform);
+                topBar.transform.localPosition = new Vector3(0f, _wallHeight - 0.08f, 0f);
+                topBar.transform.localScale = new Vector3(0.15f, 0.15f, _corridorWidth);
+                ApplyGateMaterial(topBar);
+                var topCol = topBar.GetComponent<Collider>();
+                if (topCol != null) DestroyImmediate(topCol);
+
+                // Thanh ngang dưới
+                var btmBar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                btmBar.name = "Bar_Bottom";
+                btmBar.transform.SetParent(visualRoot.transform);
+                btmBar.transform.localPosition = new Vector3(0f, 0.08f, 0f);
+                btmBar.transform.localScale = new Vector3(0.15f, 0.15f, _corridorWidth);
+                ApplyGateMaterial(btmBar);
+                var btmCol = btmBar.GetComponent<Collider>();
+                if (btmCol != null) DestroyImmediate(btmCol);
+
+                // BoxCollider phủ toàn bộ cửa
+                var boxCol = gateObj.AddComponent<BoxCollider>();
+                boxCol.center = new Vector3(0f, _wallHeight * 0.5f, 0f);
+                boxCol.size = new Vector3(0.4f, _wallHeight, _corridorWidth);
+
+                // NavMeshObstacle carve khi đóng
+                var navObs = gateObj.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+                navObs.center = new Vector3(0f, _wallHeight * 0.5f, 0f);
+                navObs.size = new Vector3(0.4f, _wallHeight, _corridorWidth);
+                navObs.carving = true;
+
+                roomGate.Initialize(visualRoot.transform, boxCol, navObs, _wallHeight);
+            }
+
+            if (!_roomGates.ContainsKey(room.GridPosition))
+            {
+                _roomGates[room.GridPosition] = new List<RoomGate>();
+            }
+            _roomGates[room.GridPosition].Add(roomGate);
+        }
+
+        private void ApplyGateMaterial(GameObject obj)
+        {
+            var renderer = obj.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                if (_gateMaterial != null)
+                {
+                    renderer.sharedMaterial = _gateMaterial;
                 }
                 else if (_wallMaterial != null)
                 {
