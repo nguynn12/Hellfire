@@ -510,24 +510,6 @@ namespace Hellfire.Editor
             light.color = new Color(1f, 0.8f, 0.65f);
             lightObj.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
-            // Test Arena Floor (50m x 50m)
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            floor.name = "ArenaFloor";
-            floor.transform.position = Vector3.zero;
-            floor.transform.localScale = new Vector3(5f, 1f, 5f);
-
-            // Obstacles / Pillars for testing first person movement & collisions
-            for (int x = -15; x <= 15; x += 10)
-            {
-                for (int z = -15; z <= 15; z += 10)
-                {
-                    if (x == 0 && z == 0) continue;
-                    var pillar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    pillar.name = $"Pillar_{x}_{z}";
-                    pillar.transform.position = new Vector3(x, 2f, z);
-                    pillar.transform.localScale = new Vector3(2f, 4f, 2f);
-                }
-            }
 
             // EventSystem & HUD Canvas
             var esObj = new GameObject("EventSystem");
