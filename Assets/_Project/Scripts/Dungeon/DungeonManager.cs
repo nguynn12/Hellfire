@@ -37,6 +37,10 @@ namespace Hellfire.Dungeon
         private readonly Dictionary<Vector2Int, RoomLockState> _roomLockStates = new Dictionary<Vector2Int, RoomLockState>();
         private Coroutine _roomLockRoutine;
 
+        [Header("Room Rewards (Mục 17.7)")]
+        [Tooltip("Thưởng Linh hồn cho mỗi người chơi còn sống khi phòng Combat Cleared (Mục 17.7)")]
+        [SerializeField] private int _combatRoomClearSoulsBonus = 20;
+
         [Header("Debug / Fallback Seed")]
         [Tooltip("Nếu > 0, Server sẽ dùng seed này để test bản đồ cố định")]
         [SerializeField] private int _overrideSeed = 0;
@@ -588,7 +592,12 @@ namespace Hellfire.Dungeon
             SetRoomGatesClientRpc(room.GridPosition, false);
             Debug.Log($"[DungeonManager] Phòng {room.GridPosition} ({room.RoomType}) đã dọn sạch quái (Cleared)! Cổng nâng lên.");
 
-            if (room.RoomType == DungeonRoomType.Boss)
+            if (room.RoomType == DungeonRoomType.Combat)
+            {
+                Hellfire.Player.PlayerWallet.DistributeSoulsToLivingPlayers(_combatRoomClearSoulsBonus);
+                Debug.Log($"[DungeonManager] Phòng Combat {room.GridPosition} đã Cleared! Thưởng +{_combatRoomClearSoulsBonus} Linh hồn cho mỗi người chơi còn sống.");
+            }
+            else if (room.RoomType == DungeonRoomType.Boss)
             {
                 if (_enemySpawner != null)
                 {

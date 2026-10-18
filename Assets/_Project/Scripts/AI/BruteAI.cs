@@ -23,6 +23,7 @@ namespace Hellfire.AI
             _attackRange = 2.8f;
             _attackCooldown = 2.0f;
             _detectionRange = 16f;
+            _soulsReward = 15;
         }
 
         protected override void ExecuteAttack()

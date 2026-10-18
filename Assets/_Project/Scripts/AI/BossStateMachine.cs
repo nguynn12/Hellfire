@@ -50,6 +50,7 @@ namespace Hellfire.AI
             _attackRange = 4.0f;
             _attackCooldown = 1.8f;
             _detectionRange = 25f;
+            _soulsReward = 0; // Boss thưởng 0 Linh hồn trực tiếp (Mục 17.7)
         }
 
         public override void OnNetworkSpawn()
@@ -267,6 +268,12 @@ namespace Hellfire.AI
                 );
 
                 var imp = Instantiate(_impMinionPrefab, spawnPos, Quaternion.identity);
+                var minionEnemy = imp.GetComponent<EnemyStateMachine>();
+                if (minionEnemy != null)
+                {
+                    minionEnemy.SetSoulsReward(0); // Quái do boss triệu hồi: 0 Linh hồn (Mục 17.7)
+                }
+
                 var netObj = imp.GetComponent<NetworkObject>();
                 if (netObj != null)
                 {

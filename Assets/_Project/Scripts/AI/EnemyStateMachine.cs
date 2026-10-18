@@ -29,6 +29,9 @@ namespace Hellfire.AI
         [SerializeField] protected LayerMask _sightObstacleMask = ~0; // Layer kiểm tra vật cản tầm nhìn
         [SerializeField] protected float _targetSearchInterval = 0.5f;
 
+        [Header("Souls Reward (Mục 17.7)")]
+        [SerializeField] protected int _soulsReward = 5;
+
         [Header("Visual & Feedback")]
         [SerializeField] protected Transform _meshRoot;
         [SerializeField] protected Renderer[] _renderers;
@@ -45,6 +48,12 @@ namespace Hellfire.AI
 
         public EnemyState CurrentState => _currentState;
         public EnemyType Type => _enemyType;
+        public int SoulsReward => _soulsReward;
+
+        public void SetSoulsReward(int value)
+        {
+            _soulsReward = Mathf.Max(0, value);
+        }
 
         protected virtual void Awake()
         {
@@ -297,6 +306,12 @@ namespace Hellfire.AI
         {
             SetState(EnemyState.Dead);
             PlayDeathFeedbackClientRpc();
+
+            // Thưởng tiền Linh hồn cho tất cả người chơi còn sống (Mục 17.7)
+            if (IsServer && _soulsReward > 0)
+            {
+                Hellfire.Player.PlayerWallet.DistributeSoulsToLivingPlayers(_soulsReward);
+            }
 
             // Tự hủy sau 3 giây
             StartCoroutine(DespawnRoutine(3.0f));

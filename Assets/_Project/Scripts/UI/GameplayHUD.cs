@@ -59,12 +59,16 @@ namespace Hellfire.UI
         [SerializeField] private Button _gameOverReturnButton;
         [SerializeField] private TextMeshProUGUI _gameOverWaitingText;
 
+        [Header("Souls (Mục 17.7)")]
+        [SerializeField] private TextMeshProUGUI _soulsText;
+
         private bool _isPaused;
         private Health _localPlayerHealth;
         private WeaponController _localWeaponController;
         private PlayerRevive _localPlayerRevive;
         private PlayerBuffManager _localBuffManager;
         private PlayerStats _localPlayerStats;
+        private PlayerWallet _localPlayerWallet;
         private Coroutine _hitmarkerCoroutine;
         private Coroutine _buffToastCoroutine;
 
@@ -143,6 +147,33 @@ namespace Hellfire.UI
             if (_gameOverOverlayPanel == null) _gameOverOverlayPanel = FindInHierarchy(root, "GameOverOverlayPanel");
             if (_gameOverReturnButton == null) _gameOverReturnButton = FindComponentInHierarchy<Button>(root, "GameOverReturnButton");
             if (_gameOverWaitingText == null) _gameOverWaitingText = FindComponentInHierarchy<TextMeshProUGUI>(root, "GameOverWaitingText");
+
+            // Souls Counter (Mục 17.7)
+            if (_soulsText == null) _soulsText = FindComponentInHierarchy<TextMeshProUGUI>(root, "SoulsText");
+            if (_soulsText == null && canvas != null)
+            {
+                _soulsText = CreateSoulsText(canvas.transform);
+            }
+        }
+
+        private TextMeshProUGUI CreateSoulsText(Transform root)
+        {
+            var obj = new GameObject("SoulsText");
+            obj.transform.SetParent(root, false);
+            var rect = obj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-30f, -30f);
+            rect.sizeDelta = new Vector2(250f, 40f);
+
+            var tmp = obj.AddComponent<TextMeshProUGUI>();
+            tmp.text = "Linh hồn: 0";
+            tmp.fontSize = 22f;
+            tmp.color = new Color(0.4f, 0.9f, 1f);
+            tmp.alignment = TextAlignmentOptions.TopRight;
+            tmp.fontStyle = FontStyles.Bold;
+            return tmp;
         }
 
         private void RegisterButtonListeners()
@@ -232,7 +263,7 @@ namespace Hellfire.UI
 
         private void TryBindLocalPlayer()
         {
-            if (_localPlayerHealth != null && _localWeaponController != null && _localBuffManager != null) return;
+            if (_localPlayerHealth != null && _localWeaponController != null && _localBuffManager != null && _localPlayerWallet != null) return;
 
             var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
             if (localPlayer == null) return;
@@ -294,6 +325,24 @@ namespace Hellfire.UI
                     _localPlayerStats.OnStatsChanged += HandlePlayerStatsChanged;
                     HandlePlayerStatsChanged(_localPlayerStats.BonusMaxHealth.Value, _localPlayerStats.Armor.Value, _localPlayerStats.MoveSpeedMultiplier.Value);
                 }
+            }
+
+            if (_localPlayerWallet == null)
+            {
+                _localPlayerWallet = localPlayer.GetComponent<PlayerWallet>();
+                if (_localPlayerWallet != null)
+                {
+                    _localPlayerWallet.OnSoulsChanged += HandleSoulsChanged;
+                    HandleSoulsChanged(_localPlayerWallet.Souls.Value);
+                }
+            }
+        }
+
+        private void HandleSoulsChanged(int currentSouls)
+        {
+            if (_soulsText != null)
+            {
+                _soulsText.text = $"Linh hồn: {currentSouls}";
             }
         }
 
@@ -412,6 +461,11 @@ namespace Hellfire.UI
             if (_localPlayerStats != null)
             {
                 _localPlayerStats.OnStatsChanged -= HandlePlayerStatsChanged;
+            }
+
+            if (_localPlayerWallet != null)
+            {
+                _localPlayerWallet.OnSoulsChanged -= HandleSoulsChanged;
             }
 
             if (GameManager.Instance != null)
