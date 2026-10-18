@@ -4,6 +4,8 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using Hellfire.Networking;
 using Hellfire.Player;
 using Unity.Netcode;
 using UnityEngine;
@@ -24,6 +26,10 @@ namespace Hellfire.Dungeon
         [Tooltip("Nếu > 0, Server sẽ dùng seed này để test bản đồ cố định")]
         [SerializeField] private int _overrideSeed = 0;
 
+        [Header("Loading Gate (Mục 15.1)")]
+        [Tooltip("Thời gian chờ tối đa cho các client sẵn sàng hầm ngục (giây)")]
+        [SerializeField] private float _readyTimeoutSeconds = 30f;
+
         /// <summary>
         /// Seed hầm ngục đồng bộ qua mạng (Mục 2.3: chỉ Server ghi, mọi client đọc).
         /// </summary>
@@ -33,9 +39,23 @@ namespace Hellfire.Dungeon
             NetworkVariableWritePermission.Server
         );
 
+        /// <summary>
+        /// Số client đã sẵn sàng (đã dựng hình học và bake NavMesh) (Mục 15.1: chỉ Server ghi, mọi client đọc).
+        /// </summary>
+        public NetworkVariable<int> ReadyCount { get; } = new NetworkVariable<int>(
+            0,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
         public bool IsDungeonReady { get; private set; }
 
         public event Action<int> OnDungeonReady;
+        public event Action<int> OnAllClientsReady;
+
+        private readonly HashSet<ulong> _readyClients = new HashSet<ulong>();
+        private Coroutine _loadingGateTimeoutCoroutine;
+        private bool _gateCompleted = false;
 
         private void Awake()
         {
@@ -64,6 +84,17 @@ namespace Hellfire.Dungeon
 
             if (IsServer)
             {
+                _gateCompleted = false;
+                _readyClients.Clear();
+                ReadyCount.Value = 0;
+
+                if (NetworkManager.Singleton != null)
+                {
+                    NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnected;
+                }
+
+                _loadingGateTimeoutCoroutine = StartCoroutine(LoadingGateTimeoutRoutine());
+
                 // Host sinh seed ngẫu nhiên (hoặc dùng overrideSeed nếu thiết lập)
                 int seedToUse = _overrideSeed > 0 ? _overrideSeed : UnityEngine.Random.Range(100000, 999999);
                 DungeonSeed.Value = seedToUse;
@@ -81,6 +112,20 @@ namespace Hellfire.Dungeon
         public override void OnNetworkDespawn()
         {
             DungeonSeed.OnValueChanged -= HandleSeedChanged;
+
+            if (IsServer)
+            {
+                if (NetworkManager.Singleton != null)
+                {
+                    NetworkManager.Singleton.OnClientDisconnectCallback -= HandleClientDisconnected;
+                }
+
+                if (_loadingGateTimeoutCoroutine != null)
+                {
+                    StopCoroutine(_loadingGateTimeoutCoroutine);
+                    _loadingGateTimeoutCoroutine = null;
+                }
+            }
         }
 
         private void HandleSeedChanged(int previousValue, int newValue)
@@ -123,11 +168,118 @@ namespace Hellfire.Dungeon
             IsDungeonReady = true;
             OnDungeonReady?.Invoke(seed);
 
-            // 3. Nếu là Server, sau khi NavMesh sẵn sàng, định vị người chơi về Spawn Room
+            // 3. Báo lên Server đã dựng xong bản đồ và bake xong NavMesh (Mục 15.1)
             if (IsServer)
             {
-                PositionPlayersAtSpawn();
+                RegisterClientReady(NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0);
             }
+            else
+            {
+                DungeonReadyServerRpc();
+            }
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        public void DungeonReadyServerRpc(ServerRpcParams rpcParams = default)
+        {
+            ulong senderClientId = rpcParams.Receive.SenderClientId;
+            RegisterClientReady(senderClientId);
+        }
+
+        private void RegisterClientReady(ulong clientId)
+        {
+            if (!IsServer || _gateCompleted) return;
+
+            if (_readyClients.Add(clientId))
+            {
+                ReadyCount.Value = _readyClients.Count;
+                Debug.Log($"[DungeonManager] Client {clientId} đã sẵn sàng hầm ngục ({ReadyCount.Value}/{GetConnectedClientCount()}).");
+                CheckAllClientsReady();
+            }
+        }
+
+        private int GetConnectedClientCount()
+        {
+            return NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClients.Count : 0;
+        }
+
+        private void CheckAllClientsReady()
+        {
+            if (!IsServer || _gateCompleted) return;
+
+            int connectedCount = GetConnectedClientCount();
+            if (connectedCount > 0 && _readyClients.Count >= connectedCount)
+            {
+                CompleteLoadingGate();
+            }
+        }
+
+        private void CompleteLoadingGate()
+        {
+            if (!IsServer || _gateCompleted) return;
+            _gateCompleted = true;
+
+            if (_loadingGateTimeoutCoroutine != null)
+            {
+                StopCoroutine(_loadingGateTimeoutCoroutine);
+                _loadingGateTimeoutCoroutine = null;
+            }
+
+            Debug.Log($"[DungeonManager] Đủ toàn bộ {_readyClients.Count} client! Mở cổng hầm ngục theo thứ tự (a) -> (b) -> (c).");
+
+            // (a) Dịch chuyển người chơi về phòng spawn (Mục 2.1.1)
+            PositionPlayersAtSpawn();
+
+            // (b) Spawn quái / rương / boss (Mục 15.1)
+            OnAllClientsReady?.Invoke(DungeonSeed.Value);
+
+            // (c) Chuyển CurrentState = Playing
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.SetState(GameState.Playing);
+            }
+        }
+
+        private IEnumerator LoadingGateTimeoutRoutine()
+        {
+            yield return new WaitForSeconds(_readyTimeoutSeconds);
+
+            if (!_gateCompleted && IsServer)
+            {
+                Debug.LogWarning($"[DungeonManager] Cổng chờ hết thời gian ({_readyTimeoutSeconds}s)! Kiểm tra các client chưa sẵn sàng...");
+
+                if (NetworkManager.Singleton != null)
+                {
+                    var unreadyClients = new List<ulong>();
+                    foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+                    {
+                        if (!_readyClients.Contains(client.ClientId) && client.ClientId != NetworkManager.Singleton.LocalClientId)
+                        {
+                            unreadyClients.Add(client.ClientId);
+                        }
+                    }
+
+                    foreach (var unreadyId in unreadyClients)
+                    {
+                        Debug.LogWarning($"[DungeonManager] Ngắt kết nối Client {unreadyId}: Tải bản đồ quá lâu.");
+                        NetworkManager.Singleton.DisconnectClient(unreadyId);
+                    }
+                }
+
+                CompleteLoadingGate();
+            }
+        }
+
+        private void HandleClientDisconnected(ulong clientId)
+        {
+            if (!IsServer || _gateCompleted) return;
+
+            if (_readyClients.Remove(clientId))
+            {
+                ReadyCount.Value = _readyClients.Count;
+            }
+
+            CheckAllClientsReady();
         }
 
         private void PositionPlayersAtSpawn()

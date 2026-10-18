@@ -4,6 +4,7 @@
 
 using System.Collections;
 using Hellfire.Combat;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -85,8 +86,8 @@ namespace Hellfire.AI
 
         protected virtual void Update()
         {
-            // BẮT BUỘC: Logic AI chỉ chạy duy nhất trên Server
-            if (!IsServer || _currentState == EnemyState.Dead)
+            // BẮT BUỘC: Logic AI chỉ chạy duy nhất trên Server, tạm dừng khi đang tạo hầm ngục (Mục 15.1)
+            if (!IsServer || _currentState == EnemyState.Dead || (GameManager.Instance != null && GameManager.Instance.CurrentState.Value == GameState.Generating))
             {
                 return;
             }

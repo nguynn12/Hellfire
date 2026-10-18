@@ -6,6 +6,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Hellfire.Networking;
 using Hellfire.Player;
 using Unity.Netcode;
 using UnityEngine;
@@ -172,6 +173,13 @@ namespace Hellfire.Combat
                 return;
             }
 
+            // Trong Generating, Lobby, GameOver, Victory: Không cho phép bắn / nạp đạn (Mục 15.1)
+            if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove())
+            {
+                if (_isReloading) CancelReload();
+                return;
+            }
+
             HandleWeaponSwitching();
             HandleReloading();
             HandleAttackInput();
@@ -302,6 +310,7 @@ namespace Hellfire.Combat
 
         private void HandleAttackInput()
         {
+            if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove()) return;
             if (_currentWeapon == null || _playerCamera == null) return;
 
             bool triggerPressed = false;
@@ -378,6 +387,11 @@ namespace Hellfire.Combat
             WeaponData weaponToUse = rw.BaseData;
 
             if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            {
+                return;
+            }
+
+            if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove())
             {
                 return;
             }

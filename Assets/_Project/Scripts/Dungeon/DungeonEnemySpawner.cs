@@ -40,7 +40,7 @@ namespace Hellfire.Dungeon
         {
             if (IsServer && _dungeonManager != null)
             {
-                _dungeonManager.OnDungeonReady += HandleDungeonReady;
+                _dungeonManager.OnAllClientsReady += HandleDungeonReady;
             }
         }
 
@@ -48,7 +48,7 @@ namespace Hellfire.Dungeon
         {
             if (IsServer && _dungeonManager != null)
             {
-                _dungeonManager.OnDungeonReady -= HandleDungeonReady;
+                _dungeonManager.OnAllClientsReady -= HandleDungeonReady;
             }
         }
 

@@ -159,7 +159,7 @@ namespace Hellfire.Networking
         }
 
         /// <summary>
-        /// Bắt đầu lượt chơi từ Lobby sang Playing.
+        /// Bắt đầu lượt chơi từ Lobby sang Generating (Cổng chờ Mục 15.1).
         /// </summary>
         public void StartGameFromLobby()
         {
@@ -169,7 +169,7 @@ namespace Hellfire.Networking
                 return;
             }
 
-            SetState(GameState.Playing);
+            SetState(GameState.Generating);
         }
 
         /// <summary>
