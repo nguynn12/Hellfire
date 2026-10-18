@@ -4,6 +4,8 @@
 
 using System.Collections.Generic;
 using Hellfire.AI;
+using Hellfire.Combat;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -32,6 +34,10 @@ namespace Hellfire.Dungeon
         [Header("Spawn Validation (Mục 15.2)")]
         [Tooltip("Khoảng cách tìm kiếm tối đa trên NavMesh khi spawn đối tượng (m)")]
         [SerializeField] private float _maxNavMeshSampleDistance = 3.0f;
+
+        [Header("Difficulty Scaling (Mục 15.3)")]
+        [Tooltip("Cấu hình cân bằng số lượng quái và máu Boss theo số người chơi")]
+        [SerializeField] private DifficultyScalingData _scalingData;
 
         private DungeonManager _dungeonManager;
         private readonly List<GameObject> _spawnedEnemies = new List<GameObject>();
@@ -98,24 +104,56 @@ namespace Hellfire.Dungeon
                 }
             }
 
-            // 2. Sinh Boss tại phòng Boss xa nhất (Mục 4.1, 5.2, 15.2)
+            // 2. Sinh Boss tại phòng Boss xa nhất (Mục 4.1, 5.2, 15.2, 15.3)
             if (grid.BossRoom != null && _bossPrefab != null)
             {
                 Vector3 bossProposed = grid.BossRoom.WorldCenter + Vector3.up * 0.5f;
                 Vector3 bossSpawnPos = GetValidSpawnPosition(bossProposed, grid.BossRoom.WorldCenter, "Phòng Boss", _maxNavMeshSampleDistance);
                 var bossObj = Instantiate(_bossPrefab, bossSpawnPos, Quaternion.identity);
+
+                // Tính máu tối đa của Boss theo hệ số độ khó (Mục 15.3: 800 * hệ số)
+                int playerCount = (GameManager.Instance != null)
+                    ? GameManager.Instance.LockedPlayerCount.Value
+                    : 1;
+                float bossHpMultiplier = _scalingData != null
+                    ? _scalingData.GetBossHealthMultiplier(playerCount)
+                    : GetDefaultBossHpMultiplier(playerCount);
+                float scaledBossMaxHp = Mathf.Round(800f * bossHpMultiplier);
+
+                var bossHealth = bossObj.GetComponent<Health>();
+                if (bossHealth != null)
+                {
+                    bossHealth.SetMaxHealth(scaledBossMaxHp);
+                }
+
                 var netObj = bossObj.GetComponent<NetworkObject>();
                 if (netObj != null)
                 {
                     netObj.Spawn(true);
                     _spawnedEnemies.Add(bossObj);
                 }
+
+                if (bossHealth != null)
+                {
+                    bossHealth.SetMaxHealth(scaledBossMaxHp);
+                }
+
+                Debug.Log($"[DungeonEnemySpawner] Đã spawn Boss tại {bossSpawnPos} với {scaledBossMaxHp} HP (Số người chốt: {playerCount}, hệ số x{bossHpMultiplier:F2}).");
             }
         }
 
         private void SpawnEnemiesInRoom(DungeonRoomNode room, System.Random rng)
         {
-            int enemyCount = rng.Next(_minEnemiesPerNormalRoom, _maxEnemiesPerNormalRoom + 1);
+            int rolledCount = rng.Next(_minEnemiesPerNormalRoom, _maxEnemiesPerNormalRoom + 1);
+
+            // Cân bằng số lượng quái theo số người chơi chốt khi vào Generating (Mục 15.3)
+            int playerCount = (GameManager.Instance != null)
+                ? GameManager.Instance.LockedPlayerCount.Value
+                : 1;
+            float enemyMultiplier = _scalingData != null
+                ? _scalingData.GetEnemyCountMultiplier(playerCount)
+                : GetDefaultEnemyCountMultiplier(playerCount);
+            int enemyCount = Mathf.Max(1, Mathf.RoundToInt(rolledCount * enemyMultiplier));
 
             for (int i = 0; i < enemyCount; i++)
             {
@@ -171,6 +209,30 @@ namespace Hellfire.Dungeon
             // 3. Tâm phòng cũng thất bại: cảnh báo và fallback về tâm phòng (không được bỏ qua)
             Debug.LogWarning($"[SpawnValidation] Không thể tìm vị trí NavMesh hợp lệ tại '{roomName}' (đề xuất: {proposedPos}, tâm: {roomCenter}). Dùng tâm phòng làm fallback.");
             return roomCenter;
+        }
+
+        private float GetDefaultEnemyCountMultiplier(int playerCount)
+        {
+            switch (playerCount)
+            {
+                case 1: return 0.7f;
+                case 2: return 1.0f;
+                case 3: return 1.4f;
+                case 4: return 1.8f;
+                default: return 1.0f;
+            }
+        }
+
+        private float GetDefaultBossHpMultiplier(int playerCount)
+        {
+            switch (playerCount)
+            {
+                case 1: return 0.6f;
+                case 2: return 1.0f;
+                case 3: return 1.5f;
+                case 4: return 2.0f;
+                default: return 1.0f;
+            }
         }
     }
 }

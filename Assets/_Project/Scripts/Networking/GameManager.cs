@@ -41,6 +41,15 @@ namespace Hellfire.Networking
             NetworkVariableWritePermission.Server
         );
 
+        /// <summary>
+        /// Số lượng người chơi được chốt một lần khi vào trạng thái Generating (Mục 15.3).
+        /// </summary>
+        public NetworkVariable<int> LockedPlayerCount { get; } = new NetworkVariable<int>(
+            1,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
         public event Action<GameState, GameState> OnGameStateChanged;
 
         private float _checkGameOverTimer = 0f;
@@ -143,6 +152,14 @@ namespace Hellfire.Networking
             if (CurrentState.Value == newState)
             {
                 return;
+            }
+
+            // Chốt số người chơi một lần khi vào Generating (Mục 15.3)
+            if (newState == GameState.Generating)
+            {
+                int count = NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClients.Count : 1;
+                LockedPlayerCount.Value = Mathf.Clamp(count, 1, 4);
+                Debug.Log($"[GameManager] Chốt số người chơi khi vào Generating: {LockedPlayerCount.Value} người.");
             }
 
             CurrentState.Value = newState;
