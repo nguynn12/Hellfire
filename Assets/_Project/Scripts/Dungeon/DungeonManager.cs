@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections;
+using Hellfire.Player;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -138,7 +139,7 @@ namespace Hellfire.Dungeon
 
             Vector3 spawnCenter = spawnRoom.WorldCenter + Vector3.up * 1.0f;
 
-            // Dời các player hiện có trong NetworkManager về phòng Spawn
+            // Dời các player hiện có trong NetworkManager về phòng Spawn an toàn theo Mục 2.1.1
             if (NetworkManager.Singleton != null)
             {
                 int index = 0;
@@ -148,7 +149,20 @@ namespace Hellfire.Dungeon
                     {
                         // Xếp so le vị trí các người chơi trong phòng spawn
                         Vector3 offset = new Vector3((index % 2 == 0 ? 1f : -1f) * 2f, 0f, (index > 1 ? 2f : -2f));
-                        client.PlayerObject.transform.position = spawnCenter + offset;
+                        Vector3 targetPos = spawnCenter + offset;
+
+                        var movement = client.PlayerObject.GetComponent<PlayerMovement>();
+                        if (movement != null)
+                        {
+                            var rpcParams = new ClientRpcParams
+                            {
+                                Send = new ClientRpcSendParams
+                                {
+                                    TargetClientIds = new[] { client.ClientId }
+                                }
+                            };
+                            movement.TeleportOwnerClientRpc(targetPos, Quaternion.identity, rpcParams);
+                        }
                         index++;
                     }
                 }

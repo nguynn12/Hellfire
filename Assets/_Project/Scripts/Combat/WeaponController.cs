@@ -29,6 +29,10 @@ namespace Hellfire.Combat
         [Header("Visual Effects (Cosmetic)")]
         [SerializeField] private float _tracerDuration = 0.05f;
 
+        [Header("Anti-Cheat / Validation (Mục 2.1.1)")]
+        [Tooltip("Khoảng cách tối đa cho phép giữa vị trí bắn từ client và vị trí người chơi trên server (m)")]
+        [SerializeField] private float _maxAllowedShootOriginDistance = 3.0f;
+
         // ================= GLOBAL WEAPON STATS (SERVER-AUTHORITATIVE) =================
         // Áp dụng cho TOÀN BỘ vũ khí của người chơi. Khi đổi súng vẫn giữ nguyên toàn bộ nâng cấp!
         public NetworkVariable<float> GlobalDamageMultiplierNet { get; } = new NetworkVariable<float>(
@@ -375,6 +379,13 @@ namespace Hellfire.Combat
 
             if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
             {
+                return;
+            }
+
+            // Kiểm tra tính hợp lệ của clientOrigin so với vị trí người chơi trên Server (Mục 2.1.1 điểm 4)
+            if (Vector3.Distance(clientOrigin, transform.position) > _maxAllowedShootOriginDistance)
+            {
+                Debug.LogWarning($"[WeaponController] Phát hiện phát bắn không hợp lệ từ Client {OwnerClientId}: origin cách vị trí server {Vector3.Distance(clientOrigin, transform.position):F2}m > {_maxAllowedShootOriginDistance}m. Bỏ qua phát bắn.");
                 return;
             }
 

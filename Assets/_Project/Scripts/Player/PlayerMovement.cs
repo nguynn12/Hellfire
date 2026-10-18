@@ -5,6 +5,7 @@
 using Hellfire.Combat;
 using Hellfire.Networking;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -336,6 +337,35 @@ namespace Hellfire.Player
             }
 
             _characterController.Move(Vector3.up * (_verticalVelocity * Time.deltaTime));
+        }
+
+        /// <summary>
+        /// Dịch chuyển chủ sở hữu nhân vật an toàn do Server yêu cầu (Mục 2.1.1).
+        /// Thứ tự bắt buộc: (a) tắt CharacterController -> (b) đặt transform.position/rotation -> (c) NetworkTransform.Teleport -> (d) bật lại CharacterController.
+        /// </summary>
+        [ClientRpc]
+        public void TeleportOwnerClientRpc(Vector3 targetPosition, Quaternion targetRotation, ClientRpcParams clientRpcParams = default)
+        {
+            if (!IsOwner) return;
+
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+            }
+
+            transform.position = targetPosition;
+            transform.rotation = targetRotation;
+
+            var netTransform = GetComponent<NetworkTransform>();
+            if (netTransform != null)
+            {
+                netTransform.Teleport(targetPosition, targetRotation, transform.localScale);
+            }
+
+            if (_characterController != null)
+            {
+                _characterController.enabled = true;
+            }
         }
     }
 }
