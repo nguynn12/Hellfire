@@ -85,7 +85,7 @@ namespace Hellfire.Dungeon
             foreach (var kvp in grid.Rooms)
             {
                 var room = kvp.Value;
-                if (room.RoomType == DungeonRoomType.Normal)
+                if (room.RoomType == DungeonRoomType.Combat)
                 {
                     SpawnEnemiesInRoom(room, rng);
 
