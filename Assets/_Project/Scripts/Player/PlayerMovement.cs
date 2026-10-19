@@ -2,6 +2,7 @@
 // Mục đích: Điều khiển di chuyển góc nhìn thứ nhất (FPS) bằng CharacterController và Unity Input System (Mục 1 & 1.3).
 // Môi trường thực thi: Cả hai (Client-side prediction cho IsOwner, NetworkTransform đồng bộ cho Client khác).
 
+using System.Collections;
 using Hellfire.Combat;
 using Hellfire.Networking;
 using Unity.Netcode;
