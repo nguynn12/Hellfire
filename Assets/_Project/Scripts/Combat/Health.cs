@@ -240,16 +240,16 @@ namespace Hellfire.Combat
                 Vector3 attackerPos = Vector3.zero;
                 if (NetworkManager.Singleton != null)
                 {
-                    if (NetworkManager.Singleton.ConnectedClients.TryGetValue(attackerClientId, out var client) && client.PlayerObject != null)
+                    if (NetworkManager.Singleton.ConnectedClients.TryGetValue(payload.AttackerClientId, out var client) && client.PlayerObject != null)
                     {
                         attackerPos = client.PlayerObject.transform.position;
                     }
-                    else if (NetworkManager.Singleton.SpawnManager != null && NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(attackerClientId, out var netObj))
+                    else if (NetworkManager.Singleton.SpawnManager != null && NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(payload.AttackerClientId, out var netObj))
                     {
                         attackerPos = netObj.transform.position;
                     }
                 }
-                NotifyPlayerAttackedClientRpc(damage, attackerPos);
+                NotifyPlayerAttackedClientRpc(finalDamage, attackerPos);
             }
 
             if (CurrentHealth.Value <= 0f)

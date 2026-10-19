@@ -313,6 +313,8 @@ namespace Hellfire.UI
         private void Update()
         {
             TryBindLocalPlayer();
+            UpdatePlayerInfo();
+            UpdateLowHealthPulse();
 
             // Cập nhật bộ đếm thời gian gục (Downed)
             if (_localPlayerHealth != null && _localPlayerHealth.IsDowned.Value)
@@ -780,12 +782,6 @@ namespace Hellfire.UI
             }
 
             _damageVignetteCoroutine = null;
-        }
-
-        private void Update()
-        {
-            UpdatePlayerInfo();
-            UpdateLowHealthPulse();
         }
 
         private void UpdateLowHealthPulse()
