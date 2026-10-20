@@ -3,6 +3,7 @@
 // Môi trường thực thi: CHỈ TRÊN SERVER.
 
 using Hellfire.Combat;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -101,8 +102,6 @@ namespace Hellfire.AI
             }
         }
 
-        private float _lastAttackTime;
-
         private void ExecuteRangedHitscanAttack()
         {
             if (_currentTarget == null) return;
@@ -111,20 +110,44 @@ namespace Hellfire.AI
             Vector3 shootTarget = _currentTarget.position + Vector3.up * 1.0f;
             Vector3 shootDir = (shootTarget - shootOrigin).normalized;
 
-            // Server tự raycast độc lập (Mục 5.1: không qua ServerRpc vì quái vật là Server)
-            if (Physics.Raycast(shootOrigin, shootDir, out RaycastHit hit, _maxCombatDistance, ~0, QueryTriggerInteraction.Ignore))
+            // Server tự raycast độc lập (Mục 5.1). Bổ sung LayerMask loại trừ quái vật và loại trừ collider bản thân (Lỗi 05)
+            int enemyLayer = LayerMask.NameToLayer("Enemy");
+            int monsterLayer = LayerMask.NameToLayer("Monster");
+            int mask = ~0;
+            if (enemyLayer >= 0) mask &= ~(1 << enemyLayer);
+            if (monsterLayer >= 0) mask &= ~(1 << monsterLayer);
+
+            RaycastHit[] hits = Physics.RaycastAll(shootOrigin, shootDir, _maxCombatDistance, mask, QueryTriggerInteraction.Ignore);
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            Vector3 hitPoint = shootOrigin + shootDir * _maxCombatDistance;
+
+            foreach (var hit in hits)
             {
+                if (hit.collider.transform.root == transform.root) continue;
+
+                hitPoint = hit.point;
                 var playerHealth = hit.collider.GetComponentInParent<Health>();
-                if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
+                if (playerHealth != null && playerHealth.IsPlayer && playerHealth != _health && IsTargetAliveAndValid(playerHealth))
                 {
-                    playerHealth.TakeDamage(_attackDamage, HitboxType.Torso, NetworkObjectId);
+                    var payload = new DamagePayload(_attackDamage, 5f, HitboxType.Torso, NetworkObjectId);
+                    playerHealth.TakeDamage(payload);
+                    break;
                 }
 
-                SpawnRangedTracerClientRpc(shootOrigin, hit.point);
+                if (hit.collider.gameObject.isStatic || hit.collider.GetComponentInParent<EnemyStateMachine>() == null)
+                {
+                    break;
+                }
+            }
+
+            if (GameModeHelper.IsOffline)
+            {
+                StartCoroutine(ArcherTracerRoutine(shootOrigin, hitPoint));
             }
             else
             {
-                SpawnRangedTracerClientRpc(shootOrigin, shootOrigin + shootDir * _maxCombatDistance);
+                SpawnRangedTracerClientRpc(shootOrigin, hitPoint);
             }
         }
 
@@ -133,6 +156,8 @@ namespace Hellfire.AI
         {
             StartCoroutine(ArcherTracerRoutine(from, to));
         }
+
+        private static Material _cachedArcherMaterial;
 
         private System.Collections.IEnumerator ArcherTracerRoutine(Vector3 from, Vector3 to)
         {
@@ -143,7 +168,13 @@ namespace Hellfire.AI
             lr.positionCount = 2;
             lr.SetPosition(0, from);
             lr.SetPosition(1, to);
-            lr.material = new Material(Shader.Find("Sprites/Default"));
+
+            if (_cachedArcherMaterial == null)
+            {
+                var s = Shader.Find("Sprites/Default");
+                if (s != null) _cachedArcherMaterial = new Material(s);
+            }
+            lr.sharedMaterial = _cachedArcherMaterial;
             lr.startColor = Color.magenta;
             lr.endColor = Color.red;
 

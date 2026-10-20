@@ -35,6 +35,9 @@ namespace Hellfire.Networking
         [SerializeField] private string _lobbySceneName = "Lobby";
         [SerializeField] private string _gameplaySceneName = "Gameplay";
 
+        public string LobbySceneName => _lobbySceneName;
+        public string GameplaySceneName => _gameplaySceneName;
+
         public NetworkVariable<GameState> CurrentState { get; } = new NetworkVariable<GameState>(
             GameState.Lobby,
             NetworkVariableReadPermission.Everyone,
@@ -130,11 +133,11 @@ namespace Hellfire.Networking
         }
 
         /// <summary>
-        /// Chỉ Server mới có quyền thay đổi trạng thái Game (Server-Authoritative).
+        /// Chỉ Server hoặc Offline mới có quyền thay đổi trạng thái Game.
         /// </summary>
         public void SetState(GameState newState)
         {
-            if (!IsServer)
+            if (!GameModeHelper.IsServerOrOffline)
             {
                 Debug.LogWarning("[GameManager] Chỉ Server mới có quyền thay đổi GameState!");
                 return;
@@ -145,7 +148,13 @@ namespace Hellfire.Networking
                 return;
             }
 
+            GameState oldState = CurrentState.Value;
             CurrentState.Value = newState;
+
+            if (GameModeHelper.IsOffline)
+            {
+                OnGameStateChanged?.Invoke(oldState, newState);
+            }
         }
 
         /// <summary>
@@ -153,7 +162,7 @@ namespace Hellfire.Networking
         /// </summary>
         public void TriggerVictory()
         {
-            if (!IsServer) return;
+            if (!GameModeHelper.IsServerOrOffline) return;
             Debug.Log("[GameManager] Chúa quỷ đã bị hạ gục! Kích hoạt Chiến Thắng (Victory).");
             SetState(GameState.Victory);
         }
@@ -170,6 +179,12 @@ namespace Hellfire.Networking
             }
 
             SetState(GameState.Playing);
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.SceneManager != null)
+            {
+                Debug.Log($"[GameManager] Tải scene {_gameplaySceneName} cho ván đấu mới...");
+                NetworkManager.Singleton.SceneManager.LoadScene(_gameplaySceneName, LoadSceneMode.Single);
+            }
         }
 
         /// <summary>
@@ -196,18 +211,21 @@ namespace Hellfire.Networking
             }
         }
 
-        [ServerRpc(RequireOwnership = false)]
-        public void ReturnToLobbyServerRpc(ServerRpcParams rpcParams = default)
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        public void ReturnToLobbyServerRpc(RpcParams rpcParams = default)
         {
-            // Chỉ Host/Server xử lý yêu cầu chuyển scene
-            if (rpcParams.Receive.SenderClientId == NetworkManager.ServerClientId)
-            {
-                ReturnToLobby();
-            }
+            // Server xử lý yêu cầu chuyển scene về Sảnh Lobby cho tất cả người chơi
+            ReturnToLobby();
         }
 
         public bool CanPlayerMove()
         {
+            // Nếu đang test offline (không có NetworkManager hoặc chưa bật mạng), luôn cho phép di chuyển
+            if (GameModeHelper.IsOffline)
+            {
+                return true;
+            }
+
             return CurrentState.Value == GameState.Playing || CurrentState.Value == GameState.BossFight;
         }
     }

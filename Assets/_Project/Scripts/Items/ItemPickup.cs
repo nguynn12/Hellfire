@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using Hellfire.Combat;
+using Hellfire.Networking;
 using Hellfire.Player;
 using TMPro;
 using Unity.Collections;
@@ -36,6 +37,10 @@ namespace Hellfire.Items
         [Header("Audio")]
         [SerializeField] private AudioSource _audioSource;
         [SerializeField] private AudioClip _pickupSound;
+
+        private MaterialPropertyBlock _itemPropBlock;
+        private static readonly int BaseColorPropId = Shader.PropertyToID("_BaseColor");
+        private static readonly int LegacyColorPropId = Shader.PropertyToID("_Color");
 
         // Network State
         private readonly NetworkVariable<int> _netPickupType = new NetworkVariable<int>(
@@ -99,6 +104,15 @@ namespace Hellfire.Items
         /// </summary>
         public void InitializePowerUp(PowerUpData data)
         {
+            if (GameModeHelper.IsOffline)
+            {
+                _pickupType = ItemPickupType.PowerUp;
+                _powerUpData = data;
+                _weaponData = null;
+                UpdateVisuals();
+                return;
+            }
+
             if (!IsServer && NetworkObject.IsSpawned) return;
 
             _pickupType = ItemPickupType.PowerUp;
@@ -119,6 +133,15 @@ namespace Hellfire.Items
         /// </summary>
         public void InitializeWeapon(WeaponData data)
         {
+            if (GameModeHelper.IsOffline)
+            {
+                _pickupType = ItemPickupType.Weapon;
+                _weaponData = data;
+                _powerUpData = null;
+                UpdateVisuals();
+                return;
+            }
+
             if (!IsServer && NetworkObject.IsSpawned) return;
 
             _pickupType = ItemPickupType.Weapon;
@@ -162,12 +185,14 @@ namespace Hellfire.Items
             Color displayColor = Color.white;
             string displayName = "Vật phẩm";
 
-            if ((ItemPickupType)_netPickupType.Value == ItemPickupType.PowerUp && _powerUpData != null)
+            ItemPickupType activeType = GameModeHelper.IsOffline ? _pickupType : (ItemPickupType)_netPickupType.Value;
+
+            if (activeType == ItemPickupType.PowerUp && _powerUpData != null)
             {
                 displayColor = _powerUpData.PickupColor;
                 displayName = $"{_powerUpData.PowerUpName}\n<size=70%>{_powerUpData.Description}</size>";
             }
-            else if ((ItemPickupType)_netPickupType.Value == ItemPickupType.Weapon && _weaponData != null)
+            else if (activeType == ItemPickupType.Weapon && _weaponData != null)
             {
                 displayColor = new Color(1f, 0.6f, 0.1f); // Màu cam vũ khí
                 displayName = $"{_weaponData.WeaponName}\n<size=70%>Sát thương: {_weaponData.BaseDamage} | Băng: {_weaponData.MagSize}</size>";
@@ -175,7 +200,11 @@ namespace Hellfire.Items
 
             if (_meshRenderer != null)
             {
-                _meshRenderer.material.color = displayColor;
+                if (_itemPropBlock == null) _itemPropBlock = new MaterialPropertyBlock();
+                _meshRenderer.GetPropertyBlock(_itemPropBlock);
+                _itemPropBlock.SetColor(BaseColorPropId, displayColor);
+                _itemPropBlock.SetColor(LegacyColorPropId, displayColor);
+                _meshRenderer.SetPropertyBlock(_itemPropBlock);
             }
 
             if (_pointLight != null)
@@ -198,44 +227,51 @@ namespace Hellfire.Items
             float newY = _initialPosition.y + Mathf.Sin(Time.time * _bobFrequency) * _bobAmplitude;
             transform.position = new Vector3(transform.position.x, newY, transform.position.z);
 
-            // Quay text hướng về Camera người chơi
-            if (_nameLabel != null && Camera.main != null)
+            // Quay text hướng về Camera người chơi (ưu tiên camera local cache để tối ưu CPU)
+            if (_nameLabel != null)
             {
-                _nameLabel.transform.rotation = Quaternion.LookRotation(_nameLabel.transform.position - Camera.main.transform.position);
+                Camera cam = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance.PlayerCamera : Camera.main;
+                if (cam != null)
+                {
+                    _nameLabel.transform.rotation = Quaternion.LookRotation(_nameLabel.transform.position - cam.transform.position);
+                }
             }
         }
 
         private void OnTriggerEnter(Collider other)
         {
-            // Chỉ Server có thẩm quyền xác thực và trao vật phẩm (Mục 6.3)
-            if (!IsServer || _hasDespawned) return;
+            // Server hoặc Offline có thẩm quyền xác thực và trao vật phẩm (Mục 6.3)
+            if (!GameModeHelper.IsServerOrOffline || _hasDespawned) return;
 
             if (!other.CompareTag("Player") && other.GetComponentInParent<PlayerMovement>() == null)
             {
                 return;
             }
 
-            var playerRoot = other.GetComponentInParent<NetworkObject>();
-            if (playerRoot == null) return;
+            var playerMove = other.GetComponentInParent<PlayerMovement>();
+            if (playerMove == null) return;
 
-            var playerHealth = playerRoot.GetComponent<Health>();
+            var playerHealth = playerMove.GetComponent<Health>();
             if (playerHealth != null && (playerHealth.IsDowned.Value || playerHealth.IsDead.Value))
             {
                 return; // Người chơi đang gục/chết không nhặt được
             }
 
-            var buffManager = playerRoot.GetComponent<PlayerBuffManager>();
-            var weaponController = playerRoot.GetComponent<WeaponController>();
+            var buffManager = playerMove.GetComponent<PlayerBuffManager>();
+            var weaponController = playerMove.GetComponent<WeaponController>();
 
-            var category = (ItemPickupType)_netPickupType.Value;
+            var category = GameModeHelper.IsOffline ? _pickupType : (ItemPickupType)_netPickupType.Value;
 
             if (category == ItemPickupType.PowerUp)
             {
                 if (_powerUpData != null && buffManager != null)
                 {
                     buffManager.ApplyPowerUp(_powerUpData);
-                    Debug.Log($"[ItemPickup] Người chơi {playerRoot.NetworkObjectId} đã nhặt bùa: {_powerUpData.PowerUpName}");
-                    PlayPickupSoundClientRpc(transform.position);
+                    Debug.Log($"[ItemPickup] Người chơi đã nhặt bùa: {_powerUpData.PowerUpName}");
+                    if (!GameModeHelper.IsOffline)
+                    {
+                        PlayPickupSoundClientRpc(transform.position);
+                    }
                     DespawnItem();
                 }
             }
@@ -244,8 +280,11 @@ namespace Hellfire.Items
                 if (_weaponData != null && weaponController != null)
                 {
                     weaponController.AddOrSwitchWeapon(_weaponData);
-                    Debug.Log($"[ItemPickup] Người chơi {playerRoot.NetworkObjectId} đã nhặt vũ khí: {_weaponData.WeaponName}");
-                    PlayPickupSoundClientRpc(transform.position);
+                    Debug.Log($"[ItemPickup] Người chơi đã nhặt vũ khí: {_weaponData.WeaponName}");
+                    if (!GameModeHelper.IsOffline)
+                    {
+                        PlayPickupSoundClientRpc(transform.position);
+                    }
                     DespawnItem();
                 }
             }
@@ -265,7 +304,11 @@ namespace Hellfire.Items
             if (_hasDespawned) return;
             _hasDespawned = true;
 
-            if (NetworkObject != null && NetworkObject.IsSpawned)
+            if (GameModeHelper.IsOffline)
+            {
+                Destroy(gameObject);
+            }
+            else if (NetworkObject != null && NetworkObject.IsSpawned)
             {
                 NetworkObject.Despawn(true);
             }

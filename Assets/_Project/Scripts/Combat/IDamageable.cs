@@ -15,9 +15,7 @@ namespace Hellfire.Combat
         /// <summary>
         /// Gây sát thương lên thực thể (Server-Authoritative).
         /// </summary>
-        /// <param name="damage">Lượng sát thương sau khi đã nhân hệ số hitbox.</param>
-        /// <param name="hitboxType">Vùng va chạm bị bắn trúng.</param>
-        /// <param name="attackerClientId">ID của người chơi đã bắn.</param>
-        void TakeDamage(float damage, HitboxType hitboxType, ulong attackerClientId);
+        /// <param name="payload">Gói dữ liệu sát thương chứa RawDamage, ArmorPenetration, Hitbox, và AttackerId.</param>
+        void TakeDamage(DamagePayload payload);
     }
 }

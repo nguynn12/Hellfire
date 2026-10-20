@@ -4,6 +4,8 @@
 
 using System.Collections;
 using Hellfire.Combat;
+using Hellfire.Networking;
+using Hellfire.Player;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -39,8 +41,13 @@ namespace Hellfire.AI
 
         private EnemyState _currentState = EnemyState.Idle;
         private float _lastTargetSearchTime;
-        private float _lastAttackTime;
+        protected float _lastAttackTime;
         private Vector3 _spawnPosition;
+
+        private static readonly int BaseColorPropId = Shader.PropertyToID("_BaseColor");
+        private static readonly int LegacyColorPropId = Shader.PropertyToID("_Color");
+        private MaterialPropertyBlock _propBlock;
+        private Coroutine _flashCoroutine;
 
         public EnemyState CurrentState => _currentState;
         public EnemyType Type => _enemyType;
@@ -49,10 +56,26 @@ namespace Hellfire.AI
         {
             _navAgent = GetComponent<NavMeshAgent>();
             _health = GetComponent<Health>();
+            _propBlock = new MaterialPropertyBlock();
 
             if (_renderers == null || _renderers.Length == 0)
             {
                 _renderers = GetComponentsInChildren<Renderer>();
+            }
+        }
+
+        protected virtual void Start()
+        {
+            if (GameModeHelper.IsOffline && !IsSpawned)
+            {
+                _spawnPosition = transform.position;
+                if (_navAgent != null) _navAgent.speed = _moveSpeed;
+                if (_health != null)
+                {
+                    _health.OnDied += HandleDeath;
+                    _health.OnDamageTaken += HandleDamageTaken;
+                }
+                SetState(EnemyState.Idle);
             }
         }
 
@@ -85,8 +108,8 @@ namespace Hellfire.AI
 
         protected virtual void Update()
         {
-            // BẮT BUỘC: Logic AI chỉ chạy duy nhất trên Server
-            if (!IsServer || _currentState == EnemyState.Dead)
+            // BẮT BUỘC: Logic AI chỉ chạy duy nhất trên Server hoặc khi Offline Test
+            if (!GameModeHelper.IsServerOrOffline || _currentState == EnemyState.Dead)
             {
                 return;
             }
@@ -222,8 +245,9 @@ namespace Hellfire.AI
         {
             if (_currentTargetHealth != null && IsTargetAliveAndValid(_currentTargetHealth))
             {
-                // Gây sát thương cận chiến Server-Authoritative lên người chơi
-                _currentTargetHealth.TakeDamage(_attackDamage, HitboxType.Torso, NetworkObjectId);
+                // Gây sát thương cận chiến Server-Authoritative lên người chơi qua DamagePayload
+                var payload = new DamagePayload(_attackDamage, 0f, HitboxType.Torso, NetworkObjectId);
+                _currentTargetHealth.TakeDamage(payload);
 
                 // Phát hiệu ứng đòn đánh cho client
                 PlayAttackFeedbackClientRpc();
@@ -257,26 +281,37 @@ namespace Hellfire.AI
                 }
             }
 
-            PlayDamageFeedbackClientRpc();
+            if (GameModeHelper.IsOffline)
+            {
+                if (_flashCoroutine != null) StopCoroutine(_flashCoroutine);
+                _flashCoroutine = StartCoroutine(FlashMaterialRoutine(Color.red, 0.12f));
+            }
+            else
+            {
+                PlayDamageFeedbackClientRpc();
+            }
         }
 
         [ClientRpc]
         private void PlayDamageFeedbackClientRpc()
         {
-            StartCoroutine(FlashMaterialRoutine(Color.red, 0.12f));
+            if (_flashCoroutine != null) StopCoroutine(_flashCoroutine);
+            _flashCoroutine = StartCoroutine(FlashMaterialRoutine(Color.red, 0.12f));
         }
 
         protected IEnumerator FlashMaterialRoutine(Color flashColor, float duration)
         {
             if (_renderers == null) yield break;
+            if (_propBlock == null) _propBlock = new MaterialPropertyBlock();
 
-            var origColors = new Color[_renderers.Length];
             for (int i = 0; i < _renderers.Length; i++)
             {
-                if (_renderers[i] != null && _renderers[i].material != null)
+                if (_renderers[i] != null)
                 {
-                    origColors[i] = _renderers[i].material.color;
-                    _renderers[i].material.color = flashColor;
+                    _renderers[i].GetPropertyBlock(_propBlock);
+                    _propBlock.SetColor(BaseColorPropId, flashColor);
+                    _propBlock.SetColor(LegacyColorPropId, flashColor);
+                    _renderers[i].SetPropertyBlock(_propBlock);
                 }
             }
 
@@ -284,11 +319,14 @@ namespace Hellfire.AI
 
             for (int i = 0; i < _renderers.Length; i++)
             {
-                if (_renderers[i] != null && _renderers[i].material != null)
+                if (_renderers[i] != null)
                 {
-                    _renderers[i].material.color = origColors[i];
+                    _renderers[i].GetPropertyBlock(_propBlock);
+                    _propBlock.Clear();
+                    _renderers[i].SetPropertyBlock(_propBlock);
                 }
             }
+            _flashCoroutine = null;
         }
 
         protected virtual void HandleDeath(ulong killerId)
@@ -296,7 +334,7 @@ namespace Hellfire.AI
             SetState(EnemyState.Dead);
             PlayDeathFeedbackClientRpc();
 
-            // Tự hủy sau 3 giây
+            // Tự hủy sau 3 giây (duy nhất trong FSM quái vật, tránh duplicate race condition Lỗi 02)
             StartCoroutine(DespawnRoutine(3.0f));
         }
 
@@ -317,7 +355,11 @@ namespace Hellfire.AI
         {
             yield return new WaitForSeconds(delay);
 
-            if (IsServer && NetworkObject != null && NetworkObject.IsSpawned)
+            if (GameModeHelper.IsOffline || NetworkObject == null || !NetworkObject.IsSpawned)
+            {
+                Destroy(gameObject);
+            }
+            else if (IsServer && NetworkObject.IsSpawned)
             {
                 NetworkObject.Despawn(true);
             }
@@ -328,6 +370,24 @@ namespace Hellfire.AI
         /// </summary>
         protected void SearchNearestLivingPlayer()
         {
+            if (GameModeHelper.IsOffline)
+            {
+                if (PlayerMovement.LocalInstance != null)
+                {
+                    var localHealth = PlayerMovement.LocalInstance.GetComponent<Health>();
+                    if (IsTargetAliveAndValid(localHealth))
+                    {
+                        float dist = Vector3.Distance(transform.position, PlayerMovement.LocalInstance.transform.position);
+                        if (dist <= _detectionRange && HasLineOfSightTo(PlayerMovement.LocalInstance.transform))
+                        {
+                            _currentTarget = PlayerMovement.LocalInstance.transform;
+                            _currentTargetHealth = localHealth;
+                            return;
+                        }
+                    }
+                }
+            }
+
             if (NetworkManager.Singleton == null) return;
 
             float closestDistSqr = _detectionRange * _detectionRange;
@@ -392,8 +452,8 @@ namespace Hellfire.AI
         protected bool IsTargetAliveAndValid(Health targetHealth)
         {
             if (targetHealth == null) return false;
-            // Mục tiêu phải còn sống và không trong trạng thái gục (Downed)
-            return !targetHealth.IsDead.Value && !targetHealth.IsDowned.Value;
+            // Mục tiêu phải là người chơi, còn sống và không trong trạng thái gục (Downed) - (Lỗi 05)
+            return targetHealth.IsPlayer && !targetHealth.IsDead.Value && !targetHealth.IsDowned.Value;
         }
     }
 }

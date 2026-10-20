@@ -138,8 +138,8 @@ namespace Hellfire.Dungeon
 
             Vector3 spawnCenter = spawnRoom.WorldCenter + Vector3.up * 1.0f;
 
-            // Dời các player hiện có trong NetworkManager về phòng Spawn
-            if (NetworkManager.Singleton != null)
+            // Dời các player hiện có trong NetworkManager về phòng Spawn an toàn bằng Teleport (Lỗi 09)
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
             {
                 int index = 0;
                 foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
@@ -148,9 +148,27 @@ namespace Hellfire.Dungeon
                     {
                         // Xếp so le vị trí các người chơi trong phòng spawn
                         Vector3 offset = new Vector3((index % 2 == 0 ? 1f : -1f) * 2f, 0f, (index > 1 ? 2f : -2f));
-                        client.PlayerObject.transform.position = spawnCenter + offset;
+                        Vector3 targetPos = spawnCenter + offset;
+                        var playerMovement = client.PlayerObject.GetComponent<Hellfire.Player.PlayerMovement>();
+                        if (playerMovement != null)
+                        {
+                            playerMovement.Teleport(targetPos);
+                            playerMovement.TeleportClientRpc(targetPos);
+                        }
+                        else
+                        {
+                            client.PlayerObject.transform.position = targetPos;
+                        }
                         index++;
                     }
+                }
+            }
+            else
+            {
+                // Hỗ trợ chế độ Offline: dịch chuyển Player cục bộ về phòng spawn
+                if (Hellfire.Player.PlayerMovement.LocalInstance != null)
+                {
+                    Hellfire.Player.PlayerMovement.LocalInstance.Teleport(spawnCenter);
                 }
             }
         }

@@ -56,9 +56,10 @@ namespace Hellfire.Combat
         }
 
         /// <summary>
-        /// Nhận sát thương và chuyển tiếp về component IDamageable ở root (Mục 3.1 & 3.2).
+        /// Nhận sát thương và chuyển tiếp về component IDamageable ở root bằng DamagePayload.
+        /// Tự động cập nhật HitboxType tương ứng với collider này.
         /// </summary>
-        public void ForwardDamage(float damage, ulong attackerClientId)
+        public void ForwardDamage(DamagePayload payload)
         {
             if (_damageable == null)
             {
@@ -67,12 +68,22 @@ namespace Hellfire.Combat
 
             if (_damageable != null)
             {
-                _damageable.TakeDamage(damage, _hitboxType, attackerClientId);
+                // Gán đúng _hitboxType của component này vào payload trước khi chuyển tiếp
+                DamagePayload finalPayload = payload.WithHitbox(_hitboxType);
+                _damageable.TakeDamage(finalPayload);
             }
             else
             {
                 Debug.LogWarning($"[HitboxIdentifier] Không tìm thấy IDamageable trên {gameObject.name} hoặc cha của nó!");
             }
+        }
+
+        /// <summary>
+        /// Quá tải hỗ trợ gọi nhanh với tham số rời rạc (tự động đóng gói DamagePayload).
+        /// </summary>
+        public void ForwardDamage(float rawDamage, ulong attackerClientId, float armorPenetration = 0f)
+        {
+            ForwardDamage(new DamagePayload(rawDamage, armorPenetration, _hitboxType, attackerClientId));
         }
     }
 }

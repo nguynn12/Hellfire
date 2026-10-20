@@ -329,6 +329,8 @@ GameObject:
   - component: {fileID: 8044882393265108530}
   - component: {fileID: 9060686978780575275}
   - component: {fileID: 8184653799288585890}
+  - component: {fileID: 5011223344556677881}
+  - component: {fileID: 5011223344556677882}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -736,3 +738,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
   _hitboxType: 0
   _damageableTarget: {fileID: 8148796173920827955}
+--- !u!114 &5011223344556677881
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5af45fd901214225b1ba6c6e48bd796a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerStats
+--- !u!114 &5011223344556677882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 510c859c23e8d9a42ab5335ade2e4add, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerBuffManager

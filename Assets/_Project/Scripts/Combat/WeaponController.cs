@@ -1,11 +1,13 @@
 // Script: WeaponController.cs
-// Mục đích: Quản lý logic bắn súng Hitscan từ tâm camera, hiệu ứng cosmetic client, và Server-Authoritative raycast tính sát thương (Mục 3.1 & 3.4).
+// Mục đích: Quản lý toàn bộ vũ khí súng tầm xa (Ranged Guns), bắn Hitscan, nạp đạn vô hạn không giới hạn số lần.
+//           Hỗ trợ Nâng Cấp Vũ Khí Toàn Cục (Global Weapon Stats & Modifiers) — giữ nguyên và áp dụng cho TẤT CẢ vũ khí khi đổi súng.
 // Môi trường thực thi: Cả hai (Client dự đoán & phát hiệu ứng, Server xác thực & trừ máu).
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using Hellfire.Player;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -28,23 +30,62 @@ namespace Hellfire.Combat
         [Header("Visual Effects (Cosmetic)")]
         [SerializeField] private float _tracerDuration = 0.05f;
 
+        // ================= GLOBAL WEAPON STATS (SERVER-AUTHORITATIVE) =================
+        // Áp dụng cho TOÀN BỘ vũ khí của người chơi. Khi đổi súng vẫn giữ nguyên toàn bộ nâng cấp!
+        public NetworkVariable<float> GlobalDamageMultiplierNet { get; } = new NetworkVariable<float>(
+            1.0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        );
+
+        public NetworkVariable<float> GlobalAttackSpeedMultiplierNet { get; } = new NetworkVariable<float>(
+            1.0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        );
+
+        public NetworkVariable<float> GlobalArmorPenetrationNet { get; } = new NetworkVariable<float>(
+            0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        );
+
+        public NetworkVariable<float> GlobalCritChanceBonusNet { get; } = new NetworkVariable<float>(
+            0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        );
+
+        public NetworkVariable<float> GlobalCritMultiplierBonusNet { get; } = new NetworkVariable<float>(
+            0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        );
+
+        public NetworkVariable<int> GlobalUpgradeLevelNet { get; } = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        );
+
+        // Danh sách Modifier toàn cục (gắn ngọc/phụ kiện có hiệu lực trên mọi khẩu súng)
+        private readonly List<IWeaponModifier> _globalModifiers = new List<IWeaponModifier>();
+
         // Runtime states
+        private readonly List<RuntimeWeapon> _runtimeWeapons = new List<RuntimeWeapon>();
         private int _currentAmmo;
         private float _nextFireTime;
         private bool _isReloading;
         private float _reloadTimer;
         private int _currentWeaponIndex = 0;
 
+        private static Material _cachedFxMaterial;
+        private PlayerBuffManager _buffManager;
+
         // Events for UI HUD
         public event Action<int, int> OnAmmoChanged;              // currentAmmo, magSize
         public event Action<string> OnWeaponChanged;               // weaponName
         public event Action<bool> OnReloadStateChanged;           // isReloading
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
+        public event Action<int> OnWeaponUpgraded;                 // newLevel
 
-        public WeaponData CurrentWeaponData => _currentWeapon;
+        public WeaponData CurrentWeaponData => CurrentRuntimeWeapon != null ? CurrentRuntimeWeapon.BaseData : _currentWeapon;
+        public RuntimeWeapon CurrentRuntimeWeapon => (_runtimeWeapons != null && _currentWeaponIndex >= 0 && _currentWeaponIndex < _runtimeWeapons.Count) ? _runtimeWeapons[_currentWeaponIndex] : null;
+        public IReadOnlyList<RuntimeWeapon> RuntimeWeapons => _runtimeWeapons;
+        public IReadOnlyList<WeaponData> AvailableWeapons => _availableWeapons;
+        public IReadOnlyList<IWeaponModifier> GlobalModifiers => _globalModifiers;
+
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
-        private Player.PlayerBuffManager _buffManager;
+        public int GlobalUpgradeLevel => GlobalUpgradeLevelNet.Value;
 
         private void Awake()
         {
@@ -59,7 +100,7 @@ namespace Hellfire.Combat
             {
                 _audioSource = GetComponent<AudioSource>();
                 if (_audioSource == null) _audioSource = gameObject.AddComponent<AudioSource>();
-                _audioSource.spatialBlend = 0f; // 2D sound for local player
+                _audioSource.spatialBlend = 0f;
             }
 
             if (_weaponMuzzlePoint == null)
@@ -67,12 +108,23 @@ namespace Hellfire.Combat
                 var viewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel/GunMesh");
                 if (viewmodel != null) _weaponMuzzlePoint = viewmodel;
             }
-            if (_buffManager == null) _buffManager = GetComponent<Player.PlayerBuffManager>();
+
+            if (_buffManager == null) _buffManager = GetComponent<PlayerBuffManager>();
         }
 
         public override void OnNetworkSpawn()
         {
             AutoResolveReferences();
+
+            // Khởi tạo danh sách RuntimeWeapon từ danh sách ScriptableObject tĩnh
+            _runtimeWeapons.Clear();
+            for (int i = 0; i < _availableWeapons.Count; i++)
+            {
+                if (_availableWeapons[i] != null)
+                {
+                    _runtimeWeapons.Add(new RuntimeWeapon(_availableWeapons[i]));
+                }
+            }
 
             if (_availableWeapons.Count > 0 && _currentWeapon == null)
             {
@@ -84,17 +136,33 @@ namespace Hellfire.Combat
                 _currentAmmo = _currentWeapon.MagSize;
             }
 
+            GlobalUpgradeLevelNet.OnValueChanged += HandleGlobalUpgradeLevelChanged;
+
             if (IsOwner)
             {
                 NotifyWeaponUI();
             }
         }
 
+        public override void OnNetworkDespawn()
+        {
+            GlobalUpgradeLevelNet.OnValueChanged -= HandleGlobalUpgradeLevelChanged;
+        }
+
+        private void HandleGlobalUpgradeLevelChanged(int prevVal, int newVal)
+        {
+            if (IsOwner)
+            {
+                NotifyWeaponUI();
+                OnWeaponUpgraded?.Invoke(newVal);
+            }
+        }
+
         private void Update()
         {
-            if (!IsOwner) return;
+            if (!GameModeHelper.CanLocalControl(this)) return;
 
-            // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn/nạp đạn (Mục 3.3)
+            // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn / nạp đạn
             if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
             {
                 if (_isReloading) CancelReload();
@@ -103,13 +171,12 @@ namespace Hellfire.Combat
 
             HandleWeaponSwitching();
             HandleReloading();
-            HandleFiring();
+            HandleAttackInput();
         }
 
         private void HandleWeaponSwitching()
         {
             if (_availableWeapons == null || _availableWeapons.Count <= 1 || _isReloading) return;
-
             if (Keyboard.current == null) return;
 
             if (Keyboard.current.digit1Key.wasPressedThisFrame && _availableWeapons.Count > 0) SwitchWeapon(0);
@@ -130,19 +197,8 @@ namespace Hellfire.Combat
             _nextFireTime = Time.time + 0.15f;
 
             NotifyWeaponUI();
-            Debug.Log($"[WeaponController] Đã đổi sang vũ khí: {_currentWeapon.WeaponName}");
+            Debug.Log($"[WeaponController] Đã đổi sang vũ khí: {_currentWeapon.WeaponName} (Kế thừa Nâng cấp Level {GlobalUpgradeLevelNet.Value})");
         }
-
-        public void SetWeaponData(WeaponData newWeapon)
-        {
-            if (newWeapon == null) return;
-            _currentWeapon = newWeapon;
-            _currentAmmo = newWeapon.MagSize;
-            _isReloading = false;
-            NotifyWeaponUI();
-        }
-
-        public IReadOnlyList<WeaponData> AvailableWeapons => _availableWeapons;
 
         public bool HasWeapon(WeaponData weapon)
         {
@@ -154,6 +210,7 @@ namespace Hellfire.Combat
             if (weapon != null && !_availableWeapons.Contains(weapon))
             {
                 _availableWeapons.Add(weapon);
+                _runtimeWeapons.Add(new RuntimeWeapon(weapon));
             }
         }
 
@@ -164,13 +221,33 @@ namespace Hellfire.Combat
             if (index == -1)
             {
                 _availableWeapons.Add(weapon);
+                _runtimeWeapons.Add(new RuntimeWeapon(weapon));
                 index = _availableWeapons.Count - 1;
             }
+
             SwitchWeapon(index);
+
+            // Đồng bộ về Client sở hữu nếu Server gọi
+            if (IsServer && !IsOwner && !GameModeHelper.IsOffline)
+            {
+                SwitchWeaponClientRpc(index);
+            }
         }
+
+        [ClientRpc]
+        private void SwitchWeaponClientRpc(int index)
+        {
+            if (IsOwner)
+            {
+                SwitchWeapon(index);
+            }
+        }
+
+        // ================= NẠP ĐẠN LIÊN TỤC KHÔNG GIỚI HẠN (INFINITE RELOAD) =================
 
         private void HandleReloading()
         {
+            // Bấm R để nạp đạn bất cứ khi nào đạn chưa đầy băng
             if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame && !_isReloading && _currentWeapon != null)
             {
                 if (_currentAmmo < _currentWeapon.MagSize)
@@ -206,7 +283,7 @@ namespace Hellfire.Combat
             _isReloading = false;
             if (_currentWeapon != null)
             {
-                _currentAmmo = _currentWeapon.MagSize;
+                _currentAmmo = _currentWeapon.MagSize; // Luôn nạp đầy băng, đạn dự trữ là vô hạn!
             }
             OnReloadStateChanged?.Invoke(false);
             OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon != null ? _currentWeapon.MagSize : 0);
@@ -218,33 +295,27 @@ namespace Hellfire.Combat
             OnReloadStateChanged?.Invoke(false);
         }
 
-        private void HandleFiring()
+        // ================= BẮN SÚNG TẦM XA (RANGED HITSCAN) =================
+
+        private void HandleAttackInput()
         {
             if (_currentWeapon == null || _playerCamera == null) return;
 
-            bool fireTriggered = false;
-
+            bool triggerPressed = false;
             if (Mouse.current != null)
             {
-                if (_currentWeapon.IsAutomatic)
-                {
-                    fireTriggered = Mouse.current.leftButton.isPressed;
-                }
-                else
-                {
-                    fireTriggered = Mouse.current.leftButton.wasPressedThisFrame;
-                }
+                triggerPressed = _currentWeapon.IsAutomatic
+                    ? Mouse.current.leftButton.isPressed
+                    : Mouse.current.leftButton.wasPressedThisFrame;
             }
 
-            if (!fireTriggered) return;
-
+            if (!triggerPressed) return;
             if (Time.time < _nextFireTime) return;
-
             if (_isReloading) return;
 
+            // Nếu hết đạn trong băng: tự động nạp đạn vô hạn
             if (_currentAmmo <= 0)
             {
-                // Hết đạn: phát âm thanh rỗng và tự động nạp đạn
                 if (_audioSource != null && _currentWeapon.EmptySound != null)
                 {
                     _audioSource.PlayOneShot(_currentWeapon.EmptySound);
@@ -254,46 +325,229 @@ namespace Hellfire.Combat
                 return;
             }
 
-            // Thực thi bắn
-            ExecuteFire();
+            ExecuteRangedFire();
         }
 
-        private void ExecuteFire()
+        private void ExecuteRangedFire()
         {
-            _currentAmmo--;
-            _nextFireTime = Time.time + _currentWeapon.FireRate;
+            _currentAmmo = Mathf.Max(0, _currentAmmo - 1);
             OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
 
-            // 1. Client Cosmetic Visuals ngay lập tức (Mục 3.1 bước 2)
+            // Tính toán tốc độ ra đòn kết hợp hệ số tốc bắn toàn cục
+            float finalAps = _currentWeapon.AttackRateAPS * GlobalAttackSpeedMultiplierNet.Value;
+            _nextFireTime = Time.time + (1.0f / Mathf.Max(0.1f, finalAps));
+
             if (_audioSource != null && _currentWeapon.FireSound != null)
             {
                 _audioSource.PlayOneShot(_currentWeapon.FireSound);
             }
 
-            // Raycast origin là tâm camera người chơi (Mục 3.1)
             Vector3 cameraPos = _playerCamera.transform.position;
             Vector3 cameraForward = _playerCamera.transform.forward;
-
-            int pellets = _currentWeapon.PelletCount;
             int seed = UnityEngine.Random.Range(0, 100000);
 
-            // Client vẽ tracer cục bộ
+            // Vẽ tracer đạn cosmetic cục bộ cho người bắn
+            int pellets = _currentWeapon.PelletCount;
+            float range = _currentWeapon.Range;
             for (int i = 0; i < pellets; i++)
             {
-                Vector3 spreadDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
-                Vector3 endPoint = cameraPos + spreadDir * _currentWeapon.Range;
-
-                // Client raycast tạm để vẽ tracer chạm tường/vật thể
-                if (Physics.Raycast(cameraPos, spreadDir, out var hit, _currentWeapon.Range))
-                {
-                    endPoint = hit.point;
-                }
-
+                Vector3 shootDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
+                Vector3 endPoint = Physics.Raycast(cameraPos, shootDir, out var hit, range) ? hit.point : cameraPos + shootDir * range;
                 DrawCosmeticTracer(GetMuzzlePosition(), endPoint);
             }
 
-            // 2. Gửi ServerRpc yêu cầu Server xác thực độc lập (Mục 3.1 bước 4)
-            FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            // Gửi ServerRpc yêu cầu Server xác thực độc lập hoặc chạy cục bộ khi Offline
+            if (GameModeHelper.IsOffline)
+            {
+                ExecuteHitscanFireLogic(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            }
+            else
+            {
+                FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            }
+
+            // Khi đạn hiện tại về 0: Tự động bắt đầu nạp đạn ngay lập tức
+            if (_currentAmmo <= 0)
+            {
+                StartReload();
+            }
+        }
+
+        [ServerRpc]
+        private void FireServerRpc(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
+        {
+            ExecuteHitscanFireLogic(clientOrigin, baseDirection, seed, weaponIndex);
+        }
+
+        public void ExecuteHitscanFireLogic(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
+        {
+            RuntimeWeapon rw = GetRuntimeWeaponByIndex(weaponIndex);
+            if (rw == null) return;
+
+            WeaponData weaponToUse = rw.BaseData;
+
+            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            {
+                return;
+            }
+
+            // Tính sát thương kết hợp Nâng Cấp Toàn Cục và Bùa Cuồng Nộ nếu có
+            float armorPen = weaponToUse.ArmorPenetration + GlobalArmorPenetrationNet.Value;
+            int pellets = weaponToUse.PelletCount;
+            float range = weaponToUse.Range;
+
+            for (int i = 0; i < pellets; i++)
+            {
+                Vector3 shootDir = CalculateSpreadDirection(baseDirection, weaponToUse.Spread, seed + i);
+
+                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range))
+                {
+                    // 1. Kiểm tra Friendly Fire (đồng đội)
+                    if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)
+                    {
+                        var hitHealth = hit.collider.GetComponentInParent<Health>();
+                        if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
+                        {
+                            if (GameModeHelper.IsOffline)
+                                SpawnImpactEffectInternal(hit.point, hit.normal, true);
+                            else
+                                SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                            continue;
+                        }
+                    }
+
+                    // 2. Tính sát thương (kết hợp Global Stats và Modifier toàn cục)
+                    float attackDamage = rw.CalculateAttackDamage(
+                        GlobalDamageMultiplierNet.Value,
+                        GlobalAttackSpeedMultiplierNet.Value,
+                        GlobalArmorPenetrationNet.Value,
+                        GlobalCritChanceBonusNet.Value,
+                        GlobalCritMultiplierBonusNet.Value,
+                        _globalModifiers,
+                        out bool isCrit
+                    );
+
+                    // 3. Nhân hệ số bùa Cuồng nộ (BerserkerCharm +30%) nếu có
+                    if (_buffManager != null)
+                    {
+                        attackDamage *= _buffManager.DamageMultiplier;
+                    }
+
+                    // 4. Đóng gói DamagePayload gửi sang mục tiêu
+                    var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
+                    if (hitbox != null)
+                    {
+                        var payload = new DamagePayload(attackDamage, armorPen, hitbox.Type, OwnerClientId);
+                        hitbox.ForwardDamage(payload);
+
+                        rw.NotifyHit(payload, hitbox.Damageable, _globalModifiers);
+
+                        if (GameModeHelper.IsOffline)
+                        {
+                            OnHitTargetConfirmed?.Invoke(hitbox.Type == HitboxType.Head);
+                            SpawnImpactEffectInternal(hit.point, hit.normal, true);
+                        }
+                        else
+                        {
+                            NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                        }
+                    }
+                    else
+                    {
+                        var damageable = hit.collider.GetComponentInParent<IDamageable>();
+                        if (damageable != null && !damageable.IsPlayerTarget)
+                        {
+                            var payload = new DamagePayload(attackDamage, armorPen, HitboxType.Torso, OwnerClientId);
+                            damageable.TakeDamage(payload);
+
+                            rw.NotifyHit(payload, damageable, _globalModifiers);
+
+                            if (GameModeHelper.IsOffline)
+                            {
+                                OnHitTargetConfirmed?.Invoke(false);
+                                SpawnImpactEffectInternal(hit.point, hit.normal, true);
+                            }
+                            else
+                            {
+                                NotifyHitConfirmClientRpc(false);
+                                SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                            }
+                        }
+                        else
+                        {
+                            if (GameModeHelper.IsOffline)
+                                SpawnImpactEffectInternal(hit.point, hit.normal, false);
+                            else
+                                SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        private RuntimeWeapon GetRuntimeWeaponByIndex(int index)
+        {
+            if (_runtimeWeapons != null && index >= 0 && index < _runtimeWeapons.Count)
+            {
+                return _runtimeWeapons[index];
+            }
+            return CurrentRuntimeWeapon;
+        }
+
+        // ================= NÂNG CẤP VŨ KHÍ TOÀN CỤC (GLOBAL WEAPON UPGRADES) =================
+
+        /// <summary>
+        /// Nâng cấp chỉ số toàn cục cho mọi vũ khí (Server-Authoritative). Khi đổi súng vẫn giữ nguyên!
+        /// </summary>
+        public void ApplyGlobalWeaponUpgradeServer(
+            float bonusDamagePercent = 0.15f,
+            float bonusApsPercent = 0.10f,
+            float bonusArmorPen = 5f,
+            float bonusCritChance = 0.05f,
+            float bonusCritMultiplier = 0.2f
+        )
+        {
+            if (!GameModeHelper.IsServerOrOffline)
+            {
+                Debug.LogWarning("[WeaponController] Chỉ Server mới có quyền nâng cấp vũ khí!");
+                return;
+            }
+
+            GlobalDamageMultiplierNet.Value += bonusDamagePercent;
+            GlobalAttackSpeedMultiplierNet.Value += bonusApsPercent;
+            GlobalArmorPenetrationNet.Value += bonusArmorPen;
+            GlobalCritChanceBonusNet.Value = Mathf.Clamp01(GlobalCritChanceBonusNet.Value + bonusCritChance);
+            GlobalCritMultiplierBonusNet.Value += bonusCritMultiplier;
+            GlobalUpgradeLevelNet.Value += 1;
+
+            Debug.Log($"[WeaponController] Client {OwnerClientId} nâng cấp Vũ khí Toàn Cục lên Level {GlobalUpgradeLevelNet.Value} " +
+                      $"(Dame: +{Mathf.RoundToInt(bonusDamagePercent * 100)}%, APS: +{Mathf.RoundToInt(bonusApsPercent * 100)}%, Pen: +{bonusArmorPen})");
+        }
+
+        /// <summary>
+        /// Gắn thêm 1 modifier toàn cục có hiệu lực trên mọi khẩu súng.
+        /// </summary>
+        public void AddGlobalModifierServer(IWeaponModifier modifier)
+        {
+            if (!GameModeHelper.IsServerOrOffline || modifier == null) return;
+            if (!_globalModifiers.Contains(modifier))
+            {
+                _globalModifiers.Add(modifier);
+                Debug.Log($"[WeaponController] Client {OwnerClientId} đã gắn Global Modifier: {modifier.DisplayName}");
+            }
+        }
+
+        /// <summary>
+        /// Tương thích ngược với lời gọi cũ từ Tế Đàn: Tự động nâng cấp toàn cục cho tất cả vũ khí!
+        /// </summary>
+        public void UpgradeCurrentWeaponServer(int levels = 1)
+        {
+            if (!GameModeHelper.IsServerOrOffline) return;
+            for (int i = 0; i < levels; i++)
+            {
+                ApplyGlobalWeaponUpgradeServer(0.20f, 0.08f, 5f, 0.04f, 0.15f);
+            }
         }
 
         private Vector3 GetMuzzlePosition()
@@ -336,98 +590,12 @@ namespace Hellfire.Combat
             line.SetPosition(0, start);
             line.SetPosition(1, end);
 
-            // Màu vàng cam vệt đạn
-            line.material = new Material(Shader.Find("Sprites/Default"));
+            line.material = GetOrCreateFxMaterial();
             line.startColor = new Color(1f, 0.9f, 0.4f, 0.9f);
             line.endColor = new Color(1f, 0.4f, 0.1f, 0.1f);
 
             yield return new WaitForSeconds(_tracerDuration);
             Destroy(tracerObj);
-        }
-
-        // ================= SERVER RPC & VALIDATION =================
-
-        [ServerRpc]
-        private void FireServerRpc(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
-        {
-            // Xác định WeaponData trên Server
-            WeaponData weaponToUse = _currentWeapon;
-            if (_availableWeapons != null && weaponIndex >= 0 && weaponIndex < _availableWeapons.Count && _availableWeapons[weaponIndex] != null)
-            {
-                weaponToUse = _availableWeapons[weaponIndex];
-            }
-
-            if (weaponToUse == null)
-            {
-                Debug.LogWarning("[WeaponController] ServerRpc: WeaponData không hợp lệ!");
-                return;
-            }
-
-            // Kiểm tra trạng thái của người bắn trên Server
-            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
-            {
-                return;
-            }
-
-            // Server-Authoritative Raycast độc lập (Mục 3.1 bước 5)
-            int pellets = weaponToUse.PelletCount;
-            float range = weaponToUse.Range;
-
-            for (int i = 0; i < pellets; i++)
-            {
-                Vector3 shootDir = CalculateSpreadDirection(baseDirection, weaponToUse.Spread, seed + i);
-
-                // Raycast toàn bộ layer va chạm
-                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range))
-                {
-                    // 1. Kiểm tra Friendly Fire (Mục 3.4 — ĐÃ CHỐT: TẮT)
-                    if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)
-                    {
-                        var hitHealth = hit.collider.GetComponentInParent<Health>();
-                        // Nếu bắn trúng đồng đội (cùng tag Player và không phải chính mình):
-                        if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
-                        {
-                            // Đạn dừng lại tại người chơi đồng đội (chặn đường đạn), NHƯNG KHÔNG trừ máu!
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
-                            continue;
-                        }
-                    }
-
-                    // 2. Kiểm tra Hitbox (Mục 3.2: Head x2.0, Torso x1.0, Limb x0.75)
-                    var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
-                    float buffMultiplier = (_buffManager != null) ? _buffManager.DamageMultiplier : 1.0f;
-
-                    if (hitbox != null)
-                    {
-                        float multiplier = weaponToUse.GetMultiplier(hitbox.Type);
-                        float damage = weaponToUse.BaseDamage * multiplier * buffMultiplier;
-
-                        hitbox.ForwardDamage(damage, OwnerClientId);
-
-                        // Gửi hit confirm về cho người bắn
-                        NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
-                        SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
-                    }
-                    else
-                    {
-                        // Kiểm tra IDamageable trực tiếp (nếu không gắn HitboxIdentifier chi tiết)
-                        var damageable = hit.collider.GetComponentInParent<IDamageable>();
-                        if (damageable != null && !damageable.IsPlayerTarget)
-                        {
-                            float damage = weaponToUse.BaseDamage * weaponToUse.GetMultiplier(HitboxType.Torso) * buffMultiplier;
-                            damageable.TakeDamage(damage, HitboxType.Torso, OwnerClientId);
-
-                            NotifyHitConfirmClientRpc(false);
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
-                        }
-                        else
-                        {
-                            // Bắn trúng môi trường / tường
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
-                        }
-                    }
-                }
-            }
         }
 
         [ClientRpc]
@@ -439,11 +607,15 @@ namespace Hellfire.Combat
             }
         }
 
+        private void SpawnImpactEffectInternal(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh)
+        {
+            StartCoroutine(ImpactEffectRoutine(hitPoint, hitNormal, isFlesh));
+        }
+
         [ClientRpc]
         private void SpawnImpactEffectClientRpc(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh)
         {
-            // Hiệu ứng tia lửa hoặc máu tại điểm trúng thực tế do Server xác thực
-            StartCoroutine(ImpactEffectRoutine(hitPoint, hitNormal, isFlesh));
+            SpawnImpactEffectInternal(hitPoint, hitNormal, isFlesh);
         }
 
         private IEnumerator ImpactEffectRoutine(Vector3 pos, Vector3 normal, bool isFlesh)
@@ -457,7 +629,7 @@ namespace Hellfire.Combat
             var rend = spark.GetComponent<Renderer>();
             if (rend != null)
             {
-                rend.material = new Material(Shader.Find("Sprites/Default"));
+                rend.sharedMaterial = GetOrCreateFxMaterial();
                 rend.material.color = isFlesh ? new Color(0.9f, 0.1f, 0.1f, 1f) : new Color(1f, 0.8f, 0.2f, 1f);
             }
 
@@ -465,11 +637,28 @@ namespace Hellfire.Combat
             Destroy(spark);
         }
 
+        private static Material GetOrCreateFxMaterial()
+        {
+            if (_cachedFxMaterial == null)
+            {
+                var s = Shader.Find("Sprites/Default");
+                if (s != null) _cachedFxMaterial = new Material(s);
+            }
+            return _cachedFxMaterial;
+        }
+
         private void NotifyWeaponUI()
         {
             if (_currentWeapon != null)
             {
-                OnWeaponChanged?.Invoke(_currentWeapon.WeaponName);
+                string displayName = _currentWeapon.WeaponName;
+                int lvl = GlobalUpgradeLevelNet.Value;
+                if (lvl > 0)
+                {
+                    displayName += $" +{lvl}";
+                }
+
+                OnWeaponChanged?.Invoke(displayName);
                 OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
             }
         }

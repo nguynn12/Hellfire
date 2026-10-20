@@ -193,7 +193,8 @@ namespace Hellfire.AI
                 var playerHealth = col.GetComponentInParent<Health>();
                 if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
                 {
-                    playerHealth.TakeDamage(_phase1MeleeDamage, HitboxType.Torso, NetworkObjectId);
+                    var payload = new DamagePayload(_phase1MeleeDamage, 15f, HitboxType.Torso, NetworkObjectId);
+                    playerHealth.TakeDamage(payload);
                 }
             }
         }
@@ -219,7 +220,8 @@ namespace Hellfire.AI
                 var playerHealth = col.GetComponentInParent<Health>();
                 if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
                 {
-                    playerHealth.TakeDamage(_phase2FireballDamage, HitboxType.Torso, NetworkObjectId);
+                    var payload = new DamagePayload(_phase2FireballDamage, 20f, HitboxType.Torso, NetworkObjectId);
+                    playerHealth.TakeDamage(payload);
                 }
             }
         }
@@ -274,7 +276,7 @@ namespace Hellfire.AI
         {
             base.HandleDeath(killerId);
 
-            if (!IsServer) return;
+            if (!Hellfire.GameModeHelper.IsServerOrOffline) return;
 
             // 1. Sinh Rương Boss (Mục 6.3: 100% rơi bùa lợi, 50% rơi thêm vũ khí)
             if (_bossChestPrefab != null)
@@ -287,7 +289,7 @@ namespace Hellfire.AI
                 {
                     chest.IsBossChest = true;
                 }
-                if (netObj != null)
+                if (!Hellfire.GameModeHelper.IsOffline && netObj != null && !netObj.IsSpawned)
                 {
                     netObj.Spawn(true);
                 }
