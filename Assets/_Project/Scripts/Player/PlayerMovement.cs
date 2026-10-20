@@ -51,15 +51,30 @@ namespace Hellfire.Player
         [Tooltip("Góc nhìn cúi xuống tối đa (độ)")]
         [SerializeField] private float _pitchClampMax = 85.0f;
 
+        [Header("Testing & Network Mode")]
+        [Tooltip("Bật: Tuân theo Netcode (chỉ IsOwner mới được điều khiển).\nTắt: Chế độ Offline Test (cho phép di chuyển tự do trong Scene test mà không cần NetworkManager).")]
+        [SerializeField] private bool _isOnlineMode = false;
+
         [Header("Layers")]
         [SerializeField] private string _playerBodyLayerName = "PlayerBody";
         [SerializeField] private string _viewmodelLayerName = "Viewmodel";
 
         // Properties
+        public static PlayerMovement LocalInstance { get; private set; }
         public bool IsGrounded => _characterController != null && _characterController.isGrounded;
         public float WalkSpeed => _walkSpeed;
         public float SprintSpeed => _sprintSpeed;
         public Camera PlayerCamera => _playerCamera;
+        public bool IsOnlineMode
+        {
+            get => _isOnlineMode;
+            set
+            {
+                _isOnlineMode = value;
+                GameModeHelper.ForceOfflineMode = !_isOnlineMode;
+                ApplyModeSettings();
+            }
+        }
 
         private float _cameraPitch;
         private float _verticalVelocity;
@@ -82,6 +97,28 @@ namespace Hellfire.Player
         private void Awake()
         {
             AutoResolveReferences();
+            if (GameModeHelper.IsOffline || IsOwner)
+            {
+                LocalInstance = this;
+            }
+        }
+
+        public override void OnDestroy()
+        {
+            base.OnDestroy();
+            if (LocalInstance == this)
+            {
+                LocalInstance = null;
+            }
+        }
+
+        private void Start()
+        {
+            // Nếu tắt chế độ Online hoặc đối tượng chưa spawn qua mạng: tự động kích hoạt điều khiển Offline
+            if (!_isOnlineMode || !IsSpawned || GameModeHelper.IsOffline)
+            {
+                ApplyModeSettings();
+            }
         }
 
         private void AutoResolveReferences()
@@ -100,96 +137,178 @@ namespace Hellfire.Player
         public override void OnNetworkSpawn()
         {
             AutoResolveReferences();
-
             if (IsOwner)
             {
-                // Bật CharacterController cho chính chủ để nhận physics & input
-                if (_characterController != null)
-                {
-                    _characterController.enabled = true;
-                }
+                LocalInstance = this;
+            }
+            ApplyModeSettings();
+        }
 
-                // Cấu hình Camera cho chính chủ sở hữu (Mục 1.1 & 1.2)
-                if (_playerCamera != null)
-                {
-                    _playerCamera.gameObject.SetActive(true);
-                    _playerCamera.fieldOfView = 90.0f;
-
-                    // Culling Mask: Ẩn layer PlayerBody của chính mình, hiện layer Viewmodel
-                    int bodyLayer = LayerMask.NameToLayer(_playerBodyLayerName);
-                    int viewmodelLayer = LayerMask.NameToLayer(_viewmodelLayerName);
-
-                    if (bodyLayer >= 0)
-                    {
-                        _playerCamera.cullingMask &= ~(1 << bodyLayer);
-                    }
-
-                    if (viewmodelLayer >= 0)
-                    {
-                        _playerCamera.cullingMask |= (1 << viewmodelLayer);
-                    }
-                }
-
-                if (_audioListener != null)
-                {
-                    _audioListener.enabled = true;
-                }
-
-                if (_weaponViewmodel != null)
-                {
-                    _weaponViewmodel.SetActive(true);
-                }
-
-                // Load độ nhạy chuột từ Settings nếu có
-                float savedSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 2.0f);
-                SetMouseSensitivity(savedSensitivity);
-
-                SetCursorLock(true);
+        /// <summary>
+        /// Dịch chuyển nhân vật tức thời an toàn mà không xung đột với CharacterController và NetworkTransform.
+        /// </summary>
+        public void Teleport(Vector3 newPosition)
+        {
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+                transform.position = newPosition;
+                _characterController.enabled = true;
             }
             else
             {
-                // Trên máy client khác: tắt CharacterController để NetworkTransform nội suy vị trí mượt mà
-                if (_characterController != null)
+                transform.position = newPosition;
+            }
+            _verticalVelocity = 0f;
+        }
+
+        [ClientRpc]
+        public void TeleportClientRpc(Vector3 newPosition)
+        {
+            Teleport(newPosition);
+        }
+
+        /// <summary>
+        /// Chuyển đổi nhanh chế độ Online / Offline (có thể click chuột phải vào component trong Inspector).
+        /// </summary>
+        [ContextMenu("Toggle Online Mode")]
+        public void ToggleOnlineMode()
+        {
+            IsOnlineMode = !_isOnlineMode;
+            Debug.Log($"[PlayerMovement] Chế độ Online: {(_isOnlineMode ? "BẬT (Netcode IsOwner)" : "TẮT (Offline Test)")}");
+        }
+
+        public void SetOnlineMode(bool isOnline)
+        {
+            IsOnlineMode = isOnline;
+        }
+
+        private void ApplyModeSettings()
+        {
+            // Cho phép điều khiển nếu: GameModeHelper cho phép hoặc IsOwner
+            bool canControlLocally = GameModeHelper.CanLocalControl(this);
+
+            if (canControlLocally)
+            {
+                LocalInstance = this;
+                SetupLocalPlayer();
+            }
+            else
+            {
+                SetupRemotePlayer();
+            }
+        }
+
+        private void SetupLocalPlayer()
+        {
+            // Bật CharacterController cho chính chủ để nhận physics & input
+            if (_characterController != null)
+            {
+                _characterController.enabled = true;
+            }
+
+            // Cấu hình Camera cho chính chủ sở hữu (Mục 1.1 & 1.2)
+            if (_playerCamera != null)
+            {
+                _playerCamera.gameObject.SetActive(true);
+                _playerCamera.fieldOfView = 90.0f;
+
+                // Culling Mask: Ẩn layer PlayerBody của chính mình, hiện layer Viewmodel
+                int bodyLayer = LayerMask.NameToLayer(_playerBodyLayerName);
+                int viewmodelLayer = LayerMask.NameToLayer(_viewmodelLayerName);
+
+                if (bodyLayer >= 0)
                 {
-                    _characterController.enabled = false;
+                    _playerCamera.cullingMask &= ~(1 << bodyLayer);
                 }
 
-                // Vô hiệu hóa Camera và AudioListener của nhân vật thuộc Client khác
-                if (_playerCamera != null)
+                if (viewmodelLayer >= 0)
                 {
-                    _playerCamera.gameObject.SetActive(false);
+                    _playerCamera.cullingMask |= (1 << viewmodelLayer);
+                }
+            }
+
+            if (_audioListener != null)
+            {
+                // Tắt các AudioListener khác trong scene để tránh cảnh báo 2 AudioListeners
+                AudioListener[] allListeners = FindObjectsByType<AudioListener>(FindObjectsInactive.Exclude);
+                foreach (var listener in allListeners)
+                {
+                    if (listener != _audioListener)
+                    {
+                        listener.enabled = false;
+                    }
                 }
 
-                if (_audioListener != null)
-                {
-                    _audioListener.enabled = false;
-                }
+                _audioListener.enabled = true;
+            }
 
-                if (_weaponViewmodel != null)
-                {
-                    _weaponViewmodel.SetActive(false);
-                }
+            if (_weaponViewmodel != null)
+            {
+                _weaponViewmodel.SetActive(true);
+            }
 
-                // Người khác PHẢI thấy mô hình toàn thân (Mục 1.1)
-                if (_playerBodyMesh != null)
-                {
-                    _playerBodyMesh.SetActive(true);
-                }
+            if (_playerBodyMesh != null)
+            {
+                // Khi chơi góc nhìn thứ nhất, ẩn body của chính mình (hoặc hiển thị tùy thiết kế)
+                _playerBodyMesh.SetActive(false);
+            }
+
+            // Load độ nhạy chuột từ Settings nếu có
+            float savedSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 2.0f);
+            SetMouseSensitivity(savedSensitivity);
+
+            SetCursorLock(true);
+        }
+
+        private void SetupRemotePlayer()
+        {
+            // Trên máy client khác: tắt CharacterController để NetworkTransform nội suy vị trí mượt mà
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+            }
+
+            // Vô hiệu hóa Camera và AudioListener của nhân vật thuộc Client khác
+            if (_playerCamera != null)
+            {
+                _playerCamera.gameObject.SetActive(false);
+            }
+
+            if (_audioListener != null)
+            {
+                _audioListener.enabled = false;
+            }
+
+            if (_weaponViewmodel != null)
+            {
+                _weaponViewmodel.SetActive(false);
+            }
+
+            // Người khác PHẢI thấy mô hình toàn thân (Mục 1.1)
+            if (_playerBodyMesh != null)
+            {
+                _playerBodyMesh.SetActive(true);
             }
         }
 
         private void Update()
         {
-            // Chỉ xử lý Input và Prediction trên máy của chính chủ sở hữu
-            if (!IsOwner)
+            if (!GameModeHelper.CanLocalControl(this))
             {
                 return;
             }
 
+            // Click chuột trái vào màn hình Game tự động khóa chuột
+            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !_isCursorLocked)
+            {
+                SetCursorLock(true);
+            }
+
             HandleCursorToggle();
 
-            // Vô hiệu hóa di chuyển khi đang Gục (Downed) hoặc Chết (Dead) theo Mục 3.3
-            if (_health != null && (_health.IsDowned.Value || _health.IsDead.Value))
+            // Vô hiệu hóa di chuyển khi đang Gục (Downed) hoặc Chết (Dead) theo Mục 3.3 (chỉ check khi đã spawn mạng)
+            if (_health != null && _health.IsSpawned && (_health.IsDowned.Value || _health.IsDead.Value))
             {
                 ApplyGravityOnly();
                 return;
@@ -205,8 +324,9 @@ namespace Hellfire.Player
             if (_isCursorLocked)
             {
                 HandleLook();
-                HandleMovement();
             }
+
+            HandleMovement();
         }
 
         private void HandleCursorToggle()
@@ -257,20 +377,20 @@ namespace Hellfire.Player
                 return;
             }
 
-            // 1. Đọc Input WASD
+            // 1. Đọc Input WASD và phím mũi tên
             Vector2 moveInput = Vector2.zero;
             if (Keyboard.current != null)
             {
-                if (Keyboard.current.wKey.isPressed) moveInput.y += 1f;
-                if (Keyboard.current.sKey.isPressed) moveInput.y -= 1f;
-                if (Keyboard.current.aKey.isPressed) moveInput.x -= 1f;
-                if (Keyboard.current.dKey.isPressed) moveInput.x += 1f;
+                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) moveInput.y += 1f;
+                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) moveInput.y -= 1f;
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) moveInput.x -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) moveInput.x += 1f;
             }
 
             moveInput = moveInput.normalized;
 
             // 2. Xác định tốc độ (đi bộ, chạy nhanh, đi lùi)
-            bool isSprinting = Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed;
+            bool isSprinting = Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
             bool isMovingBackward = moveInput.y < -0.1f;
 
             float currentSpeed;
@@ -289,7 +409,11 @@ namespace Hellfire.Player
             }
 
             // Áp dụng hệ số tốc độ chạy từ PlayerStats (Mục I.2 & II.2) và Buff Bùa Lợi (SwiftBoots)
-            float speedMultiplier = (_playerStats != null) ? _playerStats.MoveSpeedMultiplier.Value : 1.0f;
+            float speedMultiplier = 1.0f;
+            if (_playerStats != null)
+            {
+                speedMultiplier = _playerStats.MoveSpeedMultiplier.Value;
+            }
             if (_buffManager != null)
             {
                 speedMultiplier *= _buffManager.SpeedMultiplier;

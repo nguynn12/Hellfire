@@ -276,7 +276,7 @@ namespace Hellfire.AI
         {
             base.HandleDeath(killerId);
 
-            if (!IsServer) return;
+            if (!Hellfire.GameModeHelper.IsServerOrOffline) return;
 
             // 1. Sinh Rương Boss (Mục 6.3: 100% rơi bùa lợi, 50% rơi thêm vũ khí)
             if (_bossChestPrefab != null)
@@ -289,7 +289,7 @@ namespace Hellfire.AI
                 {
                     chest.IsBossChest = true;
                 }
-                if (netObj != null)
+                if (!Hellfire.GameModeHelper.IsOffline && netObj != null && !netObj.IsSpawned)
                 {
                     netObj.Spawn(true);
                 }
