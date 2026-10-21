@@ -98,15 +98,16 @@ namespace Hellfire.Editor
             var normalChestPrefab = CreateLootChestPrefabInternal("LootChest", false, powerUps, weapons, itemPickupPrefab);
             var bossChestPrefab = CreateLootChestPrefabInternal("BossLootChest", true, powerUps, weapons, itemPickupPrefab);
             var shrinePrefab = CreateInteractiveShrinePrefabInternal();
+            var shopStationPrefab = CreateShopStationPrefabInternal(powerUps, weapons);
 
             UpdateBossPrefabInternal(bossChestPrefab);
-            RegisterPrefabsToNetworkManagerInternal(itemPickupPrefab, normalChestPrefab, bossChestPrefab, shrinePrefab);
-            RegisterToDefaultNetworkPrefabsInternal(itemPickupPrefab, normalChestPrefab, bossChestPrefab, shrinePrefab);
-            UpdateDungeonManagerSpecialRoomsInScene(shrinePrefab, normalChestPrefab);
+            RegisterPrefabsToNetworkManagerInternal(itemPickupPrefab, normalChestPrefab, bossChestPrefab, shrinePrefab, shopStationPrefab);
+            RegisterToDefaultNetworkPrefabsInternal(itemPickupPrefab, normalChestPrefab, bossChestPrefab, shrinePrefab, shopStationPrefab);
+            UpdateDungeonManagerSpecialRoomsInScene(shrinePrefab, normalChestPrefab, shopStationPrefab);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("[HellfirePhase4Setup] Hoàn tất thiết lập Special Rooms (Shrine, Chests, Pickups)!");
+            Debug.Log("[HellfirePhase4Setup] Hoàn tất thiết lập Special Rooms (Shrine, Chests, Pickups, ShopStation)!");
         }
 
         private static void EnsureDirectories()
@@ -475,6 +476,109 @@ namespace Hellfire.Editor
             return prefab;
         }
 
+        public static GameObject CreateShopStationPrefabInternal(List<PowerUpData> powerUps, List<WeaponData> weapons)
+        {
+            string path = $"{PrefabDir}/ShopStation.prefab";
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null) return existing;
+
+            var root = new GameObject("ShopStation");
+            root.AddComponent<NetworkObject>();
+
+            var col = root.AddComponent<BoxCollider>();
+            col.isTrigger = true;
+            col.center = new Vector3(0f, 1.0f, 0f);
+            col.size = new Vector3(2.5f, 2.0f, 2.5f);
+
+            var audioSource = root.AddComponent<AudioSource>();
+            audioSource.spatialBlend = 1.0f;
+            audioSource.playOnAwake = false;
+
+            // Pedestal Base
+            var baseObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            baseObj.name = "ShopCounterBase";
+            baseObj.transform.SetParent(root.transform);
+            baseObj.transform.localPosition = new Vector3(0f, 0.4f, 0f);
+            baseObj.transform.localScale = new Vector3(1.6f, 0.4f, 1.6f);
+            Object.DestroyImmediate(baseObj.GetComponent<Collider>());
+            var stoneMat = new Material(Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit"));
+            stoneMat.color = new Color(0.18f, 0.18f, 0.22f);
+            baseObj.GetComponent<Renderer>().material = stoneMat;
+
+            // Spinning Gold Coin Visual
+            var coinObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            coinObj.name = "SpinningCoin";
+            coinObj.transform.SetParent(root.transform);
+            coinObj.transform.localPosition = new Vector3(0f, 1.25f, 0f);
+            coinObj.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            coinObj.transform.localScale = new Vector3(0.7f, 0.08f, 0.7f);
+            Object.DestroyImmediate(coinObj.GetComponent<Collider>());
+            var coinMat = new Material(Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit"));
+            coinMat.color = new Color(1.0f, 0.8f, 0.1f);
+            coinMat.EnableKeyword("_EMISSION");
+            coinMat.SetColor("_EmissionColor", new Color(1.0f, 0.8f, 0.1f) * 1.5f);
+            coinObj.GetComponent<Renderer>().material = coinMat;
+
+            // Warm Gold Light
+            var lightObj = new GameObject("ShopLight");
+            lightObj.transform.SetParent(root.transform);
+            lightObj.transform.localPosition = new Vector3(0f, 1.6f, 0f);
+            var light = lightObj.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 6.0f;
+            light.intensity = 2.5f;
+            light.color = new Color(1.0f, 0.85f, 0.3f);
+
+            // 3D Prompt Text
+            var promptObj = new GameObject("PromptText");
+            promptObj.transform.SetParent(root.transform);
+            promptObj.transform.localPosition = new Vector3(0f, 1.9f, 0f);
+            var promptTmp = promptObj.AddComponent<TextMeshPro>();
+            promptTmp.text = "[E] Mở Cửa Hàng (Shop)";
+            promptTmp.fontSize = 3.5f;
+            promptTmp.alignment = TextAlignmentOptions.Center;
+            promptTmp.color = new Color(1f, 0.85f, 0.2f);
+            promptTmp.rectTransform.sizeDelta = new Vector2(5f, 1.5f);
+            promptObj.SetActive(false);
+
+            var shopStation = root.AddComponent<ShopStation>();
+            var so = new SerializedObject(shopStation);
+            so.FindProperty("_interactionDistance").floatValue = 3.0f;
+            so.FindProperty("_promptText").objectReferenceValue = promptTmp;
+            so.FindProperty("_stationLight").objectReferenceValue = light;
+            so.FindProperty("_spinningCoin").objectReferenceValue = coinObj.transform;
+            so.FindProperty("_audioSource").objectReferenceValue = audioSource;
+
+            var weaponProp = so.FindProperty("_weaponCatalog");
+            weaponProp.ClearArray();
+            if (weapons != null)
+            {
+                for (int i = 0; i < weapons.Count; i++)
+                {
+                    weaponProp.InsertArrayElementAtIndex(i);
+                    weaponProp.GetArrayElementAtIndex(i).objectReferenceValue = weapons[i];
+                }
+            }
+
+            var powerUpProp = so.FindProperty("_powerUpCatalog");
+            powerUpProp.ClearArray();
+            if (powerUps != null)
+            {
+                for (int i = 0; i < powerUps.Count; i++)
+                {
+                    powerUpProp.InsertArrayElementAtIndex(i);
+                    powerUpProp.GetArrayElementAtIndex(i).objectReferenceValue = powerUps[i];
+                }
+            }
+
+            so.ApplyModifiedProperties();
+
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
+            Object.DestroyImmediate(root);
+            Debug.Log($"[HellfirePhase4Setup] Đã tạo thành công Prefab {path}");
+            return prefab;
+        }
+
         public static void UpdatePlayerPrefabInternal()
         {
             var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
@@ -575,7 +679,7 @@ namespace Hellfire.Editor
             }
         }
 
-        public static void UpdateDungeonManagerSpecialRoomsInScene(GameObject shrinePrefab, GameObject chestPrefab)
+        public static void UpdateDungeonManagerSpecialRoomsInScene(GameObject shrinePrefab, GameObject chestPrefab, GameObject shopStationPrefab = null)
         {
             var scene = EditorSceneManager.OpenScene(GameplayScenePath, OpenSceneMode.Single);
             var dungeonManagerObj = GameObject.Find("DungeonManager");
@@ -588,8 +692,12 @@ namespace Hellfire.Editor
                     typeof(DungeonManager).GetField("_shrinePrefab", flags)?.SetValue(dm, shrinePrefab);
                     typeof(DungeonManager).GetField("_lootChestPrefab", flags)?.SetValue(dm, chestPrefab);
                     typeof(DungeonManager).GetField("_treasureChestCount", flags)?.SetValue(dm, 2);
+                    if (shopStationPrefab != null)
+                    {
+                        typeof(DungeonManager).GetField("_shopStationPrefab", flags)?.SetValue(dm, shopStationPrefab);
+                    }
                     EditorUtility.SetDirty(dm);
-                    Debug.Log("[HellfirePhase4Setup] Đã cấu hình _shrinePrefab và _lootChestPrefab cho DungeonManager trong Scene Gameplay");
+                    Debug.Log("[HellfirePhase4Setup] Đã cấu hình _shrinePrefab, _lootChestPrefab, _shopStationPrefab cho DungeonManager trong Scene Gameplay");
                 }
             }
             EditorSceneManager.MarkSceneDirty(scene);

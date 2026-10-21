@@ -47,6 +47,9 @@ namespace Hellfire.Dungeon
         [SerializeField] private GameObject _lootChestPrefab;
         [SerializeField] private int _treasureChestCount = 2;
 
+        [Header("Shop Room (Mục 17.8)")]
+        [SerializeField] private GameObject _shopStationPrefab;
+
         [Header("Debug / Fallback Seed")]
         [Tooltip("Nếu > 0, Server sẽ dùng seed này để test bản đồ cố định")]
         [SerializeField] private int _overrideSeed = 0;
@@ -305,6 +308,10 @@ namespace Hellfire.Dungeon
                 {
                     SpawnTreasureRoomChests(room);
                 }
+                else if (room.RoomType == DungeonRoomType.Shop)
+                {
+                    SpawnShopStation(room);
+                }
             }
         }
 
@@ -382,6 +389,112 @@ namespace Hellfire.Dungeon
 
                 Debug.Log($"[DungeonManager] Đã spawn LootChest {i + 1}/{count} tại phòng Treasure {room.GridPosition} ({chestPos})");
             }
+        }
+
+        private void SpawnShopStation(DungeonRoomNode room)
+        {
+            Vector3 stationPos = room.WorldCenter;
+            if (UnityEngine.AI.NavMesh.SamplePosition(stationPos, out var hit, 3.0f, UnityEngine.AI.NavMesh.AllAreas))
+            {
+                stationPos = hit.position;
+            }
+
+            GameObject stationObj = null;
+            if (_shopStationPrefab != null)
+            {
+                stationObj = Instantiate(_shopStationPrefab, stationPos, Quaternion.identity);
+            }
+            else
+            {
+                stationObj = CreateDefaultShopStationObject(stationPos);
+            }
+
+            var netObj = stationObj.GetComponent<NetworkObject>();
+            if (netObj != null)
+            {
+                netObj.Spawn(true);
+            }
+
+            Debug.Log($"[DungeonManager] Đã spawn ShopStation tại tâm phòng Shop {room.GridPosition} ({stationPos})");
+        }
+
+        private GameObject CreateDefaultShopStationObject(Vector3 pos)
+        {
+            var root = new GameObject("ShopStation");
+            root.transform.position = pos;
+            root.AddComponent<NetworkObject>();
+
+            var col = root.AddComponent<BoxCollider>();
+            col.isTrigger = true;
+            col.center = new Vector3(0f, 1.0f, 0f);
+            col.size = new Vector3(2.5f, 2.0f, 2.5f);
+
+            var audioSource = root.AddComponent<AudioSource>();
+            audioSource.spatialBlend = 1.0f;
+            audioSource.playOnAwake = false;
+
+            // Pedestal Base
+            var baseObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            baseObj.name = "ShopCounterBase";
+            baseObj.transform.SetParent(root.transform, false);
+            baseObj.transform.localPosition = new Vector3(0f, 0.4f, 0f);
+            baseObj.transform.localScale = new Vector3(1.6f, 0.4f, 1.6f);
+            Destroy(baseObj.GetComponent<Collider>());
+            var renderer = baseObj.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                var mat = new Material(Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit"));
+                mat.color = new Color(0.18f, 0.18f, 0.22f);
+                renderer.material = mat;
+            }
+
+            // Spinning Gold Coin Visual
+            var coinObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            coinObj.name = "SpinningCoin";
+            coinObj.transform.SetParent(root.transform, false);
+            coinObj.transform.localPosition = new Vector3(0f, 1.25f, 0f);
+            coinObj.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            coinObj.transform.localScale = new Vector3(0.7f, 0.08f, 0.7f);
+            Destroy(coinObj.GetComponent<Collider>());
+            var coinRenderer = coinObj.GetComponent<Renderer>();
+            if (coinRenderer != null)
+            {
+                var coinMat = new Material(Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit"));
+                coinMat.color = new Color(1.0f, 0.8f, 0.1f);
+                coinMat.EnableKeyword("_EMISSION");
+                coinMat.SetColor("_EmissionColor", new Color(1.0f, 0.8f, 0.1f) * 1.5f);
+                coinRenderer.material = coinMat;
+            }
+
+            // Warm Gold Light
+            var lightObj = new GameObject("ShopLight");
+            lightObj.transform.SetParent(root.transform, false);
+            lightObj.transform.localPosition = new Vector3(0f, 1.6f, 0f);
+            var light = lightObj.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 6.0f;
+            light.intensity = 2.5f;
+            light.color = new Color(1.0f, 0.85f, 0.3f);
+
+            // 3D Prompt Text
+            var promptObj = new GameObject("PromptText");
+            promptObj.transform.SetParent(root.transform, false);
+            promptObj.transform.localPosition = new Vector3(0f, 1.9f, 0f);
+            var promptTmp = promptObj.AddComponent<TMPro.TextMeshPro>();
+            promptTmp.text = "[E] Mở Cửa Hàng (Shop)";
+            promptTmp.fontSize = 4f;
+            promptTmp.alignment = TMPro.TextAlignmentOptions.Center;
+            promptTmp.color = new Color(1f, 0.85f, 0.2f);
+            promptObj.SetActive(false);
+
+            var shopStation = root.AddComponent<Hellfire.Items.ShopStation>();
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            typeof(Hellfire.Items.ShopStation).GetField("_promptText", flags)?.SetValue(shopStation, promptTmp);
+            typeof(Hellfire.Items.ShopStation).GetField("_stationLight", flags)?.SetValue(shopStation, light);
+            typeof(Hellfire.Items.ShopStation).GetField("_spinningCoin", flags)?.SetValue(shopStation, coinObj.transform);
+            typeof(Hellfire.Items.ShopStation).GetField("_audioSource", flags)?.SetValue(shopStation, audioSource);
+
+            return root;
         }
 
         private IEnumerator LoadingGateTimeoutRoutine()

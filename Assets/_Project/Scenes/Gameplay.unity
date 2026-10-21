@@ -581,6 +581,7 @@ MonoBehaviour:
   _shrinePrefab: {fileID: 3307499296855584155, guid: 85e113e7b6b8c416386ee9842f992597, type: 3}
   _lootChestPrefab: {fileID: 8559227056804521236, guid: d42d19d74d03140f0b38397a1eaa3d46, type: 3}
   _treasureChestCount: 2
+  _shopStationPrefab: {fileID: 7798575132509848069, guid: 5029840516d684f17b9a7274745d4fca, type: 3}
   _overrideSeed: 0
   _readyTimeoutSeconds: 30
 --- !u!114 &56814011
@@ -2238,6 +2239,14 @@ MonoBehaviour:
   _crosshairObject: {fileID: 1501395809}
   _crosshairImage: {fileID: 1501395811}
   _hitmarkerImage: {fileID: 567592443}
+  _killConfirmText: {fileID: 0}
+  _damageVignetteImage: {fileID: 0}
+  _damageIndicatorArrow: {fileID: 0}
+  _combatAudioSource: {fileID: 0}
+  _hitSound: {fileID: 0}
+  _headshotSound: {fileID: 0}
+  _killSound: {fileID: 0}
+  _heartbeatSound: {fileID: 0}
   _healthSlider: {fileID: 195085889}
   _healthText: {fileID: 1256777776}
   _armorText: {fileID: 0}
@@ -2252,6 +2261,8 @@ MonoBehaviour:
   _revivePromptPanel: {fileID: 1814875611}
   _revivePromptText: {fileID: 1676151263}
   _reviveProgressBar: {fileID: 355475831}
+  _teammatePanel: {fileID: 0}
+  _teammateMarkerManager: {fileID: 0}
   _pauseMenuPanel: {fileID: 925332540}
   _resumeButton: {fileID: 1456293480}
   _leaveGameButton: {fileID: 927923796}
@@ -2263,6 +2274,9 @@ MonoBehaviour:
   _gameOverReturnButton: {fileID: 0}
   _gameOverWaitingText: {fileID: 0}
   _soulsText: {fileID: 0}
+  _dungeonMapUI: {fileID: 0}
+  _victoryStatsText: {fileID: 0}
+  _gameOverStatsText: {fileID: 0}
 --- !u!1 &764677031
 GameObject:
   m_ObjectHideFlags: 0
