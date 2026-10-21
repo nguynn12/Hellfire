@@ -35,6 +35,7 @@ namespace Hellfire.Dungeon
         public DungeonEnemySpawner EnemySpawner => _enemySpawner;
 
         private readonly Dictionary<Vector2Int, RoomLockState> _roomLockStates = new Dictionary<Vector2Int, RoomLockState>();
+        private readonly HashSet<Vector2Int> _roomsFinishedSpawning = new HashSet<Vector2Int>();
         private Coroutine _roomLockRoutine;
 
         [Header("Room Rewards (Mục 17.7)")]
@@ -492,6 +493,7 @@ namespace Hellfire.Dungeon
             if (!IsServer) return;
 
             _roomLockStates.Clear();
+            _roomsFinishedSpawning.Clear();
             if (_generator != null && _generator.ActiveGrid != null)
             {
                 foreach (var kvp in _generator.ActiveGrid.Rooms)
@@ -548,10 +550,14 @@ namespace Hellfire.Dungeon
                     else if (lockState == RoomLockState.Locked)
                     {
                         // 3. Điều kiện mở: mọi quái thuộc phòng đó đã chết (Mục 17.4 & 17.5)
-                        int aliveCount = _enemySpawner != null ? _enemySpawner.GetAliveEnemyCountInRoom(room.GridPosition) : 0;
-                        if (aliveCount == 0)
+                        // Chỉ cho phép ClearRoom khi phòng đó ĐÃ spawn xong để tránh race condition trong 0.8s đầu
+                        if (_roomsFinishedSpawning.Contains(room.GridPosition))
                         {
-                            ClearRoom(room);
+                            int aliveCount = _enemySpawner != null ? _enemySpawner.GetAliveEnemyCountInRoom(room.GridPosition) : 0;
+                            if (aliveCount == 0)
+                            {
+                                ClearRoom(room);
+                            }
                         }
                     }
                 }
@@ -694,18 +700,22 @@ namespace Hellfire.Dungeon
                     _enemySpawner.SpawnBossForRoom(room);
                 }
             }
+
+            // Đặt cờ đã spawn xong cho phòng này (chỉ Server)
+            _roomsFinishedSpawning.Add(room.GridPosition);
+            Debug.Log($"[DungeonManager] Đã đặt cờ phòng {room.GridPosition} ({room.RoomType}) đã spawn xong.");
         }
 
         private void ClearRoom(DungeonRoomNode room)
         {
             _roomLockStates[room.GridPosition] = RoomLockState.Cleared;
             SetRoomGatesClientRpc(room.GridPosition, false);
-            Debug.Log($"[DungeonManager] Phòng {room.GridPosition} ({room.RoomType}) đã dọn sạch quái (Cleared)! Cổng nâng lên.");
+            Debug.Log($"[DungeonManager] [Cleared] Phòng {room.GridPosition} ({room.RoomType}) đã dọn sạch quái (Cleared)! Cổng nâng lên.");
 
             if (room.RoomType == DungeonRoomType.Combat)
             {
                 Hellfire.Player.PlayerWallet.DistributeSoulsToLivingPlayers(_combatRoomClearSoulsBonus);
-                Debug.Log($"[DungeonManager] Phòng Combat {room.GridPosition} đã Cleared! Thưởng +{_combatRoomClearSoulsBonus} Linh hồn cho mỗi người chơi còn sống.");
+                Debug.Log($"[DungeonManager] [Cleared] Phòng Combat {room.GridPosition} đã Cleared! Thưởng +{_combatRoomClearSoulsBonus} Linh hồn cho mỗi người chơi còn sống.");
             }
             else if (room.RoomType == DungeonRoomType.Boss)
             {
@@ -713,6 +723,7 @@ namespace Hellfire.Dungeon
                 {
                     _enemySpawner.ClearAllEnemiesInRoom(room.GridPosition);
                 }
+                Debug.Log($"[DungeonManager] [Cleared] Phòng Boss {room.GridPosition} đã Cleared! Toàn bộ quái còn lại đã dọn sạch.");
             }
         }
 
