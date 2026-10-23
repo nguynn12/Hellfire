@@ -586,7 +586,6 @@ namespace Hellfire.Dungeon
                         {
                             client.PlayerObject.transform.position = targetPos;
                         }
-                        }
                         index++;
                     }
                 }

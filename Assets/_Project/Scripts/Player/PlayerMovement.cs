@@ -146,12 +146,16 @@ namespace Hellfire.Player
         public override void OnNetworkSpawn()
         {
             AutoResolveReferences();
+
             if (IsOwner)
             {
                 LocalInstance = this;
-            }
-            ApplyModeSettings();
-        }
+
+                // Bật CharacterController cho chính chủ để nhận physics & input
+                if (_characterController != null)
+                {
+                    _characterController.enabled = true;
+                }
 
                 // Cấu hình Camera cho chính chủ sở hữu (Mục 1.1, 1.2 & 16.9)
                 if (_playerCamera != null)
@@ -228,18 +232,6 @@ namespace Hellfire.Player
                 _characterController.enabled = false;
                 transform.position = newPosition;
                 _characterController.enabled = true;
-            }
-            else
-            {
-                transform.position = newPosition;
-            }
-            _verticalVelocity = 0f;
-        }
-
-        [ClientRpc]
-        public void TeleportClientRpc(Vector3 newPosition)
-        {
-            Teleport(newPosition);
             }
             else
             {
