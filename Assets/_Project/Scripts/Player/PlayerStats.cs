@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using Hellfire.Combat;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -53,6 +54,13 @@ namespace Hellfire.Player
             NetworkVariableWritePermission.Server
         );
 
+        /// <summary>
+        /// Thuộc tính truy cập nhanh chỉ số hiện tại (hoạt động đồng thời Online và Offline).
+        /// </summary>
+        public float CurrentBonusMaxHealth => BonusMaxHealth.Value;
+        public float CurrentArmor => Armor.Value;
+        public float CurrentMoveSpeedMultiplier => MoveSpeedMultiplier.Value;
+
         // ================= LỊCH SỬ TẾ ĐÀN (SERVER-SIDE TRACKING) =================
         // Lưu trữ các ID tế đàn mà riêng người chơi này đã kích hoạt (chỉ chạy trên Server)
         private readonly HashSet<int> _usedShrineIds = new HashSet<int>();
@@ -65,6 +73,14 @@ namespace Hellfire.Player
         private void Awake()
         {
             _healthComponent = GetComponent<Health>();
+        }
+
+        private void Start()
+        {
+            if (GameModeHelper.IsOffline && !IsSpawned)
+            {
+                NotifyStatsChanged();
+            }
         }
 
         public override void OnNetworkSpawn()
@@ -113,7 +129,7 @@ namespace Hellfire.Player
         /// </summary>
         public void RecordShrineUsed(int shrineId)
         {
-            if (!IsServer)
+            if (!GameModeHelper.IsServerOrOffline)
             {
                 Debug.LogWarning("[PlayerStats] Chỉ Server mới có quyền ghi nhận Shrine!");
                 return;
@@ -144,7 +160,7 @@ namespace Hellfire.Player
         /// <returns>True nếu có ít nhất 1 chỉ số được tăng, False nếu đã đạt trần tối đa.</returns>
         public bool TryApplyBodyBuff(float addHealth, float addArmor, float addSpeed)
         {
-            if (!IsServer)
+            if (!GameModeHelper.IsServerOrOffline)
             {
                 Debug.LogWarning("[PlayerStats] Chỉ Server mới có quyền tăng chỉ số PlayerStats!");
                 return false;
@@ -187,6 +203,10 @@ namespace Hellfire.Player
 
             if (statModified)
             {
+                if (GameModeHelper.IsOffline)
+                {
+                    NotifyStatsChanged();
+                }
                 Debug.Log($"[PlayerStats] Đã nâng cấp chỉ số cho Client {OwnerClientId}: +HP={BonusMaxHealth.Value}/{MaxBonusHealthCap}, Armor={Armor.Value}/{MaxArmorCap}, Speed={MoveSpeedMultiplier.Value:F2}x");
             }
 
