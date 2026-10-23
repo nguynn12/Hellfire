@@ -2,9 +2,11 @@
 // Mục đích: Điều khiển di chuyển góc nhìn thứ nhất (FPS) bằng CharacterController và Unity Input System (Mục 1 & 1.3).
 // Môi trường thực thi: Cả hai (Client-side prediction cho IsOwner, NetworkTransform đồng bộ cho Client khác).
 
+using System.Collections;
 using Hellfire.Combat;
 using Hellfire.Networking;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -65,6 +67,8 @@ namespace Hellfire.Player
         private float _verticalVelocity;
         private bool _isCursorLocked = true;
         private PlayerBuffManager _buffManager;
+        private Vector3 _originalCamLocalPos;
+        private Coroutine _shakeCoroutine;
 
         private void Reset()
         {
@@ -95,6 +99,11 @@ namespace Hellfire.Player
             if (_health == null) _health = GetComponent<Health>();
             if (_playerStats == null) _playerStats = GetComponent<PlayerStats>();
             if (_buffManager == null) _buffManager = GetComponent<PlayerBuffManager>();
+
+            if (_playerCamera != null)
+            {
+                _originalCamLocalPos = _playerCamera.transform.localPosition;
+            }
         }
 
         public override void OnNetworkSpawn()
@@ -109,11 +118,12 @@ namespace Hellfire.Player
                     _characterController.enabled = true;
                 }
 
-                // Cấu hình Camera cho chính chủ sở hữu (Mục 1.1 & 1.2)
+                // Cấu hình Camera cho chính chủ sở hữu (Mục 1.1, 1.2 & 16.9)
                 if (_playerCamera != null)
                 {
                     _playerCamera.gameObject.SetActive(true);
-                    _playerCamera.fieldOfView = 90.0f;
+                    _playerCamera.fieldOfView = GameSettings.FieldOfView;
+                    GameSettings.OnFOVChanged += HandleFOVChanged;
 
                     // Culling Mask: Ẩn layer PlayerBody của chính mình, hiện layer Viewmodel
                     int bodyLayer = LayerMask.NameToLayer(_playerBodyLayerName);
@@ -175,6 +185,22 @@ namespace Hellfire.Player
                 {
                     _playerBodyMesh.SetActive(true);
                 }
+            }
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (IsOwner)
+            {
+                GameSettings.OnFOVChanged -= HandleFOVChanged;
+            }
+        }
+
+        private void HandleFOVChanged(float newFov)
+        {
+            if (_playerCamera != null && IsOwner)
+            {
+                _playerCamera.fieldOfView = newFov;
             }
         }
 
@@ -336,6 +362,79 @@ namespace Hellfire.Player
             }
 
             _characterController.Move(Vector3.up * (_verticalVelocity * Time.deltaTime));
+        }
+
+        /// <summary>
+        /// Dịch chuyển chủ sở hữu nhân vật an toàn do Server yêu cầu (Mục 2.1.1).
+        /// Thứ tự bắt buộc: (a) tắt CharacterController -> (b) đặt transform.position/rotation -> (c) NetworkTransform.Teleport -> (d) bật lại CharacterController.
+        /// </summary>
+        [ClientRpc]
+        public void TeleportOwnerClientRpc(Vector3 targetPosition, Quaternion targetRotation, ClientRpcParams clientRpcParams = default)
+        {
+            if (!IsOwner) return;
+
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+            }
+
+            transform.position = targetPosition;
+            transform.rotation = targetRotation;
+
+            var netTransform = GetComponent<NetworkTransform>();
+            if (netTransform != null)
+            {
+                netTransform.Teleport(targetPosition, targetRotation, transform.localScale);
+            }
+
+            if (_characterController != null)
+            {
+                _characterController.enabled = true;
+            }
+        }
+
+        public void TriggerScreenShake(float duration = 0.5f, float intensity = 0.25f)
+        {
+            if (GameSettings.ReduceScreenShake) return;
+            if (_playerCamera == null) return;
+
+            if (_shakeCoroutine != null)
+            {
+                StopCoroutine(_shakeCoroutine);
+                _playerCamera.transform.localPosition = _originalCamLocalPos;
+            }
+
+            _shakeCoroutine = StartCoroutine(ScreenShakeRoutine(duration, intensity));
+        }
+
+        private IEnumerator ScreenShakeRoutine(float duration, float intensity)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float currentIntensity = Mathf.Lerp(intensity, 0f, elapsed / duration);
+                Vector3 offset = UnityEngine.Random.insideUnitSphere * currentIntensity;
+                offset.z = 0f;
+                _playerCamera.transform.localPosition = _originalCamLocalPos + offset;
+                yield return null;
+            }
+
+            _playerCamera.transform.localPosition = _originalCamLocalPos;
+            _shakeCoroutine = null;
+        }
+
+        public static void TriggerLocalPlayerScreenShake(float duration = 0.5f, float intensity = 0.25f)
+        {
+            var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            if (localPlayer != null)
+            {
+                var movement = localPlayer.GetComponent<PlayerMovement>();
+                if (movement != null)
+                {
+                    movement.TriggerScreenShake(duration, intensity);
+                }
+            }
         }
     }
 }

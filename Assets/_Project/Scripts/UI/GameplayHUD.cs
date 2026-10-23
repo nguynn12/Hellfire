@@ -17,10 +17,22 @@ namespace Hellfire.UI
     [DisallowMultipleComponent]
     public class GameplayHUD : MonoBehaviour
     {
-        [Header("Crosshair & Hitmarker")]
+        [Header("Crosshair & Hitmarker (Mục 16.7)")]
         [SerializeField] private GameObject _crosshairObject;
         [SerializeField] private Image _crosshairImage;
         [SerializeField] private Image _hitmarkerImage;
+        [SerializeField] private TextMeshProUGUI _killConfirmText;
+
+        [Header("Combat Feedback: Damage Vignette & Direction (Mục 16.7)")]
+        [SerializeField] private Image _damageVignetteImage;
+        [SerializeField] private RectTransform _damageIndicatorArrow;
+
+        [Header("Combat Feedback Audio (Mục 16.7)")]
+        [SerializeField] private AudioSource _combatAudioSource;
+        [SerializeField] private AudioClip _hitSound;
+        [SerializeField] private AudioClip _headshotSound;
+        [SerializeField] private AudioClip _killSound;
+        [SerializeField] private AudioClip _heartbeatSound;
 
         [Header("Health & Status UI")]
         [SerializeField] private Slider _healthSlider;
@@ -44,6 +56,10 @@ namespace Hellfire.UI
         [SerializeField] private TextMeshProUGUI _revivePromptText;
         [SerializeField] private Slider _reviveProgressBar;
 
+        [Header("Teammate HUD & Markers (Mục 16.2 & 16.3)")]
+        [SerializeField] private TeammateHUDPanel _teammatePanel;
+        [SerializeField] private TeammateMarkerManager _teammateMarkerManager;
+
         [Header("Pause Menu (Mục 7)")]
         [SerializeField] private GameObject _pauseMenuPanel;
         [SerializeField] private Button _resumeButton;
@@ -59,14 +75,26 @@ namespace Hellfire.UI
         [SerializeField] private Button _gameOverReturnButton;
         [SerializeField] private TextMeshProUGUI _gameOverWaitingText;
 
+        [Header("Souls (Mục 17.7)")]
+        [SerializeField] private TextMeshProUGUI _soulsText;
+
+        [Header("Dungeon Map (Mục 16.8)")]
+        [SerializeField] private DungeonMapUI _dungeonMapUI;
+
+        [Header("Match Summary Stats (Mục 16.11)")]
+        [SerializeField] private TextMeshProUGUI _victoryStatsText;
+        [SerializeField] private TextMeshProUGUI _gameOverStatsText;
+
         private bool _isPaused;
         private Health _localPlayerHealth;
         private WeaponController _localWeaponController;
         private PlayerRevive _localPlayerRevive;
         private PlayerBuffManager _localBuffManager;
         private PlayerStats _localPlayerStats;
+        private PlayerWallet _localPlayerWallet;
         private Coroutine _hitmarkerCoroutine;
         private Coroutine _buffToastCoroutine;
+        private float _lastHeartbeatTime = 0f;
 
         private void Awake()
         {
@@ -77,9 +105,13 @@ namespace Hellfire.UI
         {
             AutoResolveReferences();
             RegisterButtonListeners();
+            AttachButtonFeedbacks();
 
             if (_pauseMenuPanel != null) _pauseMenuPanel.SetActive(false);
             if (_hitmarkerImage != null) _hitmarkerImage.gameObject.SetActive(false);
+            if (_killConfirmText != null) _killConfirmText.gameObject.SetActive(false);
+            if (_damageVignetteImage != null) _damageVignetteImage.color = new Color(1f, 0f, 0f, 0f);
+            if (_damageIndicatorArrow != null) _damageIndicatorArrow.gameObject.SetActive(false);
             if (_downedOverlayPanel != null) _downedOverlayPanel.SetActive(false);
             if (_revivePromptPanel != null) _revivePromptPanel.SetActive(false);
             if (_reloadPromptText != null) _reloadPromptText.gameObject.SetActive(false);
@@ -89,6 +121,8 @@ namespace Hellfire.UI
             if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(false);
 
             UpdatePlayerInfo();
+
+            MatchSummaryManager.OnMatchSummaryReceived += HandleMatchSummaryReceived;
 
             if (GameManager.Instance != null)
             {
@@ -143,6 +177,174 @@ namespace Hellfire.UI
             if (_gameOverOverlayPanel == null) _gameOverOverlayPanel = FindInHierarchy(root, "GameOverOverlayPanel");
             if (_gameOverReturnButton == null) _gameOverReturnButton = FindComponentInHierarchy<Button>(root, "GameOverReturnButton");
             if (_gameOverWaitingText == null) _gameOverWaitingText = FindComponentInHierarchy<TextMeshProUGUI>(root, "GameOverWaitingText");
+
+            // Souls Counter (Mục 17.7)
+            if (_soulsText == null) _soulsText = FindComponentInHierarchy<TextMeshProUGUI>(root, "SoulsText");
+            if (_soulsText == null && canvas != null)
+            {
+                _soulsText = CreateSoulsText(canvas.transform);
+            }
+
+            // Teammate Panel (Mục 16.2)
+            if (_teammatePanel == null)
+            {
+                _teammatePanel = FindComponentInHierarchy<TeammateHUDPanel>(root, "TeammatePanel");
+                if (_teammatePanel == null)
+                {
+                    var panelObj = new GameObject("TeammatePanel", typeof(RectTransform), typeof(TeammateHUDPanel));
+                    panelObj.transform.SetParent(root, false);
+                    var pRect = panelObj.GetComponent<RectTransform>();
+                    pRect.anchorMin = new Vector2(0f, 0.45f);
+                    pRect.anchorMax = new Vector2(0f, 0.75f);
+                    pRect.pivot = new Vector2(0f, 0.5f);
+                    pRect.anchoredPosition = new Vector2(25f, 0f);
+                    pRect.sizeDelta = new Vector2(240f, 180f);
+
+                    var vlg = panelObj.AddComponent<VerticalLayoutGroup>();
+                    vlg.spacing = 10f;
+                    vlg.childControlWidth = true;
+                    vlg.childControlHeight = false;
+                    vlg.childForceExpandWidth = true;
+                    vlg.childForceExpandHeight = false;
+
+                    _teammatePanel = panelObj.GetComponent<TeammateHUDPanel>();
+                }
+            }
+
+            // Teammate Markers (Mục 16.3)
+            if (_teammateMarkerManager == null)
+            {
+                _teammateMarkerManager = FindComponentInHierarchy<TeammateMarkerManager>(root, "TeammateMarkerManager");
+                if (_teammateMarkerManager == null)
+                {
+                    var markerObj = new GameObject("TeammateMarkerManager", typeof(RectTransform), typeof(TeammateMarkerManager));
+                    markerObj.transform.SetParent(root, false);
+                    var mRect = markerObj.GetComponent<RectTransform>();
+                    mRect.anchorMin = Vector2.zero;
+                    mRect.anchorMax = Vector2.one;
+                    mRect.offsetMin = Vector2.zero;
+                    mRect.offsetMax = Vector2.zero;
+
+                    _teammateMarkerManager = markerObj.GetComponent<TeammateMarkerManager>();
+                }
+            }
+
+            // Damage Vignette & Indicator (Mục 16.7)
+            if (_damageVignetteImage == null)
+            {
+                var vigObj = new GameObject("DamageVignette", typeof(RectTransform), typeof(Image));
+                vigObj.transform.SetParent(root, false);
+                vigObj.transform.SetAsFirstSibling(); // Đặt sau cùng trong Canvas để không che UI khác
+                var vRect = vigObj.GetComponent<RectTransform>();
+                vRect.anchorMin = Vector2.zero;
+                vRect.anchorMax = Vector2.one;
+                vRect.offsetMin = Vector2.zero;
+                vRect.offsetMax = Vector2.zero;
+                _damageVignetteImage = vigObj.GetComponent<Image>();
+                _damageVignetteImage.color = new Color(1f, 0f, 0f, 0f);
+                _damageVignetteImage.raycastTarget = false;
+            }
+
+            if (_damageIndicatorArrow == null)
+            {
+                var arrowObj = new GameObject("DamageIndicatorArrow", typeof(RectTransform), typeof(Image));
+                arrowObj.transform.SetParent(root, false);
+                _damageIndicatorArrow = arrowObj.GetComponent<RectTransform>();
+                _damageIndicatorArrow.sizeDelta = new Vector2(32f, 32f);
+                _damageIndicatorArrow.anchoredPosition = new Vector2(0f, 120f);
+                var arrowImg = arrowObj.GetComponent<Image>();
+                arrowImg.color = new Color(1f, 0.1f, 0.1f, 0.9f);
+                arrowImg.raycastTarget = false;
+                arrowObj.SetActive(false);
+            }
+
+            // Boss Health Bar UI (Mục 16.6)
+            var bossUI = GetComponentInChildren<BossHealthBarUI>(true);
+            if (bossUI == null)
+            {
+                var bObj = new GameObject("BossHealthBarUI", typeof(RectTransform), typeof(BossHealthBarUI));
+                bObj.transform.SetParent(root, false);
+            }
+
+            // Dungeon Map UI (Mục 16.8)
+            if (_dungeonMapUI == null)
+            {
+                _dungeonMapUI = GetComponentInChildren<DungeonMapUI>(true);
+                if (_dungeonMapUI == null)
+                {
+                    var mapObj = new GameObject("DungeonMapUI", typeof(RectTransform), typeof(DungeonMapUI));
+                    mapObj.transform.SetParent(root, false);
+                    _dungeonMapUI = mapObj.GetComponent<DungeonMapUI>();
+                }
+            }
+
+            // Match Summary Stats Text (Mục 16.11)
+            if (_victoryStatsText == null && _victoryOverlayPanel != null)
+            {
+                _victoryStatsText = FindComponentInHierarchy<TextMeshProUGUI>(_victoryOverlayPanel.transform, "VictoryStatsText");
+                if (_victoryStatsText == null)
+                {
+                    var sObj = new GameObject("VictoryStatsText", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    sObj.transform.SetParent(_victoryOverlayPanel.transform, false);
+                    var sRect = sObj.GetComponent<RectTransform>();
+                    sRect.anchorMin = new Vector2(0.5f, 0.45f);
+                    sRect.anchorMax = new Vector2(0.5f, 0.45f);
+                    sRect.sizeDelta = new Vector2(850f, 220f);
+                    _victoryStatsText = sObj.GetComponent<TextMeshProUGUI>();
+                    _victoryStatsText.fontSize = 17;
+                    _victoryStatsText.alignment = TextAlignmentOptions.Center;
+                }
+            }
+
+            if (_gameOverStatsText == null && _gameOverOverlayPanel != null)
+            {
+                _gameOverStatsText = FindComponentInHierarchy<TextMeshProUGUI>(_gameOverOverlayPanel.transform, "GameOverStatsText");
+                if (_gameOverStatsText == null)
+                {
+                    var sObj = new GameObject("GameOverStatsText", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    sObj.transform.SetParent(_gameOverOverlayPanel.transform, false);
+                    var sRect = sObj.GetComponent<RectTransform>();
+                    sRect.anchorMin = new Vector2(0.5f, 0.45f);
+                    sRect.anchorMax = new Vector2(0.5f, 0.45f);
+                    sRect.sizeDelta = new Vector2(850f, 220f);
+                    _gameOverStatsText = sObj.GetComponent<TextMeshProUGUI>();
+                    _gameOverStatsText.fontSize = 17;
+                    _gameOverStatsText.alignment = TextAlignmentOptions.Center;
+                }
+            }
+
+            // AudioSource cho phản hồi chiến đấu (Mục 16.7)
+            if (_combatAudioSource == null)
+            {
+                _combatAudioSource = GetComponent<AudioSource>();
+                if (_combatAudioSource == null)
+                {
+                    _combatAudioSource = gameObject.AddComponent<AudioSource>();
+                    _combatAudioSource.playOnAwake = false;
+                    _combatAudioSource.spatialBlend = 0f;
+                }
+            }
+            InitProceduralAudioClips();
+        }
+
+        private TextMeshProUGUI CreateSoulsText(Transform root)
+        {
+            var obj = new GameObject("SoulsText");
+            obj.transform.SetParent(root, false);
+            var rect = obj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-30f, -30f);
+            rect.sizeDelta = new Vector2(250f, 40f);
+
+            var tmp = obj.AddComponent<TextMeshProUGUI>();
+            tmp.text = "Linh hồn: 0";
+            tmp.fontSize = 22f;
+            tmp.color = new Color(0.4f, 0.9f, 1f);
+            tmp.alignment = TextAlignmentOptions.TopRight;
+            tmp.fontStyle = FontStyles.Bold;
+            return tmp;
         }
 
         private void RegisterButtonListeners()
@@ -175,6 +377,8 @@ namespace Hellfire.UI
         private void Update()
         {
             TryBindLocalPlayer();
+            UpdatePlayerInfo();
+            UpdateLowHealthPulse();
 
             // Cập nhật bộ đếm thời gian gục (Downed)
             if (_localPlayerHealth != null && _localPlayerHealth.IsDowned.Value)
@@ -232,7 +436,7 @@ namespace Hellfire.UI
 
         private void TryBindLocalPlayer()
         {
-            if (_localPlayerHealth != null && _localWeaponController != null && _localBuffManager != null) return;
+            if (_localPlayerHealth != null && _localWeaponController != null && _localBuffManager != null && _localPlayerWallet != null) return;
 
             var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
             if (localPlayer == null) return;
@@ -245,6 +449,7 @@ namespace Hellfire.UI
                     _localPlayerHealth.OnHealthChanged += HandleHealthChanged;
                     _localPlayerHealth.OnDownedStateChanged += HandleDownedChanged;
                     _localPlayerHealth.OnDamageTaken += HandleDamageTaken;
+                    _localPlayerHealth.OnPlayerAttackedBy += HandlePlayerAttacked;
                     HandleHealthChanged(_localPlayerHealth.CurrentHealth.Value, _localPlayerHealth.MaxHealth);
                 }
             }
@@ -258,6 +463,7 @@ namespace Hellfire.UI
                     _localWeaponController.OnWeaponChanged += HandleWeaponChanged;
                     _localWeaponController.OnReloadStateChanged += HandleReloadStateChanged;
                     _localWeaponController.OnHitTargetConfirmed += ShowHitmarker;
+                    _localWeaponController.OnKillConfirmed += ShowKillConfirmation;
 
                     if (_localWeaponController.CurrentWeaponData != null)
                     {
@@ -294,6 +500,24 @@ namespace Hellfire.UI
                     _localPlayerStats.OnStatsChanged += HandlePlayerStatsChanged;
                     HandlePlayerStatsChanged(_localPlayerStats.BonusMaxHealth.Value, _localPlayerStats.Armor.Value, _localPlayerStats.MoveSpeedMultiplier.Value);
                 }
+            }
+
+            if (_localPlayerWallet == null)
+            {
+                _localPlayerWallet = localPlayer.GetComponent<PlayerWallet>();
+                if (_localPlayerWallet != null)
+                {
+                    _localPlayerWallet.OnSoulsChanged += HandleSoulsChanged;
+                    HandleSoulsChanged(_localPlayerWallet.Souls.Value);
+                }
+            }
+        }
+
+        private void HandleSoulsChanged(int currentSouls)
+        {
+            if (_soulsText != null)
+            {
+                _soulsText.text = $"Linh hồn: {currentSouls}";
             }
         }
 
@@ -388,6 +612,7 @@ namespace Hellfire.UI
                 _localPlayerHealth.OnHealthChanged -= HandleHealthChanged;
                 _localPlayerHealth.OnDownedStateChanged -= HandleDownedChanged;
                 _localPlayerHealth.OnDamageTaken -= HandleDamageTaken;
+                _localPlayerHealth.OnPlayerAttackedBy -= HandlePlayerAttacked;
             }
 
             if (_localWeaponController != null)
@@ -396,6 +621,7 @@ namespace Hellfire.UI
                 _localWeaponController.OnWeaponChanged -= HandleWeaponChanged;
                 _localWeaponController.OnReloadStateChanged -= HandleReloadStateChanged;
                 _localWeaponController.OnHitTargetConfirmed -= ShowHitmarker;
+                _localWeaponController.OnKillConfirmed -= ShowKillConfirmation;
             }
 
             if (_localPlayerRevive != null)
@@ -414,9 +640,43 @@ namespace Hellfire.UI
                 _localPlayerStats.OnStatsChanged -= HandlePlayerStatsChanged;
             }
 
+            if (_localPlayerWallet != null)
+            {
+                _localPlayerWallet.OnSoulsChanged -= HandleSoulsChanged;
+            }
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
+            }
+
+            MatchSummaryManager.OnMatchSummaryReceived -= HandleMatchSummaryReceived;
+        }
+
+        private void HandleMatchSummaryReceived(PlayerMatchStats[] stats, float duration)
+        {
+            int mins = Mathf.FloorToInt(duration / 60f);
+            int secs = Mathf.FloorToInt(duration % 60f);
+            string summaryText = $"<b>⏱️ THỜI GIAN LƯỢT CHƠI: {mins:00}:{secs:00}</b>\n\n";
+
+            summaryText += "<size=16><b>NGƯỜI CHƠI                   HẠ GỤC       SÁT THƯƠNG       CỨU       GỤC</b></size>\n";
+            summaryText += "─────────────────────────────────────────────────────────────\n";
+
+            foreach (var stat in stats)
+            {
+                Color pColor = PlayerPalette.GetColor(stat.ColorIndex);
+                string hex = ColorUtility.ToHtmlStringRGB(pColor);
+                string nameCol = $"<color=#{hex}><b>[P{stat.ColorIndex + 1}] {stat.PlayerName}</b></color>";
+                summaryText += $"{nameCol,-28} {stat.Kills,7}       {Mathf.RoundToInt(stat.DamageDealt),10}       {stat.Revives,5}       {stat.TimesDowned,5}\n";
+            }
+
+            if (_victoryStatsText != null)
+            {
+                _victoryStatsText.text = summaryText;
+            }
+            if (_gameOverStatsText != null)
+            {
+                _gameOverStatsText.text = summaryText;
             }
         }
 
@@ -492,32 +752,178 @@ namespace Hellfire.UI
             {
                 StopCoroutine(_hitmarkerCoroutine);
             }
-            _hitmarkerCoroutine = StartCoroutine(HitmarkerRoutine(isHeadshot));
+            _hitmarkerCoroutine = StartCoroutine(HitmarkerRoutine(isHeadshot, false));
         }
 
-        private IEnumerator HitmarkerRoutine(bool isHeadshot)
+        public void ShowKillConfirmation()
+        {
+            if (_hitmarkerCoroutine != null)
+            {
+                StopCoroutine(_hitmarkerCoroutine);
+            }
+            _hitmarkerCoroutine = StartCoroutine(HitmarkerRoutine(false, true));
+        }
+
+        private IEnumerator HitmarkerRoutine(bool isHeadshot, bool isKill)
         {
             if (_hitmarkerImage != null)
             {
                 _hitmarkerImage.gameObject.SetActive(true);
-                _hitmarkerImage.color = isHeadshot ? Color.red : Color.white;
+                if (isKill)
+                {
+                    _hitmarkerImage.color = Color.red;
+                    _hitmarkerImage.transform.localScale = Vector3.one * 1.5f;
+                    PlayCombatSound(_killSound, 0.9f);
+                }
+                else if (isHeadshot)
+                {
+                    _hitmarkerImage.color = new Color(1f, 0.45f, 0f, 1f); // Màu cam rực
+                    _hitmarkerImage.transform.localScale = Vector3.one * 1.25f;
+                    PlayCombatSound(_headshotSound, 0.8f);
+                }
+                else
+                {
+                    _hitmarkerImage.color = Color.white;
+                    _hitmarkerImage.transform.localScale = Vector3.one;
+                    PlayCombatSound(_hitSound, 0.55f);
+                }
             }
 
             if (_crosshairImage != null)
             {
-                _crosshairImage.color = isHeadshot ? Color.red : Color.yellow;
+                _crosshairImage.color = isKill ? Color.red : (isHeadshot ? new Color(1f, 0.45f, 0f, 1f) : Color.yellow);
             }
 
-            yield return new WaitForSeconds(0.1f);
+            if (isKill && _killConfirmText != null)
+            {
+                _killConfirmText.gameObject.SetActive(true);
+            }
+
+            // Thời lượng hitmarker trong khoảng 50-100ms theo mục 16.7
+            yield return new WaitForSeconds(0.08f);
 
             if (_hitmarkerImage != null)
             {
                 _hitmarkerImage.gameObject.SetActive(false);
+                _hitmarkerImage.transform.localScale = Vector3.one;
             }
 
             if (_crosshairImage != null)
             {
                 _crosshairImage.color = new Color(1f, 1f, 1f, 0.85f);
+            }
+
+            if (_killConfirmText != null)
+            {
+                _killConfirmText.gameObject.SetActive(false);
+            }
+        }
+
+        private Coroutine _damageVignetteCoroutine;
+
+        private void HandlePlayerAttacked(float damage, Vector3 attackerPos)
+        {
+            if (_damageVignetteCoroutine != null)
+            {
+                StopCoroutine(_damageVignetteCoroutine);
+            }
+            _damageVignetteCoroutine = StartCoroutine(DamageVignetteRoutine(damage, attackerPos));
+        }
+
+        private IEnumerator DamageVignetteRoutine(float damage, Vector3 attackerPos)
+        {
+            float maxAlpha = Mathf.Clamp(damage / 35f, 0.25f, 0.8f);
+
+            // Mũi tên chỉ hướng kẻ tấn công (Mục 16.7)
+            if (_damageIndicatorArrow != null && attackerPos != Vector3.zero)
+            {
+                var cam = Camera.main;
+                if (cam != null)
+                {
+                    Vector3 toAttacker = attackerPos - cam.transform.position;
+                    toAttacker.y = 0f;
+                    Vector3 fwd = cam.transform.forward;
+                    fwd.y = 0f;
+                    float angle = Vector3.SignedAngle(fwd, toAttacker, Vector3.up);
+                    _damageIndicatorArrow.rotation = Quaternion.Euler(0f, 0f, -angle);
+                    _damageIndicatorArrow.gameObject.SetActive(true);
+                }
+            }
+
+            float duration = 0.4f; // Mờ dần ~0.4 giây theo mục 16.7
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float alpha = Mathf.Lerp(maxAlpha, 0f, elapsed / duration);
+                if (_damageVignetteImage != null)
+                {
+                    _damageVignetteImage.color = new Color(0.85f, 0.05f, 0.05f, alpha);
+                }
+                yield return null;
+            }
+
+            if (_damageVignetteImage != null)
+            {
+                _damageVignetteImage.color = new Color(1f, 0f, 0f, 0f);
+            }
+
+            if (_damageIndicatorArrow != null)
+            {
+                _damageIndicatorArrow.gameObject.SetActive(false);
+            }
+
+            _damageVignetteCoroutine = null;
+        }
+
+        private void UpdateLowHealthPulse()
+        {
+            if (_localPlayerHealth == null || _damageVignetteCoroutine != null) return;
+
+            // Nhịp máu thấp < 30% (~1.2 lần/giây) theo mục 16.7; tắt khi gục hoặc chết
+            if (_localPlayerHealth.IsDowned.Value || _localPlayerHealth.IsDead.Value)
+            {
+                if (_damageVignetteImage != null && _damageVignetteCoroutine == null)
+                {
+                    _damageVignetteImage.color = new Color(1f, 0f, 0f, 0f);
+                }
+                return;
+            }
+
+            float maxHp = _localPlayerHealth.MaxHealth > 0 ? _localPlayerHealth.MaxHealth : 100f;
+            float ratio = _localPlayerHealth.CurrentHealth.Value / maxHp;
+
+            if (ratio < 0.3f && ratio > 0f)
+            {
+                float pulse = Mathf.PingPong(Time.time * 2.4f, 0.35f) + 0.15f; // Tần số 1.2Hz
+                if (_damageVignetteImage != null)
+                {
+                    _damageVignetteImage.color = new Color(0.8f, 0f, 0f, pulse);
+                }
+
+                // Phát âm thanh tim đập ~1.2 lần/giây (Mục 16.7)
+                if (Time.time - _lastHeartbeatTime >= 0.833f)
+                {
+                    _lastHeartbeatTime = Time.time;
+                    PlayCombatSound(_heartbeatSound, 0.45f);
+                }
+            }
+            else if (_damageVignetteImage != null && _damageVignetteCoroutine == null)
+            {
+                _damageVignetteImage.color = new Color(1f, 0f, 0f, 0f);
+            }
+        }
+
+        private void AttachButtonFeedbacks()
+        {
+            var buttons = GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i] != null && buttons[i].GetComponent<UIButtonFeedback>() == null)
+                {
+                    buttons[i].gameObject.AddComponent<UIButtonFeedback>();
+                }
             }
         }
 
@@ -606,6 +1012,56 @@ namespace Hellfire.UI
         {
             var obj = FindInHierarchy(parent, targetName);
             return obj != null ? obj.GetComponent<T>() : null;
+        }
+
+        private void PlayCombatSound(AudioClip clip, float volume = 0.7f)
+        {
+            if (_combatAudioSource != null && clip != null)
+            {
+                _combatAudioSource.PlayOneShot(clip, volume);
+            }
+        }
+
+        private void InitProceduralAudioClips()
+        {
+            if (_hitSound == null) _hitSound = CreateToneClip("Proc_Hit", 900f, 0.05f, 30f);
+            if (_headshotSound == null) _headshotSound = CreateToneClip("Proc_Headshot", 1600f, 0.09f, 15f);
+            if (_killSound == null) _killSound = CreateToneClip("Proc_Kill", 380f, 0.15f, 12f);
+            if (_heartbeatSound == null) _heartbeatSound = CreateHeartbeatClip("Proc_Heartbeat");
+        }
+
+        private static AudioClip CreateToneClip(string name, float freq, float duration, float decay)
+        {
+            int sampleRate = 44100;
+            int samples = Mathf.CeilToInt(sampleRate * duration);
+            float[] data = new float[samples];
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float env = Mathf.Exp(-decay * t);
+                data[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * env * 0.45f;
+            }
+            AudioClip clip = AudioClip.Create(name, samples, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip CreateHeartbeatClip(string name)
+        {
+            int sampleRate = 44100;
+            float duration = 0.25f;
+            int samples = Mathf.CeilToInt(sampleRate * duration);
+            float[] data = new float[samples];
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float thump1 = (t < 0.1f) ? Mathf.Sin(2f * Mathf.PI * 75f * t) * Mathf.Exp(-20f * t) : 0f;
+                float thump2 = (t >= 0.1f) ? Mathf.Sin(2f * Mathf.PI * 65f * (t - 0.1f)) * Mathf.Exp(-22f * (t - 0.1f)) : 0f;
+                data[i] = (thump1 * 0.5f + thump2 * 0.4f);
+            }
+            AudioClip clip = AudioClip.Create(name, samples, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
     }
 }

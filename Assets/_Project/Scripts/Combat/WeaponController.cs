@@ -6,6 +6,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Hellfire.Networking;
 using Hellfire.Player;
 using Unity.Netcode;
 using UnityEngine;
@@ -28,6 +29,10 @@ namespace Hellfire.Combat
 
         [Header("Visual Effects (Cosmetic)")]
         [SerializeField] private float _tracerDuration = 0.05f;
+
+        [Header("Anti-Cheat / Validation (Mục 2.1.1)")]
+        [Tooltip("Khoảng cách tối đa cho phép giữa vị trí bắn từ client và vị trí người chơi trên server (m)")]
+        [SerializeField] private float _maxAllowedShootOriginDistance = 3.0f;
 
         // ================= GLOBAL WEAPON STATS (SERVER-AUTHORITATIVE) =================
         // Áp dụng cho TOÀN BỘ vũ khí của người chơi. Khi đổi súng vẫn giữ nguyên toàn bộ nâng cấp!
@@ -75,6 +80,7 @@ namespace Hellfire.Combat
         public event Action<bool> OnReloadStateChanged;           // isReloading
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
         public event Action<int> OnWeaponUpgraded;                 // newLevel
+        public event Action OnKillConfirmed;                      // Kill confirmation (Mục 16.7)
 
         public WeaponData CurrentWeaponData => CurrentRuntimeWeapon != null ? CurrentRuntimeWeapon.BaseData : _currentWeapon;
         public RuntimeWeapon CurrentRuntimeWeapon => (_runtimeWeapons != null && _currentWeaponIndex >= 0 && _currentWeaponIndex < _runtimeWeapons.Count) ? _runtimeWeapons[_currentWeaponIndex] : null;
@@ -163,6 +169,13 @@ namespace Hellfire.Combat
 
             // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn / nạp đạn
             if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            {
+                if (_isReloading) CancelReload();
+                return;
+            }
+
+            // Trong Generating, Lobby, GameOver, Victory: Không cho phép bắn / nạp đạn (Mục 15.1)
+            if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove())
             {
                 if (_isReloading) CancelReload();
                 return;
@@ -298,6 +311,7 @@ namespace Hellfire.Combat
 
         private void HandleAttackInput()
         {
+            if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove()) return;
             if (_currentWeapon == null || _playerCamera == null) return;
 
             bool triggerPressed = false;
@@ -375,6 +389,18 @@ namespace Hellfire.Combat
 
             if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
             {
+                return;
+            }
+
+            if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove())
+            {
+                return;
+            }
+
+            // Kiểm tra tính hợp lệ của clientOrigin so với vị trí người chơi trên Server (Mục 2.1.1 điểm 4)
+            if (Vector3.Distance(clientOrigin, transform.position) > _maxAllowedShootOriginDistance)
+            {
+                Debug.LogWarning($"[WeaponController] Phát hiện phát bắn không hợp lệ từ Client {OwnerClientId}: origin cách vị trí server {Vector3.Distance(clientOrigin, transform.position):F2}m > {_maxAllowedShootOriginDistance}m. Bỏ qua phát bắn.");
                 return;
             }
 
@@ -567,6 +593,15 @@ namespace Hellfire.Combat
             if (IsOwner)
             {
                 OnHitTargetConfirmed?.Invoke(isHeadshot);
+            }
+        }
+
+        [ClientRpc]
+        public void NotifyKillConfirmedClientRpc()
+        {
+            if (IsOwner)
+            {
+                OnKillConfirmed?.Invoke();
             }
         }
 

@@ -221,6 +221,7 @@ namespace Hellfire.Player
             if (dist <= _reviveDistance + 1.0f)
             {
                 targetHealth.ServerRevive();
+                Networking.MatchSummaryManager.RecordRevive(OwnerClientId);
             }
         }
 

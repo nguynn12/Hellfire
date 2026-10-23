@@ -24,6 +24,9 @@ namespace Hellfire.Items
         [Tooltip("Thời lượng hiệu ứng tính bằng giây (0 = vĩnh viễn trong lượt chơi, >0 = tạm thời)")]
         [SerializeField] private float _duration = 0f;
 
+        [Tooltip("Giá mua tại Shop Station (Linh hồn) (Mục 17.8)")]
+        [SerializeField] private int _shopPrice = 50;
+
         public PowerUpType Type => _powerUpType;
         public string PowerUpName => _powerUpName;
         public string Description => _description;
@@ -31,6 +34,7 @@ namespace Hellfire.Items
         public Color PickupColor => _pickupColor;
         public float Value => _value;
         public float Duration => _duration;
+        public int ShopPrice => _shopPrice;
         public bool IsPermanent => _duration <= 0f;
     }
 }

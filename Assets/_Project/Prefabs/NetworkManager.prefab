@@ -126,6 +126,7 @@ MonoBehaviour:
   _lobbySceneName: Lobby
   _gameplaySceneName: Gameplay
   _gameManagerPrefab: {fileID: 1600566983485244021, guid: bef69b5d6347b7441bd51034dc0fe676, type: 3}
+  _connectTimeoutSeconds: 10
 --- !u!114 &577099677685327980
 MonoBehaviour:
   m_ObjectHideFlags: 0

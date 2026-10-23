@@ -41,6 +41,15 @@ namespace Hellfire.Networking
             NetworkVariableWritePermission.Server
         );
 
+        /// <summary>
+        /// Số lượng người chơi được chốt một lần khi vào trạng thái Generating (Mục 15.3).
+        /// </summary>
+        public NetworkVariable<int> LockedPlayerCount { get; } = new NetworkVariable<int>(
+            1,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
         public event Action<GameState, GameState> OnGameStateChanged;
 
         private float _checkGameOverTimer = 0f;
@@ -55,6 +64,11 @@ namespace Hellfire.Networking
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            if (GetComponent<MatchSummaryManager>() == null)
+            {
+                gameObject.AddComponent<MatchSummaryManager>();
+            }
         }
 
         public override void OnNetworkSpawn()
@@ -145,6 +159,14 @@ namespace Hellfire.Networking
                 return;
             }
 
+            // Chốt số người chơi một lần khi vào Generating (Mục 15.3)
+            if (newState == GameState.Generating)
+            {
+                int count = NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClients.Count : 1;
+                LockedPlayerCount.Value = Mathf.Clamp(count, 1, 4);
+                Debug.Log($"[GameManager] Chốt số người chơi khi vào Generating: {LockedPlayerCount.Value} người.");
+            }
+
             CurrentState.Value = newState;
         }
 
@@ -159,7 +181,7 @@ namespace Hellfire.Networking
         }
 
         /// <summary>
-        /// Bắt đầu lượt chơi từ Lobby sang Playing.
+        /// Bắt đầu lượt chơi từ Lobby sang Generating (Mục 15.1 & 16.4).
         /// </summary>
         public void StartGameFromLobby()
         {
@@ -169,7 +191,7 @@ namespace Hellfire.Networking
                 return;
             }
 
-            SetState(GameState.Playing);
+            SetState(GameState.Generating);
         }
 
         /// <summary>

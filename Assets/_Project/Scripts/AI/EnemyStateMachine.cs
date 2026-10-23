@@ -4,6 +4,7 @@
 
 using System.Collections;
 using Hellfire.Combat;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -28,6 +29,9 @@ namespace Hellfire.AI
         [SerializeField] protected LayerMask _sightObstacleMask = ~0; // Layer kiểm tra vật cản tầm nhìn
         [SerializeField] protected float _targetSearchInterval = 0.5f;
 
+        [Header("Souls Reward (Mục 17.7)")]
+        [SerializeField] protected int _soulsReward = 5;
+
         [Header("Visual & Feedback")]
         [SerializeField] protected Transform _meshRoot;
         [SerializeField] protected Renderer[] _renderers;
@@ -44,6 +48,12 @@ namespace Hellfire.AI
 
         public EnemyState CurrentState => _currentState;
         public EnemyType Type => _enemyType;
+        public int SoulsReward => _soulsReward;
+
+        public void SetSoulsReward(int value)
+        {
+            _soulsReward = Mathf.Max(0, value);
+        }
 
         protected virtual void Awake()
         {
@@ -85,8 +95,8 @@ namespace Hellfire.AI
 
         protected virtual void Update()
         {
-            // BẮT BUỘC: Logic AI chỉ chạy duy nhất trên Server
-            if (!IsServer || _currentState == EnemyState.Dead)
+            // BẮT BUỘC: Logic AI chỉ chạy duy nhất trên Server, tạm dừng khi đang tạo hầm ngục (Mục 15.1)
+            if (!IsServer || _currentState == EnemyState.Dead || (GameManager.Instance != null && GameManager.Instance.CurrentState.Value == GameState.Generating))
             {
                 return;
             }
@@ -240,6 +250,11 @@ namespace Hellfire.AI
 
         protected virtual void HandleDamageTaken(float dmg, HitboxType hitbox, ulong attackerId)
         {
+            if (IsServer && attackerId != ulong.MaxValue)
+            {
+                Networking.MatchSummaryManager.RecordDamage(attackerId, dmg);
+            }
+
             // Khi bị bắn trúng: dù chưa thấy cũng lập tức chuyển sang Chase và nhắm vào người bắn (Mục 5.1)
             if (_currentState != EnemyState.Dead && NetworkManager.Singleton != null)
             {
@@ -296,6 +311,31 @@ namespace Hellfire.AI
         {
             SetState(EnemyState.Dead);
             PlayDeathFeedbackClientRpc();
+
+            // Thưởng tiền Linh hồn cho tất cả người chơi còn sống (Mục 17.7)
+            if (IsServer && _soulsReward > 0)
+            {
+                Hellfire.Player.PlayerWallet.DistributeSoulsToLivingPlayers(_soulsReward);
+            }
+
+            // Ghi nhận chỉ số hạ gục cho tổng kết lượt chơi (Mục 16.11)
+            if (IsServer && killerId != ulong.MaxValue)
+            {
+                Networking.MatchSummaryManager.RecordKill(killerId);
+            }
+
+            // Báo xác nhận hạ gục cho người bắn (Mục 16.7)
+            if (IsServer && NetworkManager.Singleton != null && NetworkManager.Singleton.ConnectedClients.TryGetValue(killerId, out var killerClient))
+            {
+                if (killerClient.PlayerObject != null)
+                {
+                    var wp = killerClient.PlayerObject.GetComponent<WeaponController>();
+                    if (wp != null)
+                    {
+                        wp.NotifyKillConfirmedClientRpc();
+                    }
+                }
+            }
 
             // Tự hủy sau 3 giây
             StartCoroutine(DespawnRoutine(3.0f));

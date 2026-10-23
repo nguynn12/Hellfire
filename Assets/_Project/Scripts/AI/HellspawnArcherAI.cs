@@ -24,6 +24,7 @@ namespace Hellfire.AI
             _attackDamage = 12f;
             _attackRange = 18f;
             _attackCooldown = 1.6f;
+            _soulsReward = 8;
         }
 
         protected override void UpdateChaseState()

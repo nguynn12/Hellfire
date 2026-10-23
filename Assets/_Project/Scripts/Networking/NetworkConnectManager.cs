@@ -23,6 +23,10 @@ namespace Hellfire.Networking
         [SerializeField] private string _gameplaySceneName = "Gameplay";
         [SerializeField] private GameObject _gameManagerPrefab;
 
+        [Header("Connection Timeout (Mục 16.10)")]
+        [SerializeField] private float _connectTimeoutSeconds = 10.0f;
+        private Coroutine _connectTimeoutCoroutine;
+
         public int MaxPlayers => _maxPlayers;
         public ushort CurrentPort => _currentPort;
         public string CurrentRoomName => _currentRoomName;
@@ -147,6 +151,12 @@ namespace Hellfire.Networking
                 {
                     LanDiscovery.Instance.StopListening();
                 }
+
+                if (_connectTimeoutCoroutine != null)
+                {
+                    StopCoroutine(_connectTimeoutCoroutine);
+                }
+                _connectTimeoutCoroutine = StartCoroutine(ConnectTimeoutRoutine());
             }
             else
             {
@@ -159,6 +169,12 @@ namespace Hellfire.Networking
         public void Disconnect()
         {
             _isShuttingDownIntentionally = true;
+
+            if (_connectTimeoutCoroutine != null)
+            {
+                StopCoroutine(_connectTimeoutCoroutine);
+                _connectTimeoutCoroutine = null;
+            }
 
             if (LanDiscovery.Instance != null)
             {
@@ -254,6 +270,16 @@ namespace Hellfire.Networking
             OnPlayerConnected?.Invoke(clientId);
 
             var nm = NetworkManager.Singleton;
+            if (nm != null && !nm.IsServer && clientId == nm.LocalClientId)
+            {
+                // Client của máy này đã kết nối thành công -> Hủy đếm ngược timeout 10s
+                if (_connectTimeoutCoroutine != null)
+                {
+                    StopCoroutine(_connectTimeoutCoroutine);
+                    _connectTimeoutCoroutine = null;
+                }
+            }
+
             if (nm != null && nm.IsServer && LanDiscovery.Instance != null)
             {
                 LanDiscovery.Instance.UpdatePlayerCount(nm.ConnectedClientsIds.Count);
@@ -304,7 +330,26 @@ namespace Hellfire.Networking
 
         private void OnDestroy()
         {
+            if (_connectTimeoutCoroutine != null)
+            {
+                StopCoroutine(_connectTimeoutCoroutine);
+                _connectTimeoutCoroutine = null;
+            }
             UnsubscribeFromNetworkEvents();
+        }
+
+        private System.Collections.IEnumerator ConnectTimeoutRoutine()
+        {
+            yield return new WaitForSeconds(_connectTimeoutSeconds);
+
+            var nm = NetworkManager.Singleton;
+            if (nm != null && !nm.IsServer && !nm.IsConnectedClient)
+            {
+                Debug.LogWarning($"[NetworkConnectManager] Đã quá {_connectTimeoutSeconds}s chưa kết nối được tới Host!");
+                _connectTimeoutCoroutine = null;
+                Disconnect();
+                TriggerDisconnectNotice($"Không thể kết nối tới phòng sau {_connectTimeoutSeconds:F0} giây. Vui lòng kiểm tra địa chỉ IP và thử lại.");
+            }
         }
     }
 }

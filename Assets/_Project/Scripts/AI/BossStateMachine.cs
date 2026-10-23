@@ -39,6 +39,10 @@ namespace Hellfire.AI
         private float _phase2RangedTimer;
         private bool _isPhase2RangedMode = false;
 
+        public static BossStateMachine ActiveBoss { get; private set; }
+        public static event System.Action<BossStateMachine> OnBossSpawned;
+        public static event System.Action OnBossDespawned;
+
         public BossPhase CurrentPhase => _currentPhase;
 
         protected override void Awake()
@@ -50,16 +54,31 @@ namespace Hellfire.AI
             _attackRange = 4.0f;
             _attackCooldown = 1.8f;
             _detectionRange = 25f;
+            _soulsReward = 0; // Boss thưởng 0 Linh hồn trực tiếp (Mục 17.7)
         }
 
         public override void OnNetworkSpawn()
         {
             base.OnNetworkSpawn();
 
+            ActiveBoss = this;
+            OnBossSpawned?.Invoke(this);
+
             if (IsServer)
             {
                 _bossRoomCenter = transform.position;
                 _lastSummonHealthThreshold = 400f; // Bắt đầu theo dõi ngưỡng mất 20% từ mốc 50% (400 HP)
+            }
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            base.OnNetworkDespawn();
+
+            if (ActiveBoss == this)
+            {
+                ActiveBoss = null;
+                OnBossDespawned?.Invoke();
             }
         }
 
@@ -94,11 +113,30 @@ namespace Hellfire.AI
             base.Update();
         }
 
+        protected override void SetState(EnemyState newState)
+        {
+            base.SetState(newState);
+
+            if (IsServer && (newState == EnemyState.Chase || newState == EnemyState.Attack))
+            {
+                if (Networking.GameManager.Instance != null && Networking.GameManager.Instance.CurrentState.Value == Networking.GameState.Playing)
+                {
+                    Networking.GameManager.Instance.SetState(Networking.GameState.BossFight);
+                }
+            }
+        }
+
         protected override void HandleDamageTaken(float dmg, HitboxType hitbox, ulong attackerId)
         {
             base.HandleDamageTaken(dmg, hitbox, attackerId);
 
             if (!IsServer || CurrentState == EnemyState.Dead) return;
+
+            // Kích hoạt BossFight nếu chưa kích hoạt
+            if (Networking.GameManager.Instance != null && Networking.GameManager.Instance.CurrentState.Value == Networking.GameState.Playing)
+            {
+                Networking.GameManager.Instance.SetState(Networking.GameState.BossFight);
+            }
 
             float currentHp = _health.CurrentHealth.Value;
             float maxHp = _health.MaxHealth;
@@ -140,7 +178,7 @@ namespace Hellfire.AI
                 _navAgent.SetDestination(_bossRoomCenter);
             }
 
-            // Báo hiệu cho các Client biết boss đang chuyển phase (gầm thét / hiệu ứng)
+            // Báo hiệu cho các Client biết boss đang chuyển phase (gầm thét / hiệu ứng / rung màn hình / banner PHA 2)
             NotifyPhaseTransitionClientRpc();
 
             yield return new WaitForSeconds(2.0f);
@@ -160,6 +198,12 @@ namespace Hellfire.AI
         private void NotifyPhaseTransitionClientRpc()
         {
             StartCoroutine(FlashMaterialRoutine(Color.yellow, 2.0f));
+
+            // Rung màn hình ~0.5s tuân theo công tắc Giảm rung màn hình (Mục 16.6 & 16.9)
+            Player.PlayerMovement.TriggerLocalPlayerScreenShake(0.5f, 0.35f);
+
+            // Bật biểu ngữ "PHA 2" (Mục 16.6)
+            UI.BossHealthBarUI.Instance?.ShowPhase2Banner();
         }
 
         [ClientRpc]
@@ -261,13 +305,26 @@ namespace Hellfire.AI
             for (int i = 0; i < count; i++)
             {
                 Vector3 spawnOffset = new Vector3((i == 0 ? 3f : -3f), 0.5f, 3f);
-                Vector3 spawnPos = transform.position + spawnOffset;
+                Vector3 proposedPos = transform.position + spawnOffset;
+                Vector3 spawnPos = Hellfire.Dungeon.DungeonEnemySpawner.GetValidSpawnPosition(
+                    proposedPos, _bossRoomCenter, "Triệu hồi Imp của Boss", 3.0f
+                );
 
                 var imp = Instantiate(_impMinionPrefab, spawnPos, Quaternion.identity);
+                var minionEnemy = imp.GetComponent<EnemyStateMachine>();
+                if (minionEnemy != null)
+                {
+                    minionEnemy.SetSoulsReward(0); // Quái do boss triệu hồi: 0 Linh hồn (Mục 17.7)
+                }
+
                 var netObj = imp.GetComponent<NetworkObject>();
                 if (netObj != null)
                 {
                     netObj.Spawn(true);
+                    if (Hellfire.Dungeon.DungeonEnemySpawner.Instance != null)
+                    {
+                        Hellfire.Dungeon.DungeonEnemySpawner.Instance.RegisterBossSummon(imp);
+                    }
                 }
             }
         }
@@ -278,10 +335,19 @@ namespace Hellfire.AI
 
             if (!IsServer) return;
 
+            // Thông báo DungeonManager mở cổng phòng boss và dọn sạch quái triệu hồi (Mục 17.4)
+            if (Hellfire.Dungeon.DungeonManager.Instance != null)
+            {
+                Hellfire.Dungeon.DungeonManager.Instance.NotifyBossDied();
+            }
+
             // 1. Sinh Rương Boss (Mục 6.3: 100% rơi bùa lợi, 50% rơi thêm vũ khí)
             if (_bossChestPrefab != null)
             {
-                Vector3 chestPos = transform.position + transform.forward * 2f;
+                Vector3 chestProposed = transform.position + transform.forward * 2f;
+                Vector3 chestPos = Hellfire.Dungeon.DungeonEnemySpawner.GetValidSpawnPosition(
+                    chestProposed, _bossRoomCenter, "Rương Boss", 3.0f
+                );
                 var chestObj = Instantiate(_bossChestPrefab, chestPos, Quaternion.identity);
                 var netObj = chestObj.GetComponent<NetworkObject>();
                 var chest = chestObj.GetComponent<Hellfire.Items.LootChest>();

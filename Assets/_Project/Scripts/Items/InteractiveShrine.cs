@@ -55,13 +55,24 @@ namespace Hellfire.Items
         private bool _isLocalPlayerInRange = false;
         private List<UpgradeOptionData> _cachedOptions;
 
-        public int ShrineId => _shrineId;
+        // Đồng bộ ShrineId qua mạng để client nhận đúng ID xác định từ phòng Upgrade (Mục 17.6)
+        private readonly NetworkVariable<int> _networkShrineId = new NetworkVariable<int>(
+            1,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
+        public int ShrineId => IsSpawned ? _networkShrineId.Value : _shrineId;
         public ShrineType Type => _shrineType;
         public bool IsUsedByLocalPlayer => _isUsedByLocalPlayer;
 
         public void SetShrineId(int id)
         {
             _shrineId = id;
+            if (IsServer)
+            {
+                _networkShrineId.Value = id;
+            }
         }
 
         private void Reset()
@@ -81,6 +92,29 @@ namespace Hellfire.Items
 
         public override void OnNetworkSpawn()
         {
+            if (IsServer)
+            {
+                _networkShrineId.Value = _shrineId;
+            }
+            else
+            {
+                _shrineId = _networkShrineId.Value;
+            }
+
+            _networkShrineId.OnValueChanged += HandleShrineIdChanged;
+
+            GenerateOptions();
+            StartCoroutine(CheckLocalUsageDelayed());
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            _networkShrineId.OnValueChanged -= HandleShrineIdChanged;
+        }
+
+        private void HandleShrineIdChanged(int previousValue, int newValue)
+        {
+            _shrineId = newValue;
             GenerateOptions();
             StartCoroutine(CheckLocalUsageDelayed());
         }

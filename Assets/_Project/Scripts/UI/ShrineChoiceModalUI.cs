@@ -248,6 +248,7 @@ namespace Hellfire.UI
                 cardBg.color = new Color(0.12f, 0.14f, 0.22f, 0.95f);
 
                 var btn = cardObj.AddComponent<Button>();
+                cardObj.AddComponent<UIButtonFeedback>();
                 var colors = btn.colors;
                 colors.highlightedColor = new Color(0.2f, 0.35f, 0.55f, 1f);
                 colors.pressedColor = new Color(0.1f, 0.5f, 0.8f, 1f);

@@ -79,4 +79,10 @@ crashlytics-build.properties
 *.slnx
 .gemini/
 
-# End of https://www.toptal.com/developers/gitignore/api/unity
+# End of https://www.toptal.com/developers/gitignore/api/unity
+
+# macOS metadata
+.DS_Store
+*.DS_Store
+._*
+.DS_Store

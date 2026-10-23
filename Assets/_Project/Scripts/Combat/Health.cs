@@ -82,6 +82,7 @@ namespace Hellfire.Combat
         public event Action<ulong> OnDied;                           // attackerClientId
         public event Action OnRevived;
         public event Action<float, HitboxType, ulong> OnDamageTaken; // damage, hitbox, attacker
+        public event Action<float, Vector3> OnPlayerAttackedBy;      // damage, attackerPosition (Mục 16.7)
 
         private Collider[] _colliders;
         private PlayerStats _playerStats;
@@ -233,6 +234,24 @@ namespace Hellfire.Combat
             // Báo feedback cho mọi client
             NotifyDamageClientRpc(finalDamage, payload.Hitbox, payload.AttackerClientId);
 
+            // Báo hướng kẻ tấn công cho riêng nạn nhân (Mục 16.7)
+            if (_isPlayer)
+            {
+                Vector3 attackerPos = Vector3.zero;
+                if (NetworkManager.Singleton != null)
+                {
+                    if (NetworkManager.Singleton.ConnectedClients.TryGetValue(payload.AttackerClientId, out var client) && client.PlayerObject != null)
+                    {
+                        attackerPos = client.PlayerObject.transform.position;
+                    }
+                    else if (NetworkManager.Singleton.SpawnManager != null && NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(payload.AttackerClientId, out var netObj))
+                    {
+                        attackerPos = netObj.transform.position;
+                    }
+                }
+                NotifyPlayerAttackedClientRpc(finalDamage, attackerPos);
+            }
+
             if (CurrentHealth.Value <= 0f)
             {
                 if (_isPlayer)
@@ -241,6 +260,7 @@ namespace Hellfire.Combat
                     IsDowned.Value = true;
                     DownedTimer.Value = _downedDuration;
                     NotifyDownedClientRpc();
+                    Networking.MatchSummaryManager.RecordDowned(OwnerClientId);
                     Debug.Log($"[Health] Người chơi {NetworkObjectId} đã gục! Bắt đầu đếm ngược {_downedDuration}s để cứu.");
                 }
                 else
@@ -370,6 +390,15 @@ namespace Hellfire.Combat
         private void NotifyDamageClientRpc(float damage, HitboxType hitboxType, ulong attackerClientId)
         {
             OnDamageTaken?.Invoke(damage, hitboxType, attackerClientId);
+        }
+
+        [ClientRpc]
+        private void NotifyPlayerAttackedClientRpc(float damage, Vector3 attackerPosition)
+        {
+            if (IsOwner)
+            {
+                OnPlayerAttackedBy?.Invoke(damage, attackerPosition);
+            }
         }
 
         [ClientRpc]

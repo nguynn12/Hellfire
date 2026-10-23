@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using Hellfire.Networking;
+using Hellfire.Player;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,9 +48,14 @@ namespace Hellfire.UI
         [SerializeField] private Button _scanBackButton;
         [SerializeField] private TextMeshProUGUI _scanStatusText;
 
-        [Header("Settings Panel")]
+        [Header("Settings Panel (Mục 16.9)")]
         [SerializeField] private Slider _mouseSensitivitySlider;
         [SerializeField] private TextMeshProUGUI _mouseSensitivityValueText;
+        [SerializeField] private Slider _fovSlider;
+        [SerializeField] private TextMeshProUGUI _fovValueText;
+        [SerializeField] private Slider _masterVolumeSlider;
+        [SerializeField] private TextMeshProUGUI _masterVolumeValueText;
+        [SerializeField] private Toggle _reduceScreenShakeToggle;
         [SerializeField] private Button _settingsBackButton;
 
         [Header("Disconnect Modal")]
@@ -58,6 +64,9 @@ namespace Hellfire.UI
 
         [Header("Status Feedback")]
         [SerializeField] private TextMeshProUGUI _statusMessageText;
+
+        [Header("Player Identity (Mục 16.1)")]
+        [SerializeField] private TMP_InputField _playerNameInput;
 
         private void Awake()
         {
@@ -71,6 +80,8 @@ namespace Hellfire.UI
             ShowMainPanel();
             CheckForDisconnectNotice();
             LoadSettings();
+            LoadPlayerName();
+            AttachButtonFeedbacks();
 
             if (LanDiscovery.Instance != null)
             {
@@ -120,11 +131,40 @@ namespace Hellfire.UI
             if (_settingsBackButton == null) _settingsBackButton = FindComponentInHierarchy<Button>(root, "SettingsBackBtn");
             if (_mouseSensitivitySlider == null) _mouseSensitivitySlider = FindComponentInHierarchy<Slider>(root, "SensitivitySlider");
             if (_mouseSensitivityValueText == null) _mouseSensitivityValueText = FindComponentInHierarchy<TextMeshProUGUI>(root, "SensitivityValue");
+            if (_fovSlider == null) _fovSlider = FindComponentInHierarchy<Slider>(root, "FovSlider");
+            if (_fovValueText == null) _fovValueText = FindComponentInHierarchy<TextMeshProUGUI>(root, "FovValue");
+            if (_masterVolumeSlider == null) _masterVolumeSlider = FindComponentInHierarchy<Slider>(root, "VolumeSlider");
+            if (_masterVolumeValueText == null) _masterVolumeValueText = FindComponentInHierarchy<TextMeshProUGUI>(root, "VolumeValue");
+            if (_reduceScreenShakeToggle == null) _reduceScreenShakeToggle = FindComponentInHierarchy<Toggle>(root, "ScreenShakeToggle");
             if (_disconnectReasonText == null) _disconnectReasonText = FindComponentInHierarchy<TextMeshProUGUI>(root, "DisconnectReason");
             if (_disconnectModalOkButton == null) _disconnectModalOkButton = FindComponentInHierarchy<Button>(root, "DisconnectOkBtn");
 
             // Status
             if (_statusMessageText == null) _statusMessageText = FindComponentInHierarchy<TextMeshProUGUI>(root, "StatusText");
+
+            // Player Identity (Mục 16.1)
+            if (_playerNameInput == null) _playerNameInput = FindComponentInHierarchy<TMP_InputField>(root, "PlayerNameInput");
+            if (_playerNameInput == null && _hostRoomNameInput != null && _mainPanel != null)
+            {
+                // Tự động tạo PlayerNameInput dựa trên style của input field có sẵn
+                var nameObj = Instantiate(_hostRoomNameInput.gameObject, _mainPanel.transform);
+                nameObj.name = "PlayerNameInput";
+                _playerNameInput = nameObj.GetComponent<TMP_InputField>();
+                if (_playerNameInput != null)
+                {
+                    _playerNameInput.characterLimit = PlayerIdentity.MaxNameLength;
+                    var rect = nameObj.GetComponent<RectTransform>();
+                    if (rect != null)
+                    {
+                        rect.anchoredPosition = new Vector2(0f, 150f);
+                        rect.sizeDelta = new Vector2(280f, 40f);
+                    }
+                    if (_playerNameInput.placeholder is TextMeshProUGUI placeholder)
+                    {
+                        placeholder.text = "Tên người chơi (16 ký tự)...";
+                    }
+                }
+            }
         }
 
         private GameObject FindInHierarchy(Transform parent, string targetName)
@@ -296,6 +336,7 @@ namespace Hellfire.UI
 
         public void OnClickHost()
         {
+            SavePlayerName();
             string roomName = _hostRoomNameInput != null ? _hostRoomNameInput.text : "Hellfire LAN Match";
             ushort port = 7777;
             if (_hostPortInput != null && ushort.TryParse(_hostPortInput.text, out var p))
@@ -320,6 +361,7 @@ namespace Hellfire.UI
 
         public void OnClickJoinDirectIp()
         {
+            SavePlayerName();
             string ip = _joinIpInput != null ? _joinIpInput.text : "127.0.0.1";
             ushort port = 7777;
             if (_joinPortInput != null && ushort.TryParse(_joinPortInput.text, out var p))
@@ -397,6 +439,7 @@ namespace Hellfire.UI
                 var capturedRoom = room;
                 btn.onClick.AddListener(() =>
                 {
+                    SavePlayerName();
                     SetStatus($"Đang tham gia phòng {capturedRoom.RoomName}...");
                     if (NetworkConnectManager.Instance != null)
                     {
@@ -417,24 +460,128 @@ namespace Hellfire.UI
 
         public void OnMouseSensitivityChanged(float value)
         {
-            PlayerPrefs.SetFloat("MouseSensitivity", value);
+            GameSettings.SetMouseSensitivity(value);
             if (_mouseSensitivityValueText != null)
             {
                 _mouseSensitivityValueText.text = value.ToString("F1");
             }
         }
 
+        public void OnFovChanged(float value)
+        {
+            GameSettings.SetFOV(value);
+            if (_fovValueText != null)
+            {
+                _fovValueText.text = $"{Mathf.RoundToInt(value)}°";
+            }
+        }
+
+        public void OnMasterVolumeChanged(float value)
+        {
+            GameSettings.SetMasterVolume(value);
+            if (_masterVolumeValueText != null)
+            {
+                _masterVolumeValueText.text = $"{Mathf.RoundToInt(value * 100)}%";
+            }
+        }
+
+        public void OnReduceScreenShakeChanged(bool value)
+        {
+            GameSettings.SetReduceScreenShake(value);
+        }
+
         private void LoadSettings()
         {
-            float sensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 2.0f);
+            GameSettings.EnsureInitialized();
+
+            float sensitivity = GameSettings.MouseSensitivity;
             if (_mouseSensitivitySlider != null)
             {
+                _mouseSensitivitySlider.onValueChanged.RemoveAllListeners();
                 _mouseSensitivitySlider.value = sensitivity;
+                _mouseSensitivitySlider.onValueChanged.AddListener(OnMouseSensitivityChanged);
             }
             if (_mouseSensitivityValueText != null)
             {
                 _mouseSensitivityValueText.text = sensitivity.ToString("F1");
             }
+
+            float fov = GameSettings.FieldOfView;
+            if (_fovSlider != null)
+            {
+                _fovSlider.minValue = GameSettings.MinFOV;
+                _fovSlider.maxValue = GameSettings.MaxFOV;
+                _fovSlider.onValueChanged.RemoveAllListeners();
+                _fovSlider.value = fov;
+                _fovSlider.onValueChanged.AddListener(OnFovChanged);
+            }
+            if (_fovValueText != null)
+            {
+                _fovValueText.text = $"{Mathf.RoundToInt(fov)}°";
+            }
+
+            float volume = GameSettings.MasterVolume;
+            if (_masterVolumeSlider != null)
+            {
+                _masterVolumeSlider.minValue = 0f;
+                _masterVolumeSlider.maxValue = 1f;
+                _masterVolumeSlider.onValueChanged.RemoveAllListeners();
+                _masterVolumeSlider.value = volume;
+                _masterVolumeSlider.onValueChanged.AddListener(OnMasterVolumeChanged);
+            }
+            if (_masterVolumeValueText != null)
+            {
+                _masterVolumeValueText.text = $"{Mathf.RoundToInt(volume * 100)}%";
+            }
+
+            bool reduceShake = GameSettings.ReduceScreenShake;
+            if (_reduceScreenShakeToggle != null)
+            {
+                _reduceScreenShakeToggle.onValueChanged.RemoveAllListeners();
+                _reduceScreenShakeToggle.isOn = reduceShake;
+                _reduceScreenShakeToggle.onValueChanged.AddListener(OnReduceScreenShakeChanged);
+            }
+        }
+
+        private void AttachButtonFeedbacks()
+        {
+            var buttons = GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i] != null && buttons[i].GetComponent<UIButtonFeedback>() == null)
+                {
+                    buttons[i].gameObject.AddComponent<UIButtonFeedback>();
+                }
+            }
+        }
+
+        private void LoadPlayerName()
+        {
+            string savedName = PlayerPrefs.GetString(PlayerIdentity.PlayerNamePrefKey, "Player");
+            if (_playerNameInput != null)
+            {
+                _playerNameInput.text = savedName;
+                _playerNameInput.characterLimit = PlayerIdentity.MaxNameLength;
+                _playerNameInput.onValueChanged.RemoveAllListeners();
+                _playerNameInput.onValueChanged.AddListener((val) => SavePlayerName(val));
+            }
+        }
+
+        public void SavePlayerName(string explicitName = null)
+        {
+            string nameToSave = explicitName != null ? explicitName : (_playerNameInput != null ? _playerNameInput.text : string.Empty);
+            nameToSave = nameToSave.Trim();
+            if (nameToSave.Length > PlayerIdentity.MaxNameLength)
+            {
+                nameToSave = nameToSave.Substring(0, PlayerIdentity.MaxNameLength).Trim();
+            }
+            if (string.IsNullOrEmpty(nameToSave))
+            {
+                nameToSave = "Player";
+            }
+
+            PlayerPrefs.SetString(PlayerIdentity.PlayerNamePrefKey, nameToSave);
+            PlayerPrefs.Save();
         }
 
         private void CheckForDisconnectNotice()

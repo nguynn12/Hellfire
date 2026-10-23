@@ -331,6 +331,8 @@ GameObject:
   - component: {fileID: 8184653799288585890}
   - component: {fileID: 5011223344556677881}
   - component: {fileID: 5011223344556677882}
+  - component: {fileID: 5011223344556677883}
+  - component: {fileID: 489218598500552374}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -431,7 +433,7 @@ MonoBehaviour:
   RotationMaxInterpolationTime: 0.1
   ScaleLerpSmoothing: 1
   ScaleMaxInterpolationTime: 0.1
-  AuthorityMode: 0
+  AuthorityMode: 1
   TickSyncChildren: 0
   UseUnreliableDeltas: 0
   SyncPositionX: 1
@@ -762,3 +764,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 510c859c23e8d9a42ab5335ade2e4add, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerBuffManager
+--- !u!114 &5011223344556677883
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7f53a8120bd40909673966de94e1e07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerWallet
+--- !u!114 &489218598500552374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 72f452ab282a45fb9052330951a1750e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerIdentity
