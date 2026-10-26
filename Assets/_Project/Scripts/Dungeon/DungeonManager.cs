@@ -549,7 +549,7 @@ namespace Hellfire.Dungeon
             Vector3 spawnCenter = spawnRoom.WorldCenter + Vector3.up * 1.0f;
 
             // Dời các player hiện có trong NetworkManager về phòng Spawn an toàn theo Mục 2.1.1
-            if (NetworkManager.Singleton != null)
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
             {
                 int index = 0;
                 foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
@@ -563,7 +563,7 @@ namespace Hellfire.Dungeon
                             proposedPos, spawnCenter, "Phòng Spawn (Vị trí Player)", 3.0f
                         );
 
-                        var movement = client.PlayerObject.GetComponent<PlayerMovement>();
+                        var movement = client.PlayerObject.GetComponent<Hellfire.Player.PlayerMovement>();
                         if (movement != null)
                         {
                             var rpcParams = new ClientRpcParams
@@ -575,8 +575,20 @@ namespace Hellfire.Dungeon
                             };
                             movement.TeleportOwnerClientRpc(targetPos, Quaternion.identity, rpcParams);
                         }
+                        else
+                        {
+                            Debug.LogWarning($"[DungeonManager] Thiếu PlayerMovement trên Player của Client {client.ClientId}!");
+                        }
                         index++;
                     }
+                }
+            }
+            else
+            {
+                // Hỗ trợ chế độ Offline: dịch chuyển Player cục bộ về phòng spawn
+                if (Hellfire.Player.PlayerMovement.LocalInstance != null)
+                {
+                    Hellfire.Player.PlayerMovement.LocalInstance.TeleportOwnerClientRpc(spawnCenter, Quaternion.identity);
                 }
             }
         }

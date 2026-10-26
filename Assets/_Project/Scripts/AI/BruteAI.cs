@@ -14,6 +14,8 @@ namespace Hellfire.AI
         [Header("Brute Settings (Mục 6.2: 120 HP, 25 DMG, 2.5 m/s)")]
         [SerializeField] private float _staggerDuration = 0.5f;
 
+        public float StaggerDuration => _staggerDuration;
+
         protected override void Awake()
         {
             base.Awake();
@@ -35,7 +37,15 @@ namespace Hellfire.AI
                 _currentTargetHealth.TakeDamage(payload);
 
                 // Phát hiệu ứng đòn đánh nặng (rung chấn / stagger) cho client
-                PlayHeavySmashFeedbackClientRpc(transform.position + transform.forward * 1.5f);
+                Vector3 impactPoint = transform.position + transform.forward * 1.5f;
+                if (Hellfire.GameModeHelper.IsOffline)
+                {
+                    StartCoroutine(FlashMaterialRoutine(Color.black, 0.2f));
+                }
+                else
+                {
+                    PlayHeavySmashFeedbackClientRpc(impactPoint);
+                }
             }
         }
 

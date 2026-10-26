@@ -5,6 +5,7 @@
 using System;
 using Hellfire.Combat;
 using Hellfire.Items;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -67,7 +68,7 @@ namespace Hellfire.Player
 
         private void Update()
         {
-            if (!IsServer) return;
+            if (!GameModeHelper.IsServerOrOffline) return;
 
             // Đếm ngược thời gian của Khiên tạm thời (Guardian Shield - 8s)
             if (ShieldTimerNet.Value > 0f)
@@ -83,11 +84,11 @@ namespace Hellfire.Player
         }
 
         /// <summary>
-        /// Kích hoạt bùa lợi lên người chơi (CHỈ SERVER GỌI theo Mục 6.1 & 6.2).
+        /// Kích hoạt bùa lợi lên người chơi (CHỈ SERVER GỌI theo Mục 6.1 & 6.2, hoặc Offline).
         /// </summary>
         public void ApplyPowerUp(PowerUpData powerUp)
         {
-            if (!IsServer || powerUp == null) return;
+            if (!GameModeHelper.IsServerOrOffline || powerUp == null) return;
 
             switch (powerUp.Type)
             {
@@ -119,7 +120,14 @@ namespace Hellfire.Player
                     break;
             }
 
-            NotifyPowerUpAppliedClientRpc(powerUp.Type, powerUp.Value);
+            if (GameModeHelper.IsOffline)
+            {
+                OnPowerUpApplied?.Invoke(powerUp.Type, powerUp.Value);
+            }
+            else
+            {
+                NotifyPowerUpAppliedClientRpc(powerUp.Type, powerUp.Value);
+            }
         }
 
         [ClientRpc]

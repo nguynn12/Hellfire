@@ -333,7 +333,7 @@ namespace Hellfire.AI
         {
             base.HandleDeath(killerId);
 
-            if (!IsServer) return;
+            if (!Hellfire.GameModeHelper.IsServerOrOffline) return;
 
             // Thông báo DungeonManager mở cổng phòng boss và dọn sạch quái triệu hồi (Mục 17.4)
             if (Hellfire.Dungeon.DungeonManager.Instance != null)
@@ -355,7 +355,7 @@ namespace Hellfire.AI
                 {
                     chest.IsBossChest = true;
                 }
-                if (netObj != null)
+                if (!Hellfire.GameModeHelper.IsOffline && netObj != null && !netObj.IsSpawned)
                 {
                     netObj.Spawn(true);
                 }

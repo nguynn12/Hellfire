@@ -6,6 +6,7 @@
 using System;
 using System.Collections;
 using Hellfire.Player;
+using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -30,9 +31,6 @@ namespace Hellfire.Combat
         [Tooltip("Tỷ lệ % máu tối đa nhận được sau khi hồi sinh")]
         [SerializeField] private float _reviveHealthPercent = 0.3f;
 
-        [Header("Enemy Death Settings")]
-        [Tooltip("Thời gian trễ trước khi despawn GameObject quái vật sau khi chết")]
-        [SerializeField] private float _despawnDelay = 3.0f;
 
         // NetworkVariables (Server-Authoritative)
         public NetworkVariable<float> CurrentHealth { get; } = new NetworkVariable<float>(
@@ -93,6 +91,20 @@ namespace Hellfire.Combat
             _playerStats = GetComponent<PlayerStats>();
         }
 
+        private void Start()
+        {
+            if (GameModeHelper.IsOffline && !IsSpawned)
+            {
+                MaxHealthNet.Value = _baseMaxHealth;
+                CurrentHealth.Value = _baseMaxHealth;
+                IsDowned.Value = false;
+                IsDead.Value = false;
+                DownedTimer.Value = 0f;
+                OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
+                OnDownedStateChanged?.Invoke(false);
+            }
+        }
+
         public override void OnNetworkSpawn()
         {
             if (IsServer)
@@ -124,8 +136,8 @@ namespace Hellfire.Combat
 
         private void Update()
         {
-            // Chỉ Server mới đếm ngược thời gian gục (Mục 3.3)
-            if (IsServer && _isPlayer && IsDowned.Value && !IsDead.Value)
+            // Chỉ Server hoặc Offline mới đếm ngược thời gian gục (Mục 3.3)
+            if ((IsServer || GameModeHelper.IsOffline) && _isPlayer && IsDowned.Value && !IsDead.Value)
             {
                 DownedTimer.Value -= Time.deltaTime;
                 if (DownedTimer.Value <= 0f)
@@ -174,7 +186,7 @@ namespace Hellfire.Combat
         /// <param name="payload">Gói dữ liệu sát thương bất biến Zero-GC</param>
         public void TakeDamage(DamagePayload payload)
         {
-            if (!IsServer)
+            if (!GameModeHelper.IsServerOrOffline)
             {
                 Debug.LogWarning("[Health] Chỉ Server mới có quyền trừ máu!");
                 return;
@@ -231,8 +243,16 @@ namespace Hellfire.Combat
             float newHealth = Mathf.Max(0f, CurrentHealth.Value - finalDamage);
             CurrentHealth.Value = newHealth;
 
-            // Báo feedback cho mọi client
-            NotifyDamageClientRpc(finalDamage, payload.Hitbox, payload.AttackerClientId);
+            // Báo feedback cho mọi client hoặc cập nhật trực tiếp khi Offline
+            if (GameModeHelper.IsOffline)
+            {
+                OnDamageTaken?.Invoke(finalDamage, payload.Hitbox, payload.AttackerClientId);
+                OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
+            }
+            else
+            {
+                NotifyDamageClientRpc(finalDamage, payload.Hitbox, payload.AttackerClientId);
+            }
 
             // Báo hướng kẻ tấn công cho riêng nạn nhân (Mục 16.7)
             if (_isPlayer)
@@ -259,7 +279,14 @@ namespace Hellfire.Combat
                     // Người chơi chuyển sang trạng thái Downed (Mục 3.3)
                     IsDowned.Value = true;
                     DownedTimer.Value = _downedDuration;
-                    NotifyDownedClientRpc();
+                    if (GameModeHelper.IsOffline)
+                    {
+                        OnDownedStateChanged?.Invoke(true);
+                    }
+                    else
+                    {
+                        NotifyDownedClientRpc();
+                    }
                     Networking.MatchSummaryManager.RecordDowned(OwnerClientId);
                     Debug.Log($"[Health] Người chơi {NetworkObjectId} đã gục! Bắt đầu đếm ngược {_downedDuration}s để cứu.");
                 }
@@ -283,20 +310,18 @@ namespace Hellfire.Combat
         private void HandleDeathServer(ulong attackerClientId)
         {
             Debug.Log($"[Health] Thực thể {gameObject.name} (NetId: {NetworkObjectId}) đã chết bởi Client {attackerClientId}!");
-            NotifyDiedClientRpc(attackerClientId);
+            if (GameModeHelper.IsOffline)
+            {
+                OnDied?.Invoke(attackerClientId);
+            }
+            else
+            {
+                NotifyDiedClientRpc(attackerClientId);
+            }
 
             if (!_isPlayer)
             {
-                StartCoroutine(DespawnAfterDelayRoutine());
-            }
-        }
-
-        private IEnumerator DespawnAfterDelayRoutine()
-        {
-            yield return new WaitForSeconds(_despawnDelay);
-            if (NetworkObject != null && NetworkObject.IsSpawned)
-            {
-                NetworkObject.Despawn(true);
+                // Toàn bộ trách nhiệm despawn quái vật sau 3 giây được quy về EnemyStateMachine.DespawnRoutine() (Lỗi 02)
             }
         }
 
@@ -305,10 +330,14 @@ namespace Hellfire.Combat
         /// </summary>
         public void IncreaseMaxHealthServer(float bonusAmount)
         {
-            if (!IsServer || bonusAmount <= 0f) return;
+            if (!GameModeHelper.IsServerOrOffline || bonusAmount <= 0f) return;
 
             MaxHealthNet.Value += bonusAmount;
             CurrentHealth.Value = Mathf.Min(MaxHealthNet.Value, CurrentHealth.Value + bonusAmount);
+            if (GameModeHelper.IsOffline)
+            {
+                OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
+            }
             Debug.Log($"[Health] Đã tăng MaxHealth cho {gameObject.name}: {MaxHealthNet.Value} HP.");
         }
 
@@ -317,10 +346,14 @@ namespace Hellfire.Combat
         /// </summary>
         public void IncreaseMaxHealthAndHeal(float bonusAmount)
         {
-            if (!IsServer || bonusAmount <= 0f) return;
+            if (!GameModeHelper.IsServerOrOffline || bonusAmount <= 0f) return;
 
             MaxHealthNet.Value += bonusAmount;
             CurrentHealth.Value = MaxHealthNet.Value;
+            if (GameModeHelper.IsOffline)
+            {
+                OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
+            }
             Debug.Log($"[Health] Đã tăng MaxHealth và hồi đầy máu cho {gameObject.name}: {MaxHealthNet.Value} HP.");
         }
 
@@ -329,9 +362,13 @@ namespace Hellfire.Combat
         /// </summary>
         public void Heal(float amount)
         {
-            if (!IsServer || amount <= 0f || IsDead.Value) return;
+            if (!GameModeHelper.IsServerOrOffline || amount <= 0f || IsDead.Value) return;
 
             CurrentHealth.Value = Mathf.Min(MaxHealthNet.Value, CurrentHealth.Value + amount);
+            if (GameModeHelper.IsOffline)
+            {
+                OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
+            }
         }
 
         /// <summary>
@@ -339,7 +376,7 @@ namespace Hellfire.Combat
         /// </summary>
         public void ServerRevive()
         {
-            if (!IsServer)
+            if (!GameModeHelper.IsServerOrOffline)
             {
                 Debug.LogWarning("[Health] Chỉ Server mới có quyền thực thi hồi sinh!");
                 return;
@@ -354,17 +391,30 @@ namespace Hellfire.Combat
             DownedTimer.Value = 0f;
             CurrentHealth.Value = MaxHealthNet.Value * Mathf.Clamp01(_reviveHealthPercent);
 
-            NotifyRevivedClientRpc();
+            if (GameModeHelper.IsOffline)
+            {
+                OnRevived?.Invoke();
+                OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
+                OnDownedStateChanged?.Invoke(false);
+            }
+            else
+            {
+                NotifyRevivedClientRpc();
+            }
             Debug.Log($"[Health] Người chơi {NetworkObjectId} đã được hồi sinh với {CurrentHealth.Value}/{MaxHealthNet.Value} HP!");
         }
 
         public void SetMaxHealth(float maxHealth)
         {
             _baseMaxHealth = Mathf.Max(1f, maxHealth);
-            if (IsServer)
+            if (GameModeHelper.IsServerOrOffline)
             {
                 MaxHealthNet.Value = _baseMaxHealth;
                 CurrentHealth.Value = _baseMaxHealth;
+                if (GameModeHelper.IsOffline)
+                {
+                    OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
+                }
             }
         }
 

@@ -5,6 +5,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Hellfire.Combat;
+using Hellfire.Networking;
 using Hellfire.Player;
 using TMPro;
 using Unity.Netcode;
@@ -47,14 +48,28 @@ namespace Hellfire.Items
             NetworkVariableWritePermission.Server
         );
 
+        private readonly NetworkVariable<bool> _isBossChestNet = new NetworkVariable<bool>(
+            false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
         private Quaternion _initialLidRotation;
         private Quaternion _targetLidRotation;
         private bool _isLocalPlayerInRange = false;
 
         public bool IsBossChest
         {
-            get => _isBossChest;
-            set => _isBossChest = value;
+            get => _isBossChestNet.Value || _isBossChest;
+            set
+            {
+                _isBossChest = value;
+                if (IsServer && NetworkObject != null && NetworkObject.IsSpawned)
+                {
+                    _isBossChestNet.Value = value;
+                }
+                UpdateChestVisuals();
+            }
         }
 
         private void Awake()
@@ -75,18 +90,39 @@ namespace Hellfire.Items
             if (_chestLight == null) _chestLight = GetComponentInChildren<Light>();
         }
 
+        private void Start()
+        {
+            UpdateChestVisuals();
+        }
+
         public override void OnNetworkSpawn()
         {
             IsOpened.OnValueChanged += HandleChestOpenedChanged;
+            _isBossChestNet.OnValueChanged += (prev, curr) => UpdateChestVisuals();
 
-            if (_chestLight != null)
+            if (IsServer)
             {
-                _chestLight.color = _isBossChest ? _bossChestColor : _normalChestColor;
+                _isBossChestNet.Value = _isBossChest;
             }
+
+            UpdateChestVisuals();
 
             if (IsOpened.Value)
             {
                 ApplyLidState(true, true);
+            }
+        }
+
+        private void UpdateChestVisuals()
+        {
+            bool isBoss = _isBossChestNet.Value || _isBossChest;
+            if (_chestLight != null)
+            {
+                _chestLight.color = isBoss ? _bossChestColor : _normalChestColor;
+            }
+            if (_promptText != null)
+            {
+                _promptText.text = isBoss ? "[E] Mở Rương Boss" : "[E] Mở Rương";
             }
         }
 
@@ -122,33 +158,50 @@ namespace Hellfire.Items
 
         private void CheckLocalPlayerDistance()
         {
-            if (NetworkManager.Singleton == null || NetworkManager.Singleton.LocalClient == null) return;
+            Transform playerTransform = null;
+            if (PlayerMovement.LocalInstance != null)
+            {
+                playerTransform = PlayerMovement.LocalInstance.transform;
+            }
+            else if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null && NetworkManager.Singleton.LocalClient.PlayerObject != null)
+            {
+                playerTransform = NetworkManager.Singleton.LocalClient.PlayerObject.transform;
+            }
 
-            var localPlayerObj = NetworkManager.Singleton.LocalClient.PlayerObject;
-            if (localPlayerObj == null) return;
+            if (playerTransform == null) return;
 
-            float distance = Vector3.Distance(transform.position, localPlayerObj.transform.position);
+            float distance = Vector3.Distance(transform.position, playerTransform.position);
             _isLocalPlayerInRange = (distance <= _interactionDistance);
 
             if (_promptText != null)
             {
                 _promptText.gameObject.SetActive(_isLocalPlayerInRange);
-                if (_isLocalPlayerInRange && Camera.main != null)
+                if (_isLocalPlayerInRange)
                 {
-                    _promptText.text = _isBossChest ? "[E] Mở Rương Boss" : "[E] Mở Rương";
-                    _promptText.transform.rotation = Quaternion.LookRotation(_promptText.transform.position - Camera.main.transform.position);
+                    Camera cam = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance.PlayerCamera : Camera.main;
+                    if (cam != null)
+                    {
+                        _promptText.transform.rotation = Quaternion.LookRotation(_promptText.transform.position - cam.transform.position);
+                    }
                 }
             }
 
             // Nhấn E để mở rương
             if (_isLocalPlayerInRange && Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
             {
-                RequestOpenChestServerRpc();
+                if (GameModeHelper.IsOffline)
+                {
+                    PerformOpenChestServer(playerTransform.gameObject);
+                }
+                else
+                {
+                    RequestOpenChestServerRpc();
+                }
             }
         }
 
-        [ServerRpc(RequireOwnership = false)]
-        private void RequestOpenChestServerRpc(ServerRpcParams rpcParams = default)
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void RequestOpenChestServerRpc(RpcParams rpcParams = default)
         {
             if (IsOpened.Value) return;
 
@@ -173,10 +226,18 @@ namespace Hellfire.Items
 
         private void PerformOpenChestServer(GameObject openerPlayer)
         {
-            IsOpened.Value = true;
+            if (GameModeHelper.IsOffline)
+            {
+                HandleChestOpenedChanged(false, true);
+            }
+            else
+            {
+                IsOpened.Value = true;
+            }
 
             // Xác định vật phẩm rơi dựa trên tỷ lệ chốt (Mục 6.3)
-            if (_isBossChest)
+            bool isBoss = _isBossChestNet.Value || _isBossChest;
+            if (isBoss)
             {
                 // RƯƠNG BOSS: 100% rơi ít nhất 1 bùa lợi
                 DropRandomPowerUp(GetSpawnOffset(0));
@@ -225,14 +286,14 @@ namespace Hellfire.Items
             var netObj = spawnedObj.GetComponent<NetworkObject>();
             var pickup = spawnedObj.GetComponent<ItemPickup>();
 
+            if (!GameModeHelper.IsOffline && netObj != null && !netObj.IsSpawned)
+            {
+                netObj.Spawn(true);
+            }
+
             if (pickup != null)
             {
                 pickup.InitializePowerUp(chosenPowerUp);
-            }
-
-            if (netObj != null)
-            {
-                netObj.Spawn(true);
             }
 
             Debug.Log($"[LootChest] Đã rơi bùa lợi: {chosenPowerUp.PowerUpName} tại {spawnPosition}");
@@ -278,14 +339,14 @@ namespace Hellfire.Items
             var netObj = spawnedObj.GetComponent<NetworkObject>();
             var pickup = spawnedObj.GetComponent<ItemPickup>();
 
+            if (!GameModeHelper.IsOffline && netObj != null && !netObj.IsSpawned)
+            {
+                netObj.Spawn(true);
+            }
+
             if (pickup != null)
             {
                 pickup.InitializeWeapon(chosenWeapon);
-            }
-
-            if (netObj != null)
-            {
-                netObj.Spawn(true);
             }
 
             Debug.Log($"[LootChest] Đã rơi vũ khí: {chosenWeapon.WeaponName} tại {spawnPosition}");

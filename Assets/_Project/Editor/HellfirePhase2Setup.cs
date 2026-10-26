@@ -510,7 +510,7 @@ namespace Hellfire.Editor
             soHud.ApplyModifiedProperties();
 
             // 2. Đặt 4 Quái vật Imp thử nghiệm trong Arena để người chơi test bắn
-            var existingImps = GameObject.FindObjectsByType<TestEnemyImp>(FindObjectsSortMode.None);
+            var existingImps = Object.FindObjectsByType<TestEnemyImp>(FindObjectsInactive.Exclude);
             foreach (var existing in existingImps)
             {
                 Object.DestroyImmediate(existing.gameObject);
