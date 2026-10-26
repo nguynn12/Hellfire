@@ -1,4 +1,4 @@
-// Script: WeaponController.cs
+﻿// Script: WeaponController.cs
 // Mục đích: Quản lý toàn bộ vũ khí súng tầm xa (Ranged Guns), bắn Hitscan, nạp đạn vô hạn không giới hạn số lần.
 //           Hỗ trợ Nâng Cấp Vũ Khí Toàn Cục (Global Weapon Stats & Modifiers) — giữ nguyên và áp dụng cho TẤT CẢ vũ khí khi đổi súng.
 // Môi trường thực thi: Cả hai (Client dự đoán & phát hiệu ứng, Server xác thực & trừ máu).
@@ -8,7 +8,6 @@ using System.Collections;
 using System.Collections.Generic;
 using Hellfire.Networking;
 using Hellfire.Player;
-using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -82,6 +81,7 @@ namespace Hellfire.Combat
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
         public event Action<int> OnWeaponUpgraded;                 // newLevel
         public event Action OnKillConfirmed;                      // Kill confirmation (Mục 16.7)
+        public event Action OnWeaponFired;                        // Đợt 1: Kích hoạt hiệu ứng giật súng (Recoil)
 
         public WeaponData CurrentWeaponData => CurrentRuntimeWeapon != null ? CurrentRuntimeWeapon.BaseData : _currentWeapon;
         public RuntimeWeapon CurrentRuntimeWeapon => (_runtimeWeapons != null && _currentWeaponIndex >= 0 && _currentWeaponIndex < _runtimeWeapons.Count) ? _runtimeWeapons[_currentWeaponIndex] : null;
@@ -92,6 +92,7 @@ namespace Hellfire.Combat
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
         public int GlobalUpgradeLevel => GlobalUpgradeLevelNet.Value;
+        public bool IsAimingDownSights { get; set; }
 
         private void Awake()
         {
@@ -350,6 +351,7 @@ namespace Hellfire.Combat
             // Tính toán tốc độ ra đòn kết hợp hệ số tốc bắn toàn cục
             float finalAps = _currentWeapon.AttackRateAPS * GlobalAttackSpeedMultiplierNet.Value;
             _nextFireTime = Time.time + (1.0f / Mathf.Max(0.1f, finalAps));
+            OnWeaponFired?.Invoke();
 
             if (_audioSource != null && _currentWeapon.FireSound != null)
             {
@@ -363,9 +365,10 @@ namespace Hellfire.Combat
             // Vẽ tracer đạn cosmetic cục bộ cho người bắn
             int pellets = _currentWeapon.PelletCount;
             float range = _currentWeapon.Range;
+            float effectiveSpread = IsAimingDownSights ? _currentWeapon.Spread * 0.5f : _currentWeapon.Spread;
             for (int i = 0; i < pellets; i++)
             {
-                Vector3 shootDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
+                Vector3 shootDir = CalculateSpreadDirection(cameraForward, effectiveSpread, seed + i);
                 Vector3 endPoint = Physics.Raycast(cameraPos, shootDir, out var hit, range) ? hit.point : cameraPos + shootDir * range;
                 DrawCosmeticTracer(GetMuzzlePosition(), endPoint);
             }

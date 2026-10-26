@@ -1,5 +1,5 @@
-// Script: WeaponData.cs
-// Mục đích: ScriptableObject định nghĩa thông số dữ liệu vũ khí (Tấn công, APS, Xuyên giáp, Crit, Tầm quét Melee) theo đặc tả kỹ thuật.
+﻿// Script: WeaponData.cs
+// Mục đích: ScriptableObject định nghĩa thông số dữ liệu vũ khí (Tấn công, APS, Xuyên giáp, Crit, Tầm quét Melee, Recoil, ADS) theo đặc tả kỹ thuật.
 // Môi trường thực thi: Cả hai (Dữ liệu tĩnh đọc bởi Server và Client).
 
 using UnityEngine;
@@ -76,6 +76,38 @@ namespace Hellfire.Combat
         [Tooltip("Thời gian nạp đạn (giây)")]
         [SerializeField] private float _reloadTime = 1.2f;
 
+        [Header("Recoil & Handling (Đợt 1 - Combat Foundation)")]
+        [Tooltip("Độ giật lùi của súng (m)")]
+        [SerializeField] private float _recoilKickBack = 0.06f;
+
+        [Tooltip("Độ giật nảy lên của súng (m)")]
+        [SerializeField] private float _recoilKickUp = 0.025f;
+
+        [Tooltip("Góc giật nảy nòng súng (độ)")]
+        [SerializeField] private float _recoilAngleX = 3.5f;
+
+        [Tooltip("Góc giật ngẫu nhiên sang hai bên (độ)")]
+        [SerializeField] private float _recoilAngleY = 1.0f;
+
+        [Tooltip("Tốc độ giật tức thời (Snappiness)")]
+        [SerializeField] private float _recoilSnappiness = 22.0f;
+
+        [Tooltip("Tốc độ hồi tâm/vị trí (Return Speed)")]
+        [SerializeField] private float _recoilReturnSpeed = 9.0f;
+
+        [Header("Aim Down Sights (ADS) (Đợt 1 - Combat Foundation)")]
+        [Tooltip("Vị trí ngắm ADS của vũ khí này so với camera")]
+        [SerializeField] private Vector3 _adsPosition = new Vector3(0f, -0.14f, 0.38f);
+
+        [Tooltip("Góc xoay ngắm ADS")]
+        [SerializeField] private Vector3 _adsRotation = Vector3.zero;
+
+        [Tooltip("FOV của camera khi ngắm bằng vũ khí này")]
+        [SerializeField] private float _adsFOV = 65.0f;
+
+        [Tooltip("Tốc độ chuyển đổi sang trạng thái ngắm")]
+        [SerializeField] private float _adsSpeed = 12.0f;
+
         [Header("Melee Parameters (Cho MeleeWeapon)")]
         [Tooltip("Tầm quét hình cầu của đòn đánh cận chiến (mét)")]
         [SerializeField] private float _meleeRange = 2.5f;
@@ -115,6 +147,18 @@ namespace Hellfire.Combat
         public int MagSize => _magSize;
         public float ReloadTime => _reloadTime;
         public int ShopPrice => _shopPrice;
+
+        public float RecoilKickBack => _recoilKickBack;
+        public float RecoilKickUp => _recoilKickUp;
+        public float RecoilAngleX => _recoilAngleX;
+        public float RecoilAngleY => _recoilAngleY;
+        public float RecoilSnappiness => _recoilSnappiness;
+        public float RecoilReturnSpeed => _recoilReturnSpeed;
+
+        public Vector3 AdsPosition => _adsPosition;
+        public Vector3 AdsRotation => _adsRotation;
+        public float AdsFOV => _adsFOV;
+        public float AdsSpeed => _adsSpeed;
 
         public float MeleeRange => _meleeRange;
         public float MeleeSwingAngle => _meleeSwingAngle;
