@@ -103,7 +103,6 @@ namespace Hellfire.Editor
             so.FindProperty("_promptText").objectReferenceValue = tmp;
             so.FindProperty("_flameVisual").objectReferenceValue = flame;
             so.FindProperty("_shrineLight").objectReferenceValue = light;
-            so.FindProperty("_shrineRenderer").objectReferenceValue = renderer;
             so.ApplyModifiedProperties();
 
             shrine.ApplyGlowVisuals();

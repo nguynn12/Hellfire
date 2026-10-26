@@ -1,6 +1,7 @@
 // Script: PlayerStats.cs
 // Mục đích: Quản lý các chỉ số sinh tồn và cơ động của người chơi (Máu cộng thêm, Giáp, Hệ số tốc chạy), có trần cứng (Max Caps).
 //           Ghi nhớ lịch sử các Tế đàn (Shrine) đã tương tác (Server-Authoritative).
+//           Hỗ trợ đầy đủ chế độ Offline Test thông qua biến dự phòng khi chưa spawn mạng.
 // Môi trường thực thi: Cả hai (Server tính toán & ghi nhận, Client đọc qua NetworkVariable).
 
 using System;
@@ -25,6 +26,11 @@ namespace Hellfire.Player
         public const float MaxArmorCap = 60.0f;              // Trần giáp tối đa (60 giáp ~ giảm khoảng 47% sát thương)
         public const float MaxSpeedMultiplierCap = 1.8f;     // Tốc độ chạy tối đa 180% (tăng tối đa +80%)
         public const float MinSpeedMultiplier = 1.0f;        // Tốc độ cơ bản ban đầu là 1.0 (100%)
+
+        // Biến nội bộ dự phòng khi chạy Offline (chưa spawn mạng)
+        private float _rawBonusMaxHealth = 0f;
+        private float _rawArmor = 0f;
+        private float _rawMoveSpeedMultiplier = MinSpeedMultiplier;
 
         // ================= NETWORK VARIABLES (SERVER-AUTHORITATIVE) =================
         /// <summary>
@@ -57,12 +63,17 @@ namespace Hellfire.Player
         /// <summary>
         /// Thuộc tính truy cập nhanh chỉ số hiện tại (hoạt động đồng thời Online và Offline).
         /// </summary>
-        public float CurrentBonusMaxHealth => BonusMaxHealth.Value;
-        public float CurrentArmor => Armor.Value;
-        public float CurrentMoveSpeedMultiplier => MoveSpeedMultiplier.Value;
+        public float CurrentBonusMaxHealth => IsSpawned ? BonusMaxHealth.Value : _rawBonusMaxHealth;
+        public float CurrentArmor => IsSpawned ? Armor.Value : _rawArmor;
+        public float CurrentMoveSpeedMultiplier => IsSpawned ? MoveSpeedMultiplier.Value : _rawMoveSpeedMultiplier;
+
+        /// <summary>
+        /// Trả về hệ số tốc độ cơ bản/hiện tại cho PlayerMovement khi chưa spawn hoặc offline.
+        /// </summary>
+        public float GetBaseSpeedMultiplier() => CurrentMoveSpeedMultiplier;
 
         // ================= LỊCH SỬ TẾ ĐÀN (SERVER-SIDE TRACKING) =================
-        // Lưu trữ các ID tế đàn mà riêng người chơi này đã kích hoạt (chỉ chạy trên Server)
+        // Lưu trữ các ID tế đàn mà riêng người chơi này đã kích hoạt (chỉ chạy trên Server hoặc Offline)
         private readonly HashSet<int> _usedShrineIds = new HashSet<int>();
 
         // Sự kiện cục bộ để UI hoặc các hệ thống khác lắng nghe khi chỉ số thay đổi
@@ -85,6 +96,10 @@ namespace Hellfire.Player
 
         public override void OnNetworkSpawn()
         {
+            _rawBonusMaxHealth = BonusMaxHealth.Value;
+            _rawArmor = Armor.Value;
+            _rawMoveSpeedMultiplier = MoveSpeedMultiplier.Value;
+
             BonusMaxHealth.OnValueChanged += HandleBonusHealthChanged;
             Armor.OnValueChanged += HandleArmorChanged;
             MoveSpeedMultiplier.OnValueChanged += HandleSpeedChanged;
@@ -105,19 +120,33 @@ namespace Hellfire.Player
             }
         }
 
-        private void HandleBonusHealthChanged(float prev, float curr) => NotifyStatsChanged();
-        private void HandleArmorChanged(float prev, float curr) => NotifyStatsChanged();
-        private void HandleSpeedChanged(float prev, float curr) => NotifyStatsChanged();
+        private void HandleBonusHealthChanged(float prev, float curr)
+        {
+            _rawBonusMaxHealth = curr;
+            NotifyStatsChanged();
+        }
+
+        private void HandleArmorChanged(float prev, float curr)
+        {
+            _rawArmor = curr;
+            NotifyStatsChanged();
+        }
+
+        private void HandleSpeedChanged(float prev, float curr)
+        {
+            _rawMoveSpeedMultiplier = curr;
+            NotifyStatsChanged();
+        }
 
         private void NotifyStatsChanged()
         {
-            OnStatsChanged?.Invoke(BonusMaxHealth.Value, Armor.Value, MoveSpeedMultiplier.Value);
+            OnStatsChanged?.Invoke(CurrentBonusMaxHealth, CurrentArmor, CurrentMoveSpeedMultiplier);
         }
 
         // ================= QUẢN LÝ LỊCH SỬ TẾ ĐÀN (SHRINE TRACKING) =================
 
         /// <summary>
-        /// Kiểm tra xem người chơi này đã từng dùng tế đàn có ID này chưa (Server-Authoritative).
+        /// Kiểm tra xem người chơi này đã từng dùng tế đàn có ID này chưa (Server-Authoritative hoặc Offline).
         /// </summary>
         public bool HasUsedShrine(int shrineId)
         {
@@ -146,15 +175,15 @@ namespace Hellfire.Player
         /// </summary>
         public bool CanReceiveBodyBuff(float addHealth, float addArmor, float addSpeed)
         {
-            bool canAddHp = addHealth > 0f && BonusMaxHealth.Value < MaxBonusHealthCap;
-            bool canAddArmor = addArmor > 0f && Armor.Value < MaxArmorCap;
-            bool canAddSpeed = addSpeed > 0f && MoveSpeedMultiplier.Value < MaxSpeedMultiplierCap;
+            bool canAddHp = addHealth > 0f && CurrentBonusMaxHealth < MaxBonusHealthCap;
+            bool canAddArmor = addArmor > 0f && CurrentArmor < MaxArmorCap;
+            bool canAddSpeed = addSpeed > 0f && CurrentMoveSpeedMultiplier < MaxSpeedMultiplierCap;
 
             return canAddHp || canAddArmor || canAddSpeed;
         }
 
         /// <summary>
-        /// Thực thi cộng chỉ số cơ thể lên người chơi (Server-Authoritative).
+        /// Thực thi cộng chỉ số cơ thể lên người chơi (Server-Authoritative hoặc Offline).
         /// Tự động clamp trong giới hạn trần cứng (Max Caps).
         /// </summary>
         /// <returns>True nếu có ít nhất 1 chỉ số được tăng, False nếu đã đạt trần tối đa.</returns>
@@ -162,7 +191,7 @@ namespace Hellfire.Player
         {
             if (!GameModeHelper.IsServerOrOffline)
             {
-                Debug.LogWarning("[PlayerStats] Chỉ Server mới có quyền tăng chỉ số PlayerStats!");
+                Debug.LogWarning("[PlayerStats] Chỉ Server hoặc Offline mới có quyền tăng chỉ số PlayerStats!");
                 return false;
             }
 
@@ -174,11 +203,16 @@ namespace Hellfire.Player
             bool statModified = false;
 
             // 1. Tăng máu tối đa (kèm hồi lượng máu tương ứng vào Health)
-            if (addHealth > 0f && BonusMaxHealth.Value < MaxBonusHealthCap)
+            if (addHealth > 0f && CurrentBonusMaxHealth < MaxBonusHealthCap)
             {
-                float newBonus = Mathf.Min(MaxBonusHealthCap, BonusMaxHealth.Value + addHealth);
-                float actualAdd = newBonus - BonusMaxHealth.Value;
-                BonusMaxHealth.Value = newBonus;
+                float newBonus = Mathf.Min(MaxBonusHealthCap, CurrentBonusMaxHealth + addHealth);
+                float actualAdd = newBonus - CurrentBonusMaxHealth;
+
+                if (IsSpawned)
+                {
+                    BonusMaxHealth.Value = newBonus;
+                }
+                _rawBonusMaxHealth = newBonus;
 
                 if (_healthComponent != null)
                 {
@@ -188,26 +222,33 @@ namespace Hellfire.Player
             }
 
             // 2. Tăng Giáp
-            if (addArmor > 0f && Armor.Value < MaxArmorCap)
+            if (addArmor > 0f && CurrentArmor < MaxArmorCap)
             {
-                Armor.Value = Mathf.Min(MaxArmorCap, Armor.Value + addArmor);
+                float newArmor = Mathf.Min(MaxArmorCap, CurrentArmor + addArmor);
+                if (IsSpawned)
+                {
+                    Armor.Value = newArmor;
+                }
+                _rawArmor = newArmor;
                 statModified = true;
             }
 
             // 3. Tăng Tốc độ chạy
-            if (addSpeed > 0f && MoveSpeedMultiplier.Value < MaxSpeedMultiplierCap)
+            if (addSpeed > 0f && CurrentMoveSpeedMultiplier < MaxSpeedMultiplierCap)
             {
-                MoveSpeedMultiplier.Value = Mathf.Min(MaxSpeedMultiplierCap, MoveSpeedMultiplier.Value + addSpeed);
+                float newSpeed = Mathf.Min(MaxSpeedMultiplierCap, CurrentMoveSpeedMultiplier + addSpeed);
+                if (IsSpawned)
+                {
+                    MoveSpeedMultiplier.Value = newSpeed;
+                }
+                _rawMoveSpeedMultiplier = newSpeed;
                 statModified = true;
             }
 
             if (statModified)
             {
-                if (GameModeHelper.IsOffline)
-                {
-                    NotifyStatsChanged();
-                }
-                Debug.Log($"[PlayerStats] Đã nâng cấp chỉ số cho Client {OwnerClientId}: +HP={BonusMaxHealth.Value}/{MaxBonusHealthCap}, Armor={Armor.Value}/{MaxArmorCap}, Speed={MoveSpeedMultiplier.Value:F2}x");
+                NotifyStatsChanged();
+                Debug.Log($"[PlayerStats] Đã nâng cấp chỉ số cho Client {OwnerClientId}: +HP={CurrentBonusMaxHealth}/{MaxBonusHealthCap}, Armor={CurrentArmor}/{MaxArmorCap}, Speed={CurrentMoveSpeedMultiplier:F2}x");
             }
 
             return statModified;

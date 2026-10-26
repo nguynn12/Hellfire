@@ -4,6 +4,7 @@
 
 using Unity.Netcode;
 using UnityEngine;
+using Hellfire.Networking;
 
 namespace Hellfire
 {
@@ -15,27 +16,27 @@ namespace Hellfire
         public static bool ForceOfflineMode = false;
 
         /// <summary>
-        /// Xác định xem ván chơi hiện tại có đang chạy ngoại tuyến hay không.
-        /// Tự động true khi ForceOfflineMode bật, hoặc khi NetworkManager chưa khởi tạo hoặc chưa Listening.
+        /// Hệ thống được coi là Offline nếu:
+        /// 1. Cờ ForceOfflineMode được bật HOẶC
+        /// 2. Tồn tại OfflineManager trong Scene hiện tại HOẶC
+        /// 3. NetworkManager chưa khởi tạo hoặc chưa lắng nghe mạng
         /// </summary>
         public static bool IsOffline =>
             ForceOfflineMode ||
-            NetworkManager.Singleton == null ||
-            !NetworkManager.Singleton.IsListening;
+            OfflineManager.Instance != null ||
+            (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening);
 
         /// <summary>
         /// Xác định quyền Server hoặc đang ở chế độ Offline (cho phép thực thi logic Server khi test offline).
         /// </summary>
         public static bool IsServerOrOffline =>
-            IsOffline ||
-            (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer);
+            IsOffline || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer);
 
         /// <summary>
         /// Xác định quyền Client hoặc đang ở chế độ Offline.
         /// </summary>
         public static bool IsClientOrOffline =>
-            IsOffline ||
-            (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient);
+            IsOffline || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient);
 
         /// <summary>
         /// Kiểm tra xem người chơi cục bộ có quyền điều khiển component này không.
@@ -43,8 +44,8 @@ namespace Hellfire
         /// </summary>
         public static bool CanLocalControl(NetworkBehaviour behaviour)
         {
-            if (IsOffline) return true;
-            return behaviour != null && behaviour.IsOwner;
+            if (behaviour == null) return false;
+            return IsOffline || behaviour.IsOwner;
         }
     }
 }

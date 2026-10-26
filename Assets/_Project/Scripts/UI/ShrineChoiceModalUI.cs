@@ -161,7 +161,7 @@ namespace Hellfire.UI
 
         private void SetPlayerMovementLookEnabled(bool enabled)
         {
-            var playerMove = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance : FindAnyObjectByType<PlayerMovement>();
+            var playerMove = PlayerMovement.LocalInstance;
             if (playerMove != null)
             {
                 playerMove.SetCursorLock(enabled);

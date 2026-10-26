@@ -312,14 +312,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1378622105
+  GlobalObjectIdHash: 2513149042
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
-  m_InScenePlaced: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -408,11 +408,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.Health
   ShowTopMostFoldoutHeaderGroup: 1
-  _maxHealth: 800
+  _baseMaxHealth: 100
   _isPlayer: 0
+  _baseArmor: 0
   _downedDuration: 60
   _reviveHealthPercent: 0.3
-  _despawnDelay: 3
 --- !u!114 &6289259359809539645
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -444,6 +444,7 @@ MonoBehaviour:
   _phase1MeleeDamage: 30
   _phase2FireballDamage: 20
   _fireballExplosionRadius: 3
+  _bossChestPrefab: {fileID: 8613146085528015830, guid: 18ab9092a29485a47bedaaaf8f2e394b, type: 3}
   _impMinionPrefab: {fileID: 8187070297308079450, guid: 00da543e2f861034b9cb7af4e9a3a4e1, type: 3}
   _bossRoomCenter: {x: 0, y: 0, z: 0}
 --- !u!1 &6579397727876992927

@@ -113,13 +113,14 @@ namespace Hellfire.Items
                 return;
             }
 
-            if (!IsServer && NetworkObject.IsSpawned) return;
+            bool isServerAuthorized = IsServer || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer);
+            if (!isServerAuthorized && NetworkObject != null && NetworkObject.IsSpawned) return;
 
             _pickupType = ItemPickupType.PowerUp;
             _powerUpData = data;
             _weaponData = null;
 
-            if (IsServer)
+            if (isServerAuthorized)
             {
                 _netPickupType.Value = (int)ItemPickupType.PowerUp;
                 _netItemId.Value = data != null ? data.Type.ToString() : string.Empty;
@@ -142,13 +143,14 @@ namespace Hellfire.Items
                 return;
             }
 
-            if (!IsServer && NetworkObject.IsSpawned) return;
+            bool isServerAuthorized = IsServer || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer);
+            if (!isServerAuthorized && NetworkObject != null && NetworkObject.IsSpawned) return;
 
             _pickupType = ItemPickupType.Weapon;
             _weaponData = data;
             _powerUpData = null;
 
-            if (IsServer)
+            if (isServerAuthorized)
             {
                 _netPickupType.Value = (int)ItemPickupType.Weapon;
                 _netItemId.Value = data != null ? data.WeaponId : string.Empty;
@@ -219,6 +221,8 @@ namespace Hellfire.Items
             }
         }
 
+        private static Camera _cachedMainCamera;
+
         private void Update()
         {
             // Hoạt ảnh xoay và nhấp nhô cục bộ (Client & Host)
@@ -230,7 +234,20 @@ namespace Hellfire.Items
             // Quay text hướng về Camera người chơi (ưu tiên camera local cache để tối ưu CPU)
             if (_nameLabel != null)
             {
-                Camera cam = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance.PlayerCamera : Camera.main;
+                Camera cam = null;
+                if (PlayerMovement.LocalInstance != null && PlayerMovement.LocalInstance.PlayerCamera != null)
+                {
+                    cam = PlayerMovement.LocalInstance.PlayerCamera;
+                }
+                else
+                {
+                    if (_cachedMainCamera == null)
+                    {
+                        _cachedMainCamera = Camera.main;
+                    }
+                    cam = _cachedMainCamera;
+                }
+
                 if (cam != null)
                 {
                     _nameLabel.transform.rotation = Quaternion.LookRotation(_nameLabel.transform.position - cam.transform.position);

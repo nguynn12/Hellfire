@@ -311,8 +311,7 @@ MonoBehaviour:
   _promptText: {fileID: 0}
   _flameVisual: {fileID: 7731009329798769964, guid: 61562017cd1522a45a1e127943ee4f3a, type: 3}
   _shrineLight: {fileID: 2427278960820509970}
-  _shrineRenderer: {fileID: 2201771081906761559, guid: 61562017cd1522a45a1e127943ee4f3a, type: 3}
-  _usedColor: {r: 0.48504806, g: 0.9433962, b: 0.50338197, a: 1}
+  _glowController: {fileID: 0}
   _autoColorByType: 1
   _activeGlowColor: {r: 0.2, g: 0.8, b: 1, a: 1}
   _audioSource: {fileID: 0}

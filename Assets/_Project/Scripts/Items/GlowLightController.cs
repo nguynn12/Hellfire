@@ -23,13 +23,6 @@ namespace Hellfire.Items
         [ColorUsage(true, true)]
         [SerializeField] private Color _activeColor = new Color(0.2f, 0.8f, 1.0f, 1f);
 
-        [Tooltip("Màu khi đã tiêu thụ/dập tắt (Used/Extinguished)")]
-        [SerializeField] private Color _inactiveColor = new Color(0.25f, 0.25f, 0.25f, 1f);
-
-        [Tooltip("Hệ số nhân cường độ phát sáng HDR cho vật liệu Emission")]
-        [Range(0.5f, 10f)]
-        [SerializeField] private float _emissionMultiplier = 2.5f;
-
         [Header("Animation & Pulse Effect")]
         [Tooltip("Bật hiệu ứng ánh sáng bập bùng nhẹ (Pulse / Flicker)")]
         [SerializeField] private bool _enablePulse = true;
@@ -40,11 +33,6 @@ namespace Hellfire.Items
         [Tooltip("Biên độ dao động cường độ sáng")]
         [Range(0f, 0.5f)]
         [SerializeField] private float _pulseAmplitude = 0.15f;
-
-        private MaterialPropertyBlock _propBlock;
-        private static readonly int BaseColorPropId = Shader.PropertyToID("_BaseColor");
-        private static readonly int LegacyColorPropId = Shader.PropertyToID("_Color");
-        private static readonly int EmissionColorPropId = Shader.PropertyToID("_EmissionColor");
 
         private float _baseLightIntensity = 2.0f;
         private bool _isExtinguished = false;
@@ -93,7 +81,7 @@ namespace Hellfire.Items
         }
 
         /// <summary>
-        /// Áp dụng màu lên Light và MaterialPropertyBlock.
+        /// Áp dụng màu lên Light và kích hoạt Visual phát sáng (giữ nguyên Material gốc của model).
         /// </summary>
         public void ApplyGlowColor(Color color)
         {
@@ -104,20 +92,15 @@ namespace Hellfire.Items
                 _lightSource.enabled = true;
             }
 
-            // 2. Đổi màu phát sáng Emission (MaterialPropertyBlock Zero-GC)
+            // 2. Kích hoạt Renderer mà không can thiệp đè màu Material
             if (_glowRenderer != null)
             {
-                if (_propBlock == null) _propBlock = new MaterialPropertyBlock();
-                _glowRenderer.GetPropertyBlock(_propBlock);
-                _propBlock.SetColor(BaseColorPropId, color);
-                _propBlock.SetColor(LegacyColorPropId, color);
-                _propBlock.SetColor(EmissionColorPropId, color * _emissionMultiplier);
-                _glowRenderer.SetPropertyBlock(_propBlock);
+                _glowRenderer.gameObject.SetActive(true);
             }
         }
 
         /// <summary>
-        /// Dập tắt ánh sáng và chuyển vật liệu về màu tối (khi tế đàn/rương đã dùng).
+        /// Dập tắt ánh sáng khi tế đàn/rương đã dùng.
         /// </summary>
         public void Extinguish()
         {
@@ -130,12 +113,7 @@ namespace Hellfire.Items
 
             if (_glowRenderer != null)
             {
-                if (_propBlock == null) _propBlock = new MaterialPropertyBlock();
-                _glowRenderer.GetPropertyBlock(_propBlock);
-                _propBlock.SetColor(BaseColorPropId, _inactiveColor);
-                _propBlock.SetColor(LegacyColorPropId, _inactiveColor);
-                _propBlock.SetColor(EmissionColorPropId, Color.black);
-                _glowRenderer.SetPropertyBlock(_propBlock);
+                _glowRenderer.gameObject.SetActive(false);
             }
         }
 

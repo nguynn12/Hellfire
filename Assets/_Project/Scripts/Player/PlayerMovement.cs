@@ -1,6 +1,6 @@
 // Script: PlayerMovement.cs
 // Mục đích: Điều khiển di chuyển góc nhìn thứ nhất (FPS) bằng CharacterController và Unity Input System (Mục 1 & 1.3).
-// Môi trường thực thi: Cả hai (Client-side prediction cho IsOwner, NetworkTransform đồng bộ cho Client khác).
+// Môi trường thực thi: Cả hai (Client-side prediction cho IsOwner / Offline, NetworkTransform đồng bộ cho Client khác).
 
 using Hellfire.Combat;
 using Hellfire.Networking;
@@ -51,10 +51,6 @@ namespace Hellfire.Player
         [Tooltip("Góc nhìn cúi xuống tối đa (độ)")]
         [SerializeField] private float _pitchClampMax = 85.0f;
 
-        [Header("Testing & Network Mode")]
-        [Tooltip("Bật: Tuân theo Netcode (chỉ IsOwner mới được điều khiển).\nTắt: Chế độ Offline Test (cho phép di chuyển tự do trong Scene test mà không cần NetworkManager).")]
-        [SerializeField] private bool _isOnlineMode = false;
-
         [Header("Layers")]
         [SerializeField] private string _playerBodyLayerName = "PlayerBody";
         [SerializeField] private string _viewmodelLayerName = "Viewmodel";
@@ -65,16 +61,12 @@ namespace Hellfire.Player
         public float WalkSpeed => _walkSpeed;
         public float SprintSpeed => _sprintSpeed;
         public Camera PlayerCamera => _playerCamera;
-        public bool IsOnlineMode
-        {
-            get => _isOnlineMode;
-            set
-            {
-                _isOnlineMode = value;
-                GameModeHelper.ForceOfflineMode = !_isOnlineMode;
-                ApplyModeSettings();
-            }
-        }
+        public Transform CameraPivot => _cameraPivot;
+        public GameObject PlayerBodyMesh => _playerBodyMesh;
+        public GameObject WeaponViewmodelRoot => _weaponViewmodel;
+        public Vector2 CurrentLookDelta { get; private set; }
+        public bool IsMoving => _characterController != null && _characterController.velocity.sqrMagnitude > 0.1f;
+        public bool IsSprinting { get; private set; }
 
         private float _cameraPitch;
         private float _verticalVelocity;
@@ -114,8 +106,8 @@ namespace Hellfire.Player
 
         private void Start()
         {
-            // Nếu tắt chế độ Online hoặc đối tượng chưa spawn qua mạng: tự động kích hoạt điều khiển Offline
-            if (!_isOnlineMode || !IsSpawned || GameModeHelper.IsOffline)
+            // Nếu đang chạy Offline hoặc đối tượng chưa spawn qua mạng: tự động kích hoạt điều khiển cục bộ
+            if (GameModeHelper.IsOffline || !IsSpawned)
             {
                 ApplyModeSettings();
             }
@@ -166,21 +158,6 @@ namespace Hellfire.Player
         public void TeleportClientRpc(Vector3 newPosition)
         {
             Teleport(newPosition);
-        }
-
-        /// <summary>
-        /// Chuyển đổi nhanh chế độ Online / Offline (có thể click chuột phải vào component trong Inspector).
-        /// </summary>
-        [ContextMenu("Toggle Online Mode")]
-        public void ToggleOnlineMode()
-        {
-            IsOnlineMode = !_isOnlineMode;
-            Debug.Log($"[PlayerMovement] Chế độ Online: {(_isOnlineMode ? "BẬT (Netcode IsOwner)" : "TẮT (Offline Test)")}");
-        }
-
-        public void SetOnlineMode(bool isOnline)
-        {
-            IsOnlineMode = isOnline;
         }
 
         private void ApplyModeSettings()
@@ -250,7 +227,7 @@ namespace Hellfire.Player
 
             if (_playerBodyMesh != null)
             {
-                // Khi chơi góc nhìn thứ nhất, ẩn body của chính mình (hoặc hiển thị tùy thiết kế)
+                // Khi chơi góc nhìn thứ nhất, ẩn body của chính mình
                 _playerBodyMesh.SetActive(false);
             }
 
@@ -307,11 +284,18 @@ namespace Hellfire.Player
 
             HandleCursorToggle();
 
-            // Vô hiệu hóa di chuyển khi đang Gục (Downed) hoặc Chết (Dead) theo Mục 3.3 (chỉ check khi đã spawn mạng)
-            if (_health != null && _health.IsSpawned && (_health.IsDowned.Value || _health.IsDead.Value))
+            // Vô hiệu hóa di chuyển khi đang Gục (Downed) hoặc Chết (Dead) theo Mục 3.3 (kiểm tra an toàn cả Online lẫn Offline)
+            if (_health != null)
             {
-                ApplyGravityOnly();
-                return;
+                bool isDownedOrDead = _health.IsSpawned
+                    ? (_health.IsDowned.Value || _health.IsDead.Value)
+                    : (_health.IsDownedValue || _health.IsDeadValue);
+
+                if (isDownedOrDead)
+                {
+                    ApplyGravityOnly();
+                    return;
+                }
             }
 
             // Kiểm tra trạng thái GameManager trước khi cho phép di chuyển
@@ -349,6 +333,17 @@ namespace Hellfire.Player
             _mouseSensitivity = Mathf.Max(0.1f, newSensitivity);
         }
 
+        public void AddCameraRecoil(float pitchKick, float yawKick)
+        {
+            _cameraPitch -= pitchKick;
+            _cameraPitch = Mathf.Clamp(_cameraPitch, _pitchClampMin, _pitchClampMax);
+            if (_cameraPivot != null)
+            {
+                _cameraPivot.localRotation = Quaternion.Euler(_cameraPitch, 0f, 0f);
+            }
+            transform.Rotate(Vector3.up * yawKick);
+        }
+
         private void HandleLook()
         {
             Vector2 lookDelta = Vector2.zero;
@@ -357,6 +352,8 @@ namespace Hellfire.Player
             {
                 lookDelta = Mouse.current.delta.ReadValue() * (0.1f * _mouseSensitivity);
             }
+
+            CurrentLookDelta = lookDelta;
 
             // Xoay ngang (Yaw): xoay trực tiếp Player root
             transform.Rotate(Vector3.up * lookDelta.x);
@@ -374,6 +371,7 @@ namespace Hellfire.Player
         {
             if (_characterController == null || !_characterController.enabled)
             {
+                IsSprinting = false;
                 return;
             }
 
@@ -391,6 +389,7 @@ namespace Hellfire.Player
 
             // 2. Xác định tốc độ (đi bộ, chạy nhanh, đi lùi)
             bool isSprinting = Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+            IsSprinting = isSprinting && moveInput.sqrMagnitude > 0.01f;
             bool isMovingBackward = moveInput.y < -0.1f;
 
             float currentSpeed;
@@ -399,7 +398,7 @@ namespace Hellfire.Player
                 // Đi lùi: 70% walkSpeed (Mục 1.3)
                 currentSpeed = _walkSpeed * _backwardMultiplier;
             }
-            else if (isSprinting && moveInput.sqrMagnitude > 0.01f)
+            else if (IsSprinting)
             {
                 currentSpeed = _sprintSpeed;
             }
@@ -412,7 +411,7 @@ namespace Hellfire.Player
             float speedMultiplier = 1.0f;
             if (_playerStats != null)
             {
-                speedMultiplier = _playerStats.MoveSpeedMultiplier.Value;
+                speedMultiplier = _playerStats.IsSpawned ? _playerStats.MoveSpeedMultiplier.Value : _playerStats.GetBaseSpeedMultiplier();
             }
             if (_buffManager != null)
             {
@@ -427,23 +426,20 @@ namespace Hellfire.Player
             bool grounded = _characterController.isGrounded;
             if (grounded && _verticalVelocity < 0f)
             {
-                // Giữ lực dính mặt đất nhẹ
-                _verticalVelocity = -2f;
+                _verticalVelocity = -2f; // Giữ chặt nhân vật xuống dốc/mặt phẳng
             }
 
-            // 5. Xử lý nhảy: v = sqrt(2 * |g| * h) (Mục 1.3)
-            bool jumpPressed = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
-            if (jumpPressed && grounded)
+            // 5. Xử lý nhảy (Space)
+            if (grounded && Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
-                _verticalVelocity = Mathf.Sqrt(2f * Mathf.Abs(_gravity) * _jumpHeight);
+                _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
             }
 
-            // Áp dụng trọng lực
             _verticalVelocity += _gravity * Time.deltaTime;
 
-            // 6. Di chuyển CharacterController
-            Vector3 velocity = moveDirection * currentSpeed + Vector3.up * _verticalVelocity;
-            _characterController.Move(velocity * Time.deltaTime);
+            // 6. Thực thi di chuyển CharacterController
+            Vector3 finalMovement = moveDirection * currentSpeed + Vector3.up * _verticalVelocity;
+            _characterController.Move(finalMovement * Time.deltaTime);
         }
 
         private void ApplyGravityOnly()
@@ -454,11 +450,7 @@ namespace Hellfire.Player
             {
                 _verticalVelocity = -2f;
             }
-            else
-            {
-                _verticalVelocity += _gravity * Time.deltaTime;
-            }
-
+            _verticalVelocity += _gravity * Time.deltaTime;
             _characterController.Move(Vector3.up * (_verticalVelocity * Time.deltaTime));
         }
     }

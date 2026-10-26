@@ -30,8 +30,14 @@ namespace Hellfire.Combat
         [Header("Visual Effects (Cosmetic)")]
         [SerializeField] private float _tracerDuration = 0.05f;
 
-        // ================= GLOBAL WEAPON STATS (SERVER-AUTHORITATIVE) =================
-        // Áp dụng cho TOÀN BỘ vũ khí của người chơi. Khi đổi súng vẫn giữ nguyên toàn bộ nâng cấp!
+        // ================= GLOBAL WEAPON STATS (FALLBACK OFFLINE + NETWORK VARIABLES) =================
+        private float _rawGlobalDamageMultiplier = 1.0f;
+        private float _rawGlobalAttackSpeedMultiplier = 1.0f;
+        private float _rawGlobalArmorPenetration = 0f;
+        private float _rawGlobalCritChanceBonus = 0f;
+        private float _rawGlobalCritMultiplierBonus = 0f;
+        private int _rawGlobalUpgradeLevel = 0;
+
         public NetworkVariable<float> GlobalDamageMultiplierNet { get; } = new NetworkVariable<float>(
             1.0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
         );
@@ -55,6 +61,14 @@ namespace Hellfire.Combat
         public NetworkVariable<int> GlobalUpgradeLevelNet { get; } = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
         );
+
+        // Safe Accessors cho chỉ số hỏa lực toàn cục (hỗ trợ đọc an toàn cả Online lẫn Offline)
+        public float GlobalDamageMultiplier => IsSpawned ? GlobalDamageMultiplierNet.Value : _rawGlobalDamageMultiplier;
+        public float GlobalAttackSpeedMultiplier => IsSpawned ? GlobalAttackSpeedMultiplierNet.Value : _rawGlobalAttackSpeedMultiplier;
+        public float GlobalArmorPenetration => IsSpawned ? GlobalArmorPenetrationNet.Value : _rawGlobalArmorPenetration;
+        public float GlobalCritChanceBonus => IsSpawned ? GlobalCritChanceBonusNet.Value : _rawGlobalCritChanceBonus;
+        public float GlobalCritMultiplierBonus => IsSpawned ? GlobalCritMultiplierBonusNet.Value : _rawGlobalCritMultiplierBonus;
+        public int GlobalUpgradeLevel => IsSpawned ? GlobalUpgradeLevelNet.Value : _rawGlobalUpgradeLevel;
 
         // Danh sách Modifier toàn cục (gắn ngọc/phụ kiện có hiệu lực trên mọi khẩu súng)
         private readonly List<IWeaponModifier> _globalModifiers = new List<IWeaponModifier>();
@@ -85,7 +99,6 @@ namespace Hellfire.Combat
 
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
-        public int GlobalUpgradeLevel => GlobalUpgradeLevelNet.Value;
 
         private void Awake()
         {
@@ -112,17 +125,32 @@ namespace Hellfire.Combat
             if (_buffManager == null) _buffManager = GetComponent<PlayerBuffManager>();
         }
 
-        public override void OnNetworkSpawn()
+        private void Start()
         {
-            AutoResolveReferences();
-
-            // Khởi tạo danh sách RuntimeWeapon từ danh sách ScriptableObject tĩnh
-            _runtimeWeapons.Clear();
-            for (int i = 0; i < _availableWeapons.Count; i++)
+            if (GameModeHelper.IsOffline && !IsSpawned)
             {
-                if (_availableWeapons[i] != null)
+                InitializeWeapons();
+                if (OfflineManager.Instance != null && OfflineManager.Instance.InitialWeaponIndex >= 0 && OfflineManager.Instance.InitialWeaponIndex < _availableWeapons.Count)
                 {
-                    _runtimeWeapons.Add(new RuntimeWeapon(_availableWeapons[i]));
+                    _currentWeaponIndex = OfflineManager.Instance.InitialWeaponIndex;
+                    _currentWeapon = _availableWeapons[_currentWeaponIndex];
+                    _currentAmmo = _currentWeapon.MagSize;
+                }
+                UpdateWeaponVisuals(_currentWeaponIndex);
+                NotifyWeaponUI();
+            }
+        }
+
+        private void InitializeWeapons()
+        {
+            if (_runtimeWeapons.Count == 0)
+            {
+                for (int i = 0; i < _availableWeapons.Count; i++)
+                {
+                    if (_availableWeapons[i] != null)
+                    {
+                        _runtimeWeapons.Add(new RuntimeWeapon(_availableWeapons[i]));
+                    }
                 }
             }
 
@@ -131,15 +159,29 @@ namespace Hellfire.Combat
                 _currentWeapon = _availableWeapons[0];
             }
 
-            if (_currentWeapon != null)
+            if (_currentWeapon != null && _currentAmmo <= 0)
             {
                 _currentAmmo = _currentWeapon.MagSize;
             }
+        }
+
+        public override void OnNetworkSpawn()
+        {
+            AutoResolveReferences();
+            InitializeWeapons();
+
+            _rawGlobalDamageMultiplier = GlobalDamageMultiplierNet.Value;
+            _rawGlobalAttackSpeedMultiplier = GlobalAttackSpeedMultiplierNet.Value;
+            _rawGlobalArmorPenetration = GlobalArmorPenetrationNet.Value;
+            _rawGlobalCritChanceBonus = GlobalCritChanceBonusNet.Value;
+            _rawGlobalCritMultiplierBonus = GlobalCritMultiplierBonusNet.Value;
+            _rawGlobalUpgradeLevel = GlobalUpgradeLevelNet.Value;
 
             GlobalUpgradeLevelNet.OnValueChanged += HandleGlobalUpgradeLevelChanged;
 
             if (IsOwner)
             {
+                UpdateWeaponVisuals(_currentWeaponIndex);
                 NotifyWeaponUI();
             }
         }
@@ -151,6 +193,7 @@ namespace Hellfire.Combat
 
         private void HandleGlobalUpgradeLevelChanged(int prevVal, int newVal)
         {
+            _rawGlobalUpgradeLevel = newVal;
             if (IsOwner)
             {
                 NotifyWeaponUI();
@@ -162,11 +205,18 @@ namespace Hellfire.Combat
         {
             if (!GameModeHelper.CanLocalControl(this)) return;
 
-            // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn / nạp đạn
-            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn / nạp đạn (kiểm tra an toàn cả Online lẫn Offline)
+            if (_playerHealth != null)
             {
-                if (_isReloading) CancelReload();
-                return;
+                bool isDownedOrDead = _playerHealth.IsSpawned
+                    ? (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value)
+                    : (_playerHealth.IsDownedValue || _playerHealth.IsDeadValue);
+
+                if (isDownedOrDead)
+                {
+                    if (_isReloading) CancelReload();
+                    return;
+                }
             }
 
             HandleWeaponSwitching();
@@ -196,8 +246,26 @@ namespace Hellfire.Combat
             _isReloading = false;
             _nextFireTime = Time.time + 0.15f;
 
+            UpdateWeaponVisuals(index);
             NotifyWeaponUI();
-            Debug.Log($"[WeaponController] Đã đổi sang vũ khí: {_currentWeapon.WeaponName} (Kế thừa Nâng cấp Level {GlobalUpgradeLevelNet.Value})");
+
+            if (!GameModeHelper.IsOffline && IsSpawned)
+            {
+                SwitchWeaponServerRpc(index);
+            }
+
+            Debug.Log($"[WeaponController] Đã đổi sang vũ khí: {_currentWeapon.WeaponName} (Kế thừa Nâng cấp Level {GlobalUpgradeLevel})");
+        }
+
+        public void UpdateWeaponVisuals(int index)
+        {
+            // Placeholder/Mở rộng thay đổi Mesh súng tương ứng nếu có
+        }
+
+        [ServerRpc]
+        private void SwitchWeaponServerRpc(int index)
+        {
+            SwitchWeaponClientRpc(index);
         }
 
         public bool HasWeapon(WeaponData weapon)
@@ -330,11 +398,14 @@ namespace Hellfire.Combat
 
         private void ExecuteRangedFire()
         {
-            _currentAmmo = Mathf.Max(0, _currentAmmo - 1);
+            if (OfflineManager.Instance == null || !OfflineManager.Instance.InfiniteAmmo)
+            {
+                _currentAmmo = Mathf.Max(0, _currentAmmo - 1);
+            }
             OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
 
             // Tính toán tốc độ ra đòn kết hợp hệ số tốc bắn toàn cục
-            float finalAps = _currentWeapon.AttackRateAPS * GlobalAttackSpeedMultiplierNet.Value;
+            float finalAps = _currentWeapon.AttackRateAPS * GlobalAttackSpeedMultiplier;
             _nextFireTime = Time.time + (1.0f / Mathf.Max(0.1f, finalAps));
 
             if (_audioSource != null && _currentWeapon.FireSound != null)
@@ -357,20 +428,32 @@ namespace Hellfire.Combat
             }
 
             // Gửi ServerRpc yêu cầu Server xác thực độc lập hoặc chạy cục bộ khi Offline
-            if (GameModeHelper.IsOffline)
+            Vector3 clientOrigin = cameraPos;
+            Vector3 baseDirection = cameraForward;
+            if (GameModeHelper.IsOffline || !IsSpawned)
             {
-                ExecuteHitscanFireLogic(cameraPos, cameraForward, seed, _currentWeaponIndex);
+                // XỬ LÝ OFFLINE: Thực thi raycast trừ máu quái trực tiếp tại máy cục bộ
+                ExecuteOfflineHitscan(clientOrigin, baseDirection, seed, _currentWeaponIndex);
             }
             else
             {
-                FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+                // XỬ LÝ ONLINE: Gửi gói tin RPC lên Server kiểm duyệt
+                FireServerRpc(clientOrigin, baseDirection, seed, _currentWeaponIndex);
             }
 
-            // Khi đạn hiện tại về 0: Tự động bắt đầu nạp đạn ngay lập tức
-            if (_currentAmmo <= 0)
+            // Khi đạn hiện tại về 0: Tự động bắt đầu nạp đạn ngay lập tức (nếu không phải infinite ammo)
+            if (_currentAmmo <= 0 && (OfflineManager.Instance == null || !OfflineManager.Instance.InfiniteAmmo))
             {
                 StartReload();
             }
+        }
+
+        /// <summary>
+        /// Xử lý Offline: Thực thi raycast trừ máu quái trực tiếp tại máy cục bộ (không RPC).
+        /// </summary>
+        public void ExecuteOfflineHitscan(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
+        {
+            ExecuteHitscanFireLogic(clientOrigin, baseDirection, seed, weaponIndex);
         }
 
         [ServerRpc]
@@ -386,13 +469,17 @@ namespace Hellfire.Combat
 
             WeaponData weaponToUse = rw.BaseData;
 
-            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            if (_playerHealth != null)
             {
-                return;
+                bool isDownedOrDead = _playerHealth.IsSpawned
+                    ? (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value)
+                    : (_playerHealth.IsDownedValue || _playerHealth.IsDeadValue);
+
+                if (isDownedOrDead) return;
             }
 
             // Tính sát thương kết hợp Nâng Cấp Toàn Cục và Bùa Cuồng Nộ nếu có
-            float armorPen = weaponToUse.ArmorPenetration + GlobalArmorPenetrationNet.Value;
+            float armorPen = weaponToUse.ArmorPenetration + GlobalArmorPenetration;
             int pellets = weaponToUse.PelletCount;
             float range = weaponToUse.Range;
 
@@ -406,9 +493,14 @@ namespace Hellfire.Combat
                     if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)
                     {
                         var hitHealth = hit.collider.GetComponentInParent<Health>();
+                        if (hitHealth != null && hitHealth == _playerHealth)
+                        {
+                            continue; // Bỏ qua chính bản thân
+                        }
+
                         if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
                         {
-                            if (GameModeHelper.IsOffline)
+                            if (GameModeHelper.IsOffline || !IsSpawned)
                                 SpawnImpactEffectInternal(hit.point, hit.normal, true);
                             else
                                 SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
@@ -418,11 +510,11 @@ namespace Hellfire.Combat
 
                     // 2. Tính sát thương (kết hợp Global Stats và Modifier toàn cục)
                     float attackDamage = rw.CalculateAttackDamage(
-                        GlobalDamageMultiplierNet.Value,
-                        GlobalAttackSpeedMultiplierNet.Value,
-                        GlobalArmorPenetrationNet.Value,
-                        GlobalCritChanceBonusNet.Value,
-                        GlobalCritMultiplierBonusNet.Value,
+                        GlobalDamageMultiplier,
+                        GlobalAttackSpeedMultiplier,
+                        GlobalArmorPenetration,
+                        GlobalCritChanceBonus,
+                        GlobalCritMultiplierBonus,
                         _globalModifiers,
                         out bool isCrit
                     );
@@ -442,7 +534,7 @@ namespace Hellfire.Combat
 
                         rw.NotifyHit(payload, hitbox.Damageable, _globalModifiers);
 
-                        if (GameModeHelper.IsOffline)
+                        if (GameModeHelper.IsOffline || !IsSpawned)
                         {
                             OnHitTargetConfirmed?.Invoke(hitbox.Type == HitboxType.Head);
                             SpawnImpactEffectInternal(hit.point, hit.normal, true);
@@ -463,7 +555,7 @@ namespace Hellfire.Combat
 
                             rw.NotifyHit(payload, damageable, _globalModifiers);
 
-                            if (GameModeHelper.IsOffline)
+                            if (GameModeHelper.IsOffline || !IsSpawned)
                             {
                                 OnHitTargetConfirmed?.Invoke(false);
                                 SpawnImpactEffectInternal(hit.point, hit.normal, true);
@@ -476,7 +568,7 @@ namespace Hellfire.Combat
                         }
                         else
                         {
-                            if (GameModeHelper.IsOffline)
+                            if (GameModeHelper.IsOffline || !IsSpawned)
                                 SpawnImpactEffectInternal(hit.point, hit.normal, false);
                             else
                                 SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
@@ -510,18 +602,34 @@ namespace Hellfire.Combat
         {
             if (!GameModeHelper.IsServerOrOffline)
             {
-                Debug.LogWarning("[WeaponController] Chỉ Server mới có quyền nâng cấp vũ khí!");
+                Debug.LogWarning("[WeaponController] Chỉ Server hoặc Offline mới có quyền nâng cấp vũ khí!");
                 return;
             }
 
-            GlobalDamageMultiplierNet.Value += bonusDamagePercent;
-            GlobalAttackSpeedMultiplierNet.Value += bonusApsPercent;
-            GlobalArmorPenetrationNet.Value += bonusArmorPen;
-            GlobalCritChanceBonusNet.Value = Mathf.Clamp01(GlobalCritChanceBonusNet.Value + bonusCritChance);
-            GlobalCritMultiplierBonusNet.Value += bonusCritMultiplier;
-            GlobalUpgradeLevelNet.Value += 1;
+            if (IsSpawned)
+            {
+                GlobalDamageMultiplierNet.Value += bonusDamagePercent;
+                GlobalAttackSpeedMultiplierNet.Value += bonusApsPercent;
+                GlobalArmorPenetrationNet.Value += bonusArmorPen;
+                GlobalCritChanceBonusNet.Value = Mathf.Clamp01(GlobalCritChanceBonusNet.Value + bonusCritChance);
+                GlobalCritMultiplierBonusNet.Value += bonusCritMultiplier;
+                GlobalUpgradeLevelNet.Value += 1;
+            }
 
-            Debug.Log($"[WeaponController] Client {OwnerClientId} nâng cấp Vũ khí Toàn Cục lên Level {GlobalUpgradeLevelNet.Value} " +
+            _rawGlobalDamageMultiplier += bonusDamagePercent;
+            _rawGlobalAttackSpeedMultiplier += bonusApsPercent;
+            _rawGlobalArmorPenetration += bonusArmorPen;
+            _rawGlobalCritChanceBonus = Mathf.Clamp01(_rawGlobalCritChanceBonus + bonusCritChance);
+            _rawGlobalCritMultiplierBonus += bonusCritMultiplier;
+            _rawGlobalUpgradeLevel += 1;
+
+            if (GameModeHelper.IsOffline || !IsSpawned)
+            {
+                NotifyWeaponUI();
+                OnWeaponUpgraded?.Invoke(GlobalUpgradeLevel);
+            }
+
+            Debug.Log($"[WeaponController] Nâng cấp Vũ khí Toàn Cục lên Level {GlobalUpgradeLevel} " +
                       $"(Dame: +{Mathf.RoundToInt(bonusDamagePercent * 100)}%, APS: +{Mathf.RoundToInt(bonusApsPercent * 100)}%, Pen: +{bonusArmorPen})");
         }
 

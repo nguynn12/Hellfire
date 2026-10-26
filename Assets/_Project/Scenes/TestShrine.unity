@@ -337,6 +337,53 @@ Transform:
   - {fileID: 1255134639}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &647093426
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 647093428}
+  - component: {fileID: 647093427}
+  m_Layer: 0
+  m_Name: OfflineManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &647093427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 647093426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 870d0ea023d231448bfbea5438280ba7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Networking.OfflineManager
+  _godMode: 0
+  _infiniteAmmo: 0
+  _initialWeaponIndex: 0
+--- !u!4 &647093428
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 647093426}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 22.23, y: 1.47, z: 25.28}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &770700181
 GameObject:
   m_ObjectHideFlags: 0
@@ -1184,6 +1231,18 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7788966717535816811, guid: c212b291d5c4d6548a3f0e88a7ff141d, type: 3}
+      propertyPath: _usedColor.b
+      value: 0.27678213
+      objectReference: {fileID: 0}
+    - target: {fileID: 7788966717535816811, guid: c212b291d5c4d6548a3f0e88a7ff141d, type: 3}
+      propertyPath: _usedColor.g
+      value: 0.17412782
+      objectReference: {fileID: 0}
+    - target: {fileID: 7788966717535816811, guid: c212b291d5c4d6548a3f0e88a7ff141d, type: 3}
+      propertyPath: _usedColor.r
+      value: 0.8584906
+      objectReference: {fileID: 0}
+    - target: {fileID: 7788966717535816811, guid: c212b291d5c4d6548a3f0e88a7ff141d, type: 3}
       propertyPath: _activeGlowColor.b
       value: 1
       objectReference: {fileID: 0}
@@ -1213,3 +1272,4 @@ SceneRoots:
   - {fileID: 4927533113966323211}
   - {fileID: 1144022710}
   - {fileID: 2109885146}
+  - {fileID: 647093428}

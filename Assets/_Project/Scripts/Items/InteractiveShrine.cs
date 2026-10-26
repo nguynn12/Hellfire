@@ -47,8 +47,6 @@ namespace Hellfire.Items
         [Header("Local Visuals (Chỉ tắt trên máy người đã dùng)")]
         [SerializeField] private GameObject _flameVisual;
         [SerializeField] private Light _shrineLight;
-        [SerializeField] private Renderer _shrineRenderer;
-        [SerializeField] private Color _usedColor = new Color(0.3f, 0.3f, 0.3f, 1f);
 
         [Header("Glow & Lighting (Tùy biến màu phát sáng)")]
         [Tooltip("Thành phần điều khiển phát sáng tái sử dụng (Tùy chọn)")]
@@ -61,12 +59,6 @@ namespace Hellfire.Items
 
         [SerializeField] private AudioSource _audioSource;
         [SerializeField] private AudioClip _interactSound;
-
-        private MaterialPropertyBlock _shrinePropBlock;
-        private MaterialPropertyBlock _flamePropBlock;
-        private static readonly int BaseColorPropId = Shader.PropertyToID("_BaseColor");
-        private static readonly int LegacyColorPropId = Shader.PropertyToID("_Color");
-        private static readonly int EmissionColorPropId = Shader.PropertyToID("_EmissionColor");
 
         private bool _isUsedByLocalPlayer = false;
         private bool _isLocalPlayerInRange = false;
@@ -96,6 +88,7 @@ namespace Hellfire.Items
             if (_promptText == null) _promptText = GetComponentInChildren<TextMeshPro>();
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             if (_glowController == null) _glowController = GetComponentInChildren<GlowLightController>();
+            if (_shrineLight == null) _shrineLight = GetComponentInChildren<Light>();
 
             // Tự động tạo 3D Text Prompt nếu chưa có
             if (_promptText == null)
@@ -113,14 +106,25 @@ namespace Hellfire.Items
 
         private void Start()
         {
-            // Tự động sinh ID duy nhất dựa theo toạ độ thế giới nếu chưa được gán ID riêng (Khắc phục Lỗi 07)
-            if (_shrineId == 1)
+            // Tự động sinh ID duy nhất dựa theo NetworkObjectId hoặc toạ độ thế giới nếu chưa được gán ID riêng (Khắc phục Lỗi 07)
+            if (_shrineId <= 1)
             {
-                int posHash = (Mathf.RoundToInt(transform.position.x * 10f) * 73856093) ^ 
-                              (Mathf.RoundToInt(transform.position.z * 10f) * 19349663);
-                if (posHash != 0)
+                if (NetworkObject != null && NetworkObject.IsSpawned && NetworkObjectId > 0)
                 {
-                    _shrineId = Mathf.Abs(posHash) % 100000 + 1;
+                    _shrineId = (int)(NetworkObjectId % 1000000) + 1;
+                }
+                else
+                {
+                    int posHash = (Mathf.RoundToInt(transform.position.x * 10f) * 73856093) ^ 
+                                  (Mathf.RoundToInt(transform.position.z * 10f) * 19349663);
+                    if (posHash != 0)
+                    {
+                        _shrineId = Mathf.Abs(posHash) % 100000 + 1;
+                    }
+                    else
+                    {
+                        _shrineId = UnityEngine.Random.Range(100, 99999);
+                    }
                 }
             }
 
@@ -199,20 +203,10 @@ namespace Hellfire.Items
                 _shrineLight.enabled = true;
             }
 
-            // 2. Đổi màu và phát sáng quả cầu lửa FlameVisual (Emission)
+            // 2. Kích hoạt ngọn lửa / hiệu ứng phát sáng FlameVisual (giữ nguyên Material gốc của model)
             if (_flameVisual != null)
             {
                 _flameVisual.SetActive(true);
-                var flameRenderer = _flameVisual.GetComponent<Renderer>();
-                if (flameRenderer != null)
-                {
-                    if (_flamePropBlock == null) _flamePropBlock = new MaterialPropertyBlock();
-                    flameRenderer.GetPropertyBlock(_flamePropBlock);
-                    _flamePropBlock.SetColor(BaseColorPropId, glow);
-                    _flamePropBlock.SetColor(LegacyColorPropId, glow);
-                    _flamePropBlock.SetColor(EmissionColorPropId, glow * 2.5f); // Phát sáng HDR
-                    flameRenderer.SetPropertyBlock(_flamePropBlock);
-                }
             }
         }
 
@@ -241,6 +235,10 @@ namespace Hellfire.Items
 
         public override void OnNetworkSpawn()
         {
+            if (_shrineId <= 1 && NetworkObjectId > 0)
+            {
+                _shrineId = (int)(NetworkObjectId % 1000000) + 1;
+            }
             GenerateOptions();
             StartCoroutine(CheckLocalUsageDelayed());
         }
@@ -469,13 +467,13 @@ namespace Hellfire.Items
         {
             if (_isUsedByLocalPlayer) return;
 
-            if (!GameModeHelper.IsOffline && IsSpawned && NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            if (GameModeHelper.IsOffline || !IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
             {
-                InteractServerRpc(choiceIndex);
+                ApplyUpgradeOffline(choiceIndex);
             }
             else
             {
-                ApplyUpgradeOffline(choiceIndex);
+                InteractServerRpc(choiceIndex);
             }
         }
 
@@ -802,18 +800,12 @@ namespace Hellfire.Items
                 _glowController.Extinguish();
             }
 
-            if (_flameVisual != null) _flameVisual.SetActive(false);
+            if (_flameVisual != null)
+            {
+                _flameVisual.SetActive(false);
+            }
             if (_shrineLight != null) _shrineLight.enabled = false;
             if (_promptText != null) _promptText.gameObject.SetActive(false);
-
-            if (_shrineRenderer != null)
-            {
-                if (_shrinePropBlock == null) _shrinePropBlock = new MaterialPropertyBlock();
-                _shrineRenderer.GetPropertyBlock(_shrinePropBlock);
-                _shrinePropBlock.SetColor(BaseColorPropId, _usedColor);
-                _shrinePropBlock.SetColor(LegacyColorPropId, _usedColor);
-                _shrineRenderer.SetPropertyBlock(_shrinePropBlock);
-            }
 
             if (_audioSource != null && _interactSound != null)
             {

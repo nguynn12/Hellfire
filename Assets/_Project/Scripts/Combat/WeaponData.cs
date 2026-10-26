@@ -81,12 +81,57 @@ namespace Hellfire.Combat
         [Tooltip("Góc quét hình nón trước mặt nhân vật (độ)")]
         [SerializeField] private float _meleeSwingAngle = 70.0f;
 
-        [Header("Visual & Audio Assets")]
+        [Header("Visual & Effects Assets")]
         [SerializeField] private GameObject _viewmodelPrefab;
         [SerializeField] private GameObject _worldModelPrefab;
+        [SerializeField] private GameObject _muzzleFlashPrefab;
+        [SerializeField] private GameObject _tracerPrefab;
+        [SerializeField] private GameObject _impactEffectPrefab;
+        [SerializeField] private GameObject _fleshImpactEffectPrefab;
+        [SerializeField] private GameObject _casingPrefab;
+
+        [Header("Model Alignment & ADS (Góc nhìn & Ngắm bắn)")]
+        [Tooltip("Độ lệch vị trí khi cầm súng thông thường")]
+        [SerializeField] private Vector3 _viewmodelOffset = Vector3.zero;
+        [Tooltip("Độ lệch góc xoay khi cầm súng thông thường")]
+        [SerializeField] private Vector3 _viewmodelRotation = Vector3.zero;
+        [Tooltip("Bật chế độ ngắm bắn qua đầu ruồi/ống ngắm (ADS)")]
+        [SerializeField] private bool _hasAds = true;
+        [Tooltip("Vị trí dịch chuyển cục bộ khi ngắm ADS để đưa thước ngắm về giữa màn hình")]
+        [SerializeField] private Vector3 _adsOffset = new Vector3(-0.25f, 0.05f, 0.05f);
+        [Tooltip("Góc nhìn FOV của camera khi ngắm ADS")]
+        [Range(30f, 85f)]
+        [SerializeField] private float _adsFov = 65.0f;
+        [Tooltip("Hệ số thu hẹp độ phân tán đạn khi ngắm ADS (0.35 = giảm 65% spread)")]
+        [Range(0.05f, 1f)]
+        [SerializeField] private float _adsSpreadMultiplier = 0.35f;
+
+        [Header("Recoil & Procedural Kickback (Độ giật súng & Camera)")]
+        [Tooltip("Lực nảy giật lùi về phía sau của viewmodel khi bắn (mét)")]
+        [SerializeField] private float _kickbackForce = 0.05f;
+        [Tooltip("Góc nảy ngửa lên trên của viewmodel khi bắn (độ)")]
+        [SerializeField] private float _kickbackAngle = 2.0f;
+        [Tooltip("Độ nảy ngửa góc nhìn camera khi bóp cò (độ)")]
+        [SerializeField] private float _cameraRecoilPitch = 1.0f;
+        [Tooltip("Độ lắc ngang ngẫu nhiên của camera khi bóp cò (độ)")]
+        [SerializeField] private float _cameraRecoilYaw = 0.25f;
+        [Tooltip("Tốc độ hồi tâm súng và camera về vị trí cũ")]
+        [SerializeField] private float _recoilRecoverySpeed = 12.0f;
+
+        [Header("Ballistics & Damage Falloff (Giảm sát thương theo cự ly)")]
+        [Tooltip("Tầm bắn hiệu quả tối đa giữ 100% sát thương (mét)")]
+        [SerializeField] private float _effectiveRange = 30.0f;
+        [Tooltip("Hệ số sát thương tối thiểu khi bắn vượt quá tầm bắn hiệu quả (0.3 = 30% dame)")]
+        [Range(0.1f, 1.0f)]
+        [SerializeField] private float _minDamageMultiplier = 0.3f;
+
+        [Header("Audio Assets & Variations")]
         [SerializeField] private AudioClip _fireSound;
+        [Tooltip("Mảng các biến thể âm thanh bắn để phát ngẫu nhiên tránh đơn điệu")]
+        [SerializeField] private AudioClip[] _fireSounds;
         [SerializeField] private AudioClip _reloadSound;
         [SerializeField] private AudioClip _emptySound;
+        [SerializeField] private AudioClip _meleeSwingSound;
 
         // Getters
         public string WeaponName => _weaponName;
@@ -118,9 +163,46 @@ namespace Hellfire.Combat
 
         public GameObject ViewmodelPrefab => _viewmodelPrefab;
         public GameObject WorldModelPrefab => _worldModelPrefab;
+        public GameObject MuzzleFlashPrefab => _muzzleFlashPrefab;
+        public GameObject TracerPrefab => _tracerPrefab;
+        public GameObject ImpactEffectPrefab => _impactEffectPrefab;
+        public GameObject FleshImpactEffectPrefab => _fleshImpactEffectPrefab;
+        public GameObject CasingPrefab => _casingPrefab;
+
+        public Vector3 ViewmodelOffset => _viewmodelOffset;
+        public Vector3 ViewmodelRotation => _viewmodelRotation;
+        public bool HasAds => _hasAds;
+        public Vector3 AdsOffset => _adsOffset;
+        public float AdsFov => _adsFov > 10f ? _adsFov : 65.0f;
+        public float AdsSpreadMultiplier => Mathf.Clamp(_adsSpreadMultiplier, 0.05f, 1.0f);
+
+        public float KickbackForce => Mathf.Max(0f, _kickbackForce);
+        public float KickbackAngle => Mathf.Max(0f, _kickbackAngle);
+        public float CameraRecoilPitch => Mathf.Max(0f, _cameraRecoilPitch);
+        public float CameraRecoilYaw => Mathf.Max(0f, _cameraRecoilYaw);
+        public float RecoilRecoverySpeed => _recoilRecoverySpeed > 0.1f ? _recoilRecoverySpeed : 12.0f;
+
+        public float EffectiveRange => _effectiveRange > 0.1f ? _effectiveRange : (_range * 0.4f);
+        public float MinDamageMultiplier => Mathf.Clamp(_minDamageMultiplier, 0.1f, 1.0f);
+
         public AudioClip FireSound => _fireSound;
+        public AudioClip[] FireSounds => _fireSounds;
         public AudioClip ReloadSound => _reloadSound;
         public AudioClip EmptySound => _emptySound;
+        public AudioClip MeleeSwingSound => _meleeSwingSound;
+
+        /// <summary>
+        /// Lấy ngẫu nhiên âm thanh bắn từ danh sách hoặc trả về âm thanh mặc định.
+        /// </summary>
+        public AudioClip GetRandomFireSound()
+        {
+            if (_fireSounds != null && _fireSounds.Length > 0)
+            {
+                int idx = UnityEngine.Random.Range(0, _fireSounds.Length);
+                if (_fireSounds[idx] != null) return _fireSounds[idx];
+            }
+            return _fireSound;
+        }
 
         /// <summary>
         /// Tính toán hệ số nhân sát thương theo loại Hitbox.
