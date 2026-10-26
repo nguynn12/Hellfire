@@ -37,18 +37,20 @@ namespace Hellfire.Combat
         public void SetDamageableTarget(Component target)
         {
             _damageableTarget = target;
-            ResolveDamageable();
+            _damageable = target as IDamageable;
         }
 
         private void ResolveDamageable()
         {
-            if (_damageableTarget != null && _damageableTarget is IDamageable d)
+            if (_damageableTarget != null)
             {
-                _damageable = d;
-                return;
+                _damageable = _damageableTarget as IDamageable;
+                if (_damageable != null) return;
             }
 
-            _damageable = GetComponentInParent<IDamageable>();
+            _damageable = GetComponent<IDamageable>();
+            if (_damageable == null) _damageable = GetComponentInParent<IDamageable>();
+
             if (_damageable is Component c)
             {
                 _damageableTarget = c;

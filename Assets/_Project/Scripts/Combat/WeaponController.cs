@@ -40,10 +40,14 @@ namespace Hellfire.Combat
         public event Action<string> OnWeaponChanged;               // weaponName
         public event Action<bool> OnReloadStateChanged;           // isReloading
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
+        public event Action OnWeaponFired;                        // Đợt 1: Kích hoạt hiệu ứng giật súng (Recoil)
+        public event Action<Vector3, Vector3> OnTracerRequested;  // start, end (VFX Tracer)
+        public event Action<Vector3, Vector3, bool> OnImpactRequested; // point, normal, isFlesh (VFX Impact)
 
         public WeaponData CurrentWeaponData => _currentWeapon;
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
+        public bool IsAimingDownSights { get; set; }              // Đợt 1: Trạng thái ngắm bắn (ADS)
         private Player.PlayerBuffManager _buffManager;
 
         private void Awake()
@@ -64,10 +68,45 @@ namespace Hellfire.Combat
 
             if (_weaponMuzzlePoint == null)
             {
-                var viewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel/GunMesh");
-                if (viewmodel != null) _weaponMuzzlePoint = viewmodel;
+                var shootFx = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel/RifleMesh/WeaponGrip/ShootFX");
+                if (shootFx != null)
+                {
+                    _weaponMuzzlePoint = shootFx;
+                }
+                else
+                {
+                    var viewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel/GunMesh");
+                    if (viewmodel != null) _weaponMuzzlePoint = viewmodel;
+                }
             }
             if (_buffManager == null) _buffManager = GetComponent<Player.PlayerBuffManager>();
+        }
+
+        public bool IsLocallyControlled => !IsSpawned || IsOwner;
+
+        private void Start()
+        {
+            if (!IsSpawned)
+            {
+                InitializeOffline();
+            }
+        }
+
+        public void InitializeOffline()
+        {
+            AutoResolveReferences();
+
+            if (_availableWeapons.Count > 0 && _currentWeapon == null)
+            {
+                _currentWeapon = _availableWeapons[0];
+            }
+
+            if (_currentWeapon != null)
+            {
+                _currentAmmo = _currentWeapon.MagSize;
+            }
+
+            NotifyWeaponUI();
         }
 
         public override void OnNetworkSpawn()
@@ -92,13 +131,17 @@ namespace Hellfire.Combat
 
         private void Update()
         {
-            if (!IsOwner) return;
+            if (!IsLocallyControlled) return;
 
             // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn/nạp đạn (Mục 3.3)
-            if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
+            if (_playerHealth != null)
             {
-                if (_isReloading) CancelReload();
-                return;
+                IDamageable dmg = _playerHealth;
+                if (dmg.IsDowned || dmg.IsDead)
+                {
+                    if (_isReloading) CancelReload();
+                    return;
+                }
             }
 
             HandleWeaponSwitching();
@@ -127,6 +170,7 @@ namespace Hellfire.Combat
             _currentWeapon = _availableWeapons[index];
             _currentAmmo = _currentWeapon.MagSize;
             _isReloading = false;
+            IsAimingDownSights = false;
             _nextFireTime = Time.time + 0.15f;
 
             NotifyWeaponUI();
@@ -192,6 +236,7 @@ namespace Hellfire.Combat
         private void StartReload()
         {
             _isReloading = true;
+            IsAimingDownSights = false;
             _reloadTimer = _currentWeapon.ReloadTime;
             OnReloadStateChanged?.Invoke(true);
 
@@ -258,42 +303,88 @@ namespace Hellfire.Combat
             ExecuteFire();
         }
 
-        private void ExecuteFire()
+        public void ExecuteFire()
         {
             _currentAmmo--;
             _nextFireTime = Time.time + _currentWeapon.FireRate;
             OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
+            OnWeaponFired?.Invoke();
 
-            // 1. Client Cosmetic Visuals ngay lập tức (Mục 3.1 bước 2)
-            if (_audioSource != null && _currentWeapon.FireSound != null)
-            {
-                _audioSource.PlayOneShot(_currentWeapon.FireSound);
-            }
-
-            // Raycast origin là tâm camera người chơi (Mục 3.1)
+            // Tính toán đường đạn & Raycast từ tâm camera
             Vector3 cameraPos = _playerCamera.transform.position;
             Vector3 cameraForward = _playerCamera.transform.forward;
 
             int pellets = _currentWeapon.PelletCount;
             int seed = UnityEngine.Random.Range(0, 100000);
 
-            // Client vẽ tracer cục bộ
+            // Thu hẹp spread khi ngắm ADS
+            float effectiveSpread = IsAimingDownSights ? _currentWeapon.Spread * 0.5f : _currentWeapon.Spread;
             for (int i = 0; i < pellets; i++)
             {
-                Vector3 spreadDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
+                Vector3 spreadDir = CalculateSpreadDirection(cameraForward, effectiveSpread, seed + i);
                 Vector3 endPoint = cameraPos + spreadDir * _currentWeapon.Range;
 
-                // Client raycast tạm để vẽ tracer chạm tường/vật thể
-                if (Physics.Raycast(cameraPos, spreadDir, out var hit, _currentWeapon.Range))
+                bool hasHit = Physics.Raycast(cameraPos, spreadDir, out var hit, _currentWeapon.Range);
+                if (hasHit)
                 {
                     endPoint = hit.point;
                 }
 
-                DrawCosmeticTracer(GetMuzzlePosition(), endPoint);
+                // Gửi event để WeaponVisualEffects vẽ Bullet Tracer
+                OnTracerRequested?.Invoke(GetMuzzlePosition(), endPoint);
+
+                // Xử lý trúng đích cục bộ ngay khi chạy Offline trong scene test
+                if (!IsSpawned && hasHit)
+                {
+                    ProcessHitLocal(hit, spreadDir, _currentWeapon);
+                }
             }
 
-            // 2. Gửi ServerRpc yêu cầu Server xác thực độc lập (Mục 3.1 bước 4)
-            FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            // Nếu đang trong phòng Multiplayer, gửi ServerRpc để Server xác thực
+            if (IsSpawned)
+            {
+                FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            }
+        }
+
+        private void ProcessHitLocal(RaycastHit hit, Vector3 shootDir, WeaponData weapon)
+        {
+            // Kiểm tra Friendly Fire
+            if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<Player.PlayerMovement>() != null)
+            {
+                OnImpactRequested?.Invoke(hit.point, hit.normal, false);
+                return;
+            }
+
+            var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
+            float buffMultiplier = (_buffManager != null) ? _buffManager.DamageMultiplier : 1.0f;
+
+            if (hitbox != null)
+            {
+                float multiplier = weapon.GetMultiplier(hitbox.Type);
+                float damage = weapon.BaseDamage * multiplier * buffMultiplier;
+                hitbox.ForwardDamage(damage, 0);
+
+                OnHitTargetConfirmed?.Invoke(hitbox.Type == HitboxType.Head);
+                OnImpactRequested?.Invoke(hit.point, hit.normal, true);
+            }
+            else
+            {
+                var damageable = hit.collider.GetComponentInParent<IDamageable>();
+                if (damageable != null && !damageable.IsPlayerTarget)
+                {
+                    float damage = weapon.BaseDamage * weapon.GetMultiplier(HitboxType.Torso) * buffMultiplier;
+                    damageable.TakeDamage(damage, HitboxType.Torso, 0);
+
+                    OnHitTargetConfirmed?.Invoke(false);
+                    OnImpactRequested?.Invoke(hit.point, hit.normal, true);
+                }
+                else
+                {
+                    // Trúng môi trường / tường
+                    OnImpactRequested?.Invoke(hit.point, hit.normal, false);
+                }
+            }
         }
 
         private Vector3 GetMuzzlePosition()
@@ -321,29 +412,7 @@ namespace Hellfire.Combat
             return (baseDirection + offset).normalized;
         }
 
-        private void DrawCosmeticTracer(Vector3 start, Vector3 end)
-        {
-            StartCoroutine(TracerRoutine(start, end));
-        }
 
-        private IEnumerator TracerRoutine(Vector3 start, Vector3 end)
-        {
-            var tracerObj = new GameObject("Tracer");
-            var line = tracerObj.AddComponent<LineRenderer>();
-            line.startWidth = 0.04f;
-            line.endWidth = 0.01f;
-            line.positionCount = 2;
-            line.SetPosition(0, start);
-            line.SetPosition(1, end);
-
-            // Màu vàng cam vệt đạn
-            line.material = new Material(Shader.Find("Sprites/Default"));
-            line.startColor = new Color(1f, 0.9f, 0.4f, 0.9f);
-            line.endColor = new Color(1f, 0.4f, 0.1f, 0.1f);
-
-            yield return new WaitForSeconds(_tracerDuration);
-            Destroy(tracerObj);
-        }
 
         // ================= SERVER RPC & VALIDATION =================
 
@@ -442,27 +511,8 @@ namespace Hellfire.Combat
         [ClientRpc]
         private void SpawnImpactEffectClientRpc(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh)
         {
-            // Hiệu ứng tia lửa hoặc máu tại điểm trúng thực tế do Server xác thực
-            StartCoroutine(ImpactEffectRoutine(hitPoint, hitNormal, isFlesh));
-        }
-
-        private IEnumerator ImpactEffectRoutine(Vector3 pos, Vector3 normal, bool isFlesh)
-        {
-            var spark = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            spark.transform.position = pos;
-            spark.transform.localScale = Vector3.one * 0.08f;
-            var col = spark.GetComponent<Collider>();
-            if (col != null) Destroy(col);
-
-            var rend = spark.GetComponent<Renderer>();
-            if (rend != null)
-            {
-                rend.material = new Material(Shader.Find("Sprites/Default"));
-                rend.material.color = isFlesh ? new Color(0.9f, 0.1f, 0.1f, 1f) : new Color(1f, 0.8f, 0.2f, 1f);
-            }
-
-            yield return new WaitForSeconds(0.15f);
-            Destroy(spark);
+            // Báo event cho WeaponVisualEffects xử lý client-side
+            OnImpactRequested?.Invoke(hitPoint, hitNormal, isFlesh);
         }
 
         private void NotifyWeaponUI()

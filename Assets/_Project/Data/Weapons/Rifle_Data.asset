@@ -26,8 +26,18 @@ MonoBehaviour:
   _isAutomatic: 0
   _magSize: 10
   _reloadTime: 1.8
+  _recoilKickBack: 0.06
+  _recoilKickUp: 0.025
+  _recoilAngleX: 3.5
+  _recoilAngleY: 1
+  _recoilSnappiness: 22
+  _recoilReturnSpeed: 9
+  _adsPosition: {x: 0, y: -0.14, z: 0.38}
+  _adsRotation: {x: 0, y: 0, z: 0}
+  _adsFOV: 65
+  _adsSpeed: 12
   _viewmodelPrefab: {fileID: 0}
   _worldModelPrefab: {fileID: 0}
-  _fireSound: {fileID: 0}
+  _fireSound: {fileID: 8300000, guid: 04f2ad2e0c988dc42b7874ae0489b488, type: 3}
   _reloadSound: {fileID: 0}
   _emptySound: {fileID: 0}
