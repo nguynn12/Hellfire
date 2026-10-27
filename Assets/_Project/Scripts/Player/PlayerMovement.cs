@@ -109,11 +109,12 @@ namespace Hellfire.Player
 
         public override void OnDestroy()
         {
-            base.OnDestroy();
+            GameSettings.OnFOVChanged -= HandleFOVChanged;
             if (LocalInstance == this)
             {
                 LocalInstance = null;
             }
+            base.OnDestroy();
         }
 
         private void Start()
@@ -285,10 +286,6 @@ namespace Hellfire.Player
             GameSettings.OnFOVChanged -= HandleFOVChanged;
         }
 
-        private void OnDestroy()
-        {
-            GameSettings.OnFOVChanged -= HandleFOVChanged;
-        }
 
         private void HandleFOVChanged(float newFov)
         {
