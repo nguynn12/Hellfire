@@ -90,16 +90,8 @@ namespace Hellfire.Items
             if (_glowController == null) _glowController = GetComponentInChildren<GlowLightController>();
             if (_shrineLight == null) _shrineLight = GetComponentInChildren<Light>();
 
-            // Tự động tạo 3D Text Prompt nếu chưa có
-            if (_promptText == null)
+            if (_promptText != null)
             {
-                var textObj = new GameObject("PromptText");
-                textObj.transform.SetParent(transform, false);
-                textObj.transform.localPosition = new Vector3(0f, 2.2f, 0f);
-                _promptText = textObj.AddComponent<TextMeshPro>();
-                _promptText.fontSize = 4;
-                _promptText.alignment = TextAlignmentOptions.Center;
-                _promptText.color = Color.yellow;
                 _promptText.gameObject.SetActive(false);
             }
         }

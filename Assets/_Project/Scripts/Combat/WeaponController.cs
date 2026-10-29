@@ -23,12 +23,19 @@ namespace Hellfire.Combat
 
         [Header("References")]
         [SerializeField] private Camera _playerCamera;
+        [SerializeField] private Transform _weaponHolder;
+        [SerializeField] private Transform _worldWeaponHolder;
         [SerializeField] private Transform _weaponMuzzlePoint;
         [SerializeField] private Health _playerHealth;
         [SerializeField] private AudioSource _audioSource;
 
         [Header("Visual Effects (Cosmetic)")]
         [SerializeField] private float _tracerDuration = 0.05f;
+
+        private PlayerMovement _playerMovement;
+        private Hellfire.UI.WeaponCrosshairHUD _crosshairHud;
+        private Vector3 _recoilOffset;
+        private Vector3 _recoilRotation;
 
         // ================= GLOBAL WEAPON STATS (FALLBACK OFFLINE + NETWORK VARIABLES) =================
         private float _rawGlobalDamageMultiplier = 1.0f;
@@ -116,13 +123,25 @@ namespace Hellfire.Combat
                 _audioSource.spatialBlend = 0f;
             }
 
+            if (_weaponHolder == null)
+            {
+                _weaponHolder = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel");
+            }
+
             if (_weaponMuzzlePoint == null)
             {
                 var viewmodel = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel/GunMesh");
                 if (viewmodel != null) _weaponMuzzlePoint = viewmodel;
+                else if (_weaponHolder != null) _weaponMuzzlePoint = _weaponHolder;
             }
 
             if (_buffManager == null) _buffManager = GetComponent<PlayerBuffManager>();
+            if (_playerMovement == null) _playerMovement = GetComponent<PlayerMovement>();
+            if (_crosshairHud == null)
+            {
+                _crosshairHud = GetComponent<Hellfire.UI.WeaponCrosshairHUD>();
+                if (_crosshairHud == null) _crosshairHud = gameObject.AddComponent<Hellfire.UI.WeaponCrosshairHUD>();
+            }
         }
 
         private void Start()
@@ -222,6 +241,23 @@ namespace Hellfire.Combat
             HandleWeaponSwitching();
             HandleReloading();
             HandleAttackInput();
+            HandleRecoilRecovery();
+        }
+
+        private void HandleRecoilRecovery()
+        {
+            float recoverySpeed = _currentWeapon != null ? _currentWeapon.RecoilRecoverySpeed : 12f;
+            _recoilOffset = Vector3.Lerp(_recoilOffset, Vector3.zero, Time.deltaTime * recoverySpeed);
+            _recoilRotation = Vector3.Lerp(_recoilRotation, Vector3.zero, Time.deltaTime * recoverySpeed);
+
+            if (_currentViewmodelInstance != null)
+            {
+                Vector3 basePos = _currentWeapon != null ? _currentWeapon.ViewmodelOffset : Vector3.zero;
+                Vector3 baseRot = _currentWeapon != null ? _currentWeapon.ViewmodelRotation : Vector3.zero;
+
+                _currentViewmodelInstance.transform.localPosition = basePos + _recoilOffset;
+                _currentViewmodelInstance.transform.localRotation = Quaternion.Euler(baseRot + _recoilRotation);
+            }
         }
 
         private void HandleWeaponSwitching()
@@ -257,9 +293,159 @@ namespace Hellfire.Combat
             Debug.Log($"[WeaponController] Đã đổi sang vũ khí: {_currentWeapon.WeaponName} (Kế thừa Nâng cấp Level {GlobalUpgradeLevel})");
         }
 
+        private GameObject _currentViewmodelInstance;
+        private GameObject _currentWorldModelInstance;
+
         public void UpdateWeaponVisuals(int index)
         {
-            // Placeholder/Mở rộng thay đổi Mesh súng tương ứng nếu có
+            if (_weaponHolder == null)
+            {
+                _weaponHolder = transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel");
+            }
+            if (_weaponHolder == null) return;
+
+            // Đảm bảo WeaponViewmodel luôn chuẩn hóa rotation (0,0,0) chuẩn hệ FPS
+            _weaponHolder.localRotation = Quaternion.identity;
+
+            // 1. Tắt placeholder box GunMesh nếu có
+            var oldPlaceholder = _weaponHolder.Find("GunMesh");
+            if (oldPlaceholder != null)
+            {
+                oldPlaceholder.gameObject.SetActive(false);
+            }
+
+            // 2. Dọn dẹp model súng cũ
+            if (_currentViewmodelInstance != null)
+            {
+                Destroy(_currentViewmodelInstance);
+                _currentViewmodelInstance = null;
+            }
+
+            for (int i = _weaponHolder.childCount - 1; i >= 0; i--)
+            {
+                Transform child = _weaponHolder.GetChild(i);
+                if (child.name != "GunMesh" && (child.name.StartsWith("[Model]") || child.name.StartsWith("ViewModel_") || child.name.StartsWith("[VM]")))
+                {
+                    Destroy(child.gameObject);
+                }
+            }
+
+            if (index < 0 || index >= _availableWeapons.Count) return;
+            WeaponData data = _availableWeapons[index];
+            if (data == null) return;
+
+            // 3. Khởi tạo mô hình súng mới (từ Prefab hoặc tự sinh Procedural)
+            if (data.ViewmodelPrefab != null)
+            {
+                _currentViewmodelInstance = Instantiate(data.ViewmodelPrefab, _weaponHolder);
+                _currentViewmodelInstance.name = $"[Model]_{data.WeaponId}";
+                _currentViewmodelInstance.transform.localPosition = data.ViewmodelOffset;
+                _currentViewmodelInstance.transform.localRotation = Quaternion.Euler(data.ViewmodelRotation);
+            }
+            else
+            {
+                _currentViewmodelInstance = ProceduralWeaponModelBuilder.BuildProceduralGun(data, false);
+                _currentViewmodelInstance.transform.SetParent(_weaponHolder, false);
+                _currentViewmodelInstance.transform.localPosition = data.ViewmodelOffset;
+                _currentViewmodelInstance.transform.localRotation = Quaternion.Euler(data.ViewmodelRotation);
+            }
+
+            // Vô hiệu hóa va chạm Collider với CharacterController người chơi
+            var colliders = _currentViewmodelInstance.GetComponentsInChildren<Collider>();
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                colliders[i].enabled = false;
+            }
+
+            // Gán layer Viewmodel (Layer 7) cho toàn bộ bộ phận súng
+            int vmLayer = LayerMask.NameToLayer("Viewmodel");
+            if (vmLayer >= 0)
+            {
+                SetLayerRecursively(_currentViewmodelInstance, vmLayer);
+            }
+
+            // 4. Tìm Socket đầu nòng súng (Muzzle / MuzzlePoint)
+            _weaponMuzzlePoint = FindMuzzlePoint(_currentViewmodelInstance.transform);
+            if (_weaponMuzzlePoint == null)
+            {
+                _weaponMuzzlePoint = _currentViewmodelInstance.transform;
+            }
+
+            // 5. Cập nhật WorldModel cho đồng đội góc nhìn thứ 3
+            UpdateWorldModelVisuals(data);
+        }
+
+        private void UpdateWorldModelVisuals(WeaponData data)
+        {
+            if (_worldWeaponHolder == null)
+            {
+                _worldWeaponHolder = transform.Find("WorldWeaponHolder") ?? transform.Find("RightHandSocket") ?? transform.Find("PlayerBodyMesh/RightHandSocket");
+                if (_worldWeaponHolder == null)
+                {
+                    var holderObj = new GameObject("WorldWeaponHolder");
+                    holderObj.transform.SetParent(transform, false);
+                    holderObj.transform.localPosition = new Vector3(0.28f, 0.85f, 0.35f);
+                    _worldWeaponHolder = holderObj.transform;
+                }
+            }
+
+            if (_currentWorldModelInstance != null)
+            {
+                Destroy(_currentWorldModelInstance);
+                _currentWorldModelInstance = null;
+            }
+
+            for (int i = _worldWeaponHolder.childCount - 1; i >= 0; i--)
+            {
+                Transform child = _worldWeaponHolder.GetChild(i);
+                if (child != null) Destroy(child.gameObject);
+            }
+
+            if (data != null && data.WorldModelPrefab != null)
+            {
+                _currentWorldModelInstance = Instantiate(data.WorldModelPrefab, _worldWeaponHolder);
+                _currentWorldModelInstance.name = $"[WorldModel]_{data.WeaponId}";
+                _currentWorldModelInstance.transform.localPosition = Vector3.zero;
+                _currentWorldModelInstance.transform.localRotation = Quaternion.identity;
+
+                var cols = _currentWorldModelInstance.GetComponentsInChildren<Collider>();
+                for (int i = 0; i < cols.Length; i++) cols[i].enabled = false;
+
+                bool isLocalPlayer = IsOwner || GameModeHelper.IsOffline || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening;
+                if (isLocalPlayer)
+                {
+                    int bodyLayer = LayerMask.NameToLayer("PlayerBody");
+                    SetLayerRecursively(_currentWorldModelInstance, bodyLayer >= 0 ? bodyLayer : 6);
+                }
+            }
+        }
+
+        private static void SetLayerRecursively(GameObject obj, int newLayer)
+        {
+            if (obj == null) return;
+            obj.layer = newLayer;
+            foreach (Transform child in obj.transform)
+            {
+                if (child != null) SetLayerRecursively(child.gameObject, newLayer);
+            }
+        }
+
+        private static Transform FindMuzzlePoint(Transform root)
+        {
+            if (root == null) return null;
+            if (root.name.Equals("Muzzle", StringComparison.OrdinalIgnoreCase) ||
+                root.name.Equals("MuzzlePoint", StringComparison.OrdinalIgnoreCase) ||
+                root.name.Equals("Socket_Muzzle", StringComparison.OrdinalIgnoreCase))
+            {
+                return root;
+            }
+
+            foreach (Transform child in root)
+            {
+                var found = FindMuzzlePoint(child);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         [ServerRpc]
@@ -308,6 +494,15 @@ namespace Hellfire.Combat
             if (IsOwner)
             {
                 SwitchWeapon(index);
+            }
+            else
+            {
+                if (index >= 0 && index < _availableWeapons.Count)
+                {
+                    _currentWeaponIndex = index;
+                    _currentWeapon = _availableWeapons[index];
+                    UpdateWorldModelVisuals(_currentWeapon);
+                }
             }
         }
 
@@ -417,14 +612,53 @@ namespace Hellfire.Combat
             Vector3 cameraForward = _playerCamera.transform.forward;
             int seed = UnityEngine.Random.Range(0, 100000);
 
-            // Vẽ tracer đạn cosmetic cục bộ cho người bắn
+            // Bắn viên đạn cosmetic (Option 1) từ đầu nòng súng
             int pellets = _currentWeapon.PelletCount;
             float range = _currentWeapon.Range;
+            Vector3 muzzlePos = GetMuzzlePosition();
+
             for (int i = 0; i < pellets; i++)
             {
                 Vector3 shootDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
-                Vector3 endPoint = Physics.Raycast(cameraPos, shootDir, out var hit, range) ? hit.point : cameraPos + shootDir * range;
-                DrawCosmeticTracer(GetMuzzlePosition(), endPoint);
+                Vector3 endPoint;
+                bool hasHit = PerformRaycastFiltered(cameraPos, shootDir, range, out var hit);
+                if (hasHit)
+                {
+                    endPoint = hit.point;
+                    // Đảm bảo đạn luôn phóng về phía trước mặt, không bao giờ bay ngược về sau
+                    if (Vector3.Dot(endPoint - muzzlePos, cameraForward) < 0.2f)
+                    {
+                        endPoint = muzzlePos + cameraForward * Mathf.Max(0.6f, hit.distance);
+                    }
+                }
+                else
+                {
+                    endPoint = cameraPos + shootDir * range;
+                }
+
+                SpawnCosmeticBullet(muzzlePos, endPoint);
+            }
+            SpawnMuzzleFlash(muzzlePos);
+
+            // ================= ÁP DỤNG ĐỘ GIẬT (RECOIL SYSTEM) =================
+            // 1. Độ giật súng trên tay (ViewModel Kickback)
+            float kickForce = _currentWeapon != null && _currentWeapon.KickbackForce > 0.001f ? _currentWeapon.KickbackForce : 0.04f;
+            float kickAngle = _currentWeapon != null && _currentWeapon.KickbackAngle > 0.001f ? _currentWeapon.KickbackAngle : 2.5f;
+            _recoilOffset += new Vector3(0f, 0.005f, -kickForce);
+            _recoilRotation += new Vector3(-kickAngle, UnityEngine.Random.Range(-0.8f, 0.8f), UnityEngine.Random.Range(-1f, 1f));
+
+            // 2. Độ giật Camera hất lên (Camera Kick)
+            if (_playerMovement != null && _currentWeapon != null)
+            {
+                float pitchKick = _currentWeapon.CameraRecoilPitch;
+                float yawKick = UnityEngine.Random.Range(-_currentWeapon.CameraRecoilYaw, _currentWeapon.CameraRecoilYaw);
+                _playerMovement.AddCameraRecoil(pitchKick, yawKick);
+            }
+
+            // 3. Nở tâm ngắm (Crosshair Dynamic Bloom)
+            if (_crosshairHud != null)
+            {
+                _crosshairHud.TriggerFireBloom(8f);
             }
 
             // Gửi ServerRpc yêu cầu Server xác thực độc lập hoặc chạy cục bộ khi Offline
@@ -487,7 +721,7 @@ namespace Hellfire.Combat
             {
                 Vector3 shootDir = CalculateSpreadDirection(baseDirection, weaponToUse.Spread, seed + i);
 
-                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range))
+                if (PerformRaycastFiltered(clientOrigin, shootDir, range, out var hit))
                 {
                     // 1. Kiểm tra Friendly Fire (đồng đội)
                     if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)
@@ -658,13 +892,85 @@ namespace Hellfire.Combat
             }
         }
 
+        /// <summary>
+        /// Bắn tia Raycast loại bỏ hoàn toàn các collider của chính người chơi (tránh đạn bị va vào đầu/thân mình khi quay người).
+        /// </summary>
+        private bool PerformRaycastFiltered(Vector3 origin, Vector3 direction, float maxRange, out RaycastHit hitResult)
+        {
+            hitResult = default;
+            RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxRange, ~LayerMask.GetMask("Viewmodel", "PlayerBody"), QueryTriggerInteraction.Ignore);
+            if (hits == null || hits.Length == 0) return false;
+
+            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var h = hits[i];
+                if (h.collider == null) continue;
+
+                // Bỏ qua tất cả các collider thuộc về chính nhân vật người chơi (CharacterController, Head Hitbox, v.v.)
+                if (h.collider.transform.root == transform.root || 
+                    h.collider.GetComponentInParent<WeaponController>() == this ||
+                    (_playerMovement != null && h.collider.GetComponentInParent<PlayerMovement>() == _playerMovement) ||
+                    (_playerHealth != null && h.collider.GetComponentInParent<Health>() == _playerHealth))
+                {
+                    continue;
+                }
+
+                hitResult = h;
+                return true;
+            }
+
+            return false;
+        }
+
         private Vector3 GetMuzzlePosition()
         {
-            if (_weaponMuzzlePoint != null)
+            Vector3 candidatePos = Vector3.zero;
+            bool hasValidSocket = false;
+
+            // 1. Lấy từ Socket Muzzle của ViewModel đang cầm trên tay
+            if (_weaponMuzzlePoint != null && _weaponMuzzlePoint.gameObject.activeInHierarchy)
             {
-                return _weaponMuzzlePoint.position;
+                candidatePos = _weaponMuzzlePoint.position;
+                hasValidSocket = true;
             }
-            return _playerCamera != null ? _playerCamera.transform.position + _playerCamera.transform.forward * 0.5f : transform.position;
+            // 2. Tự động tìm lại Socket Muzzle trong ViewModel hiện tại nếu bị mất liên kết
+            else if (_currentViewmodelInstance != null)
+            {
+                var mz = FindMuzzlePoint(_currentViewmodelInstance.transform);
+                if (mz != null)
+                {
+                    _weaponMuzzlePoint = mz;
+                    candidatePos = mz.position;
+                    hasValidSocket = true;
+                }
+            }
+
+            // Xác thực Socket: đảm bảo nòng súng thực sự nằm phía trước Camera (tránh trường hợp model bị xoay ngược vào mặt)
+            if (hasValidSocket && _playerCamera != null)
+            {
+                float forwardDist = Vector3.Dot(candidatePos - _playerCamera.transform.position, _playerCamera.transform.forward);
+                if (forwardDist >= 0.12f)
+                {
+                    return candidatePos;
+                }
+            }
+            else if (hasValidSocket)
+            {
+                return candidatePos;
+            }
+
+            // 3. Fallback chuẩn xác vị trí cầm súng (phía trước dưới bên phải camera)
+            if (_playerCamera != null)
+            {
+                return _playerCamera.transform.position 
+                       + _playerCamera.transform.forward * 0.55f 
+                       + _playerCamera.transform.right * 0.22f 
+                       - _playerCamera.transform.up * 0.16f;
+            }
+
+            return transform.position + Vector3.up * 1.5f;
         }
 
         private Vector3 CalculateSpreadDirection(Vector3 baseDirection, float spread, int seed)
@@ -683,27 +989,50 @@ namespace Hellfire.Combat
             return (baseDirection + offset).normalized;
         }
 
-        private void DrawCosmeticTracer(Vector3 start, Vector3 end)
+        private void SpawnCosmeticBullet(Vector3 start, Vector3 end)
         {
-            StartCoroutine(TracerRoutine(start, end));
+            var bulletObj = new GameObject("CosmeticBullet");
+            var bullet = bulletObj.AddComponent<CosmeticBullet>();
+
+            float speed = GetBulletSpeedForCurrentWeapon();
+            Material mat = GetOrCreateFxMaterial();
+            Color coreColor = new Color(1.0f, 0.95f, 0.45f, 1f); // Lõi vàng rực
+            Color trailColor = new Color(1.0f, 0.35f, 0.05f, 0.8f); // Đuôi lửa cam
+
+            bullet.Launch(start, end, speed, mat, mat, coreColor, trailColor);
         }
 
-        private IEnumerator TracerRoutine(Vector3 start, Vector3 end)
+        private void SpawnMuzzleFlash(Vector3 muzzlePos)
         {
-            var tracerObj = new GameObject("Tracer");
-            var line = tracerObj.AddComponent<LineRenderer>();
-            line.startWidth = 0.04f;
-            line.endWidth = 0.01f;
-            line.positionCount = 2;
-            line.SetPosition(0, start);
-            line.SetPosition(1, end);
+            StartCoroutine(MuzzleFlashRoutine(muzzlePos));
+        }
 
-            line.material = GetOrCreateFxMaterial();
-            line.startColor = new Color(1f, 0.9f, 0.4f, 0.9f);
-            line.endColor = new Color(1f, 0.4f, 0.1f, 0.1f);
+        private IEnumerator MuzzleFlashRoutine(Vector3 muzzlePos)
+        {
+            var flashObj = new GameObject("MuzzleFlash");
+            flashObj.transform.position = muzzlePos;
 
-            yield return new WaitForSeconds(_tracerDuration);
-            Destroy(tracerObj);
+            var light = flashObj.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1.0f, 0.85f, 0.4f);
+            light.range = 2.5f;
+            light.intensity = 3.5f;
+            light.shadows = LightShadows.None;
+
+            yield return new WaitForSeconds(0.04f);
+            Destroy(flashObj);
+        }
+
+        private float GetBulletSpeedForCurrentWeapon()
+        {
+            if (_currentWeapon == null) return 220f;
+            switch (_currentWeapon.WeaponId.ToLower())
+            {
+                case "shotgun": return 175f;
+                case "rifle":   return 280f;
+                case "smg":     return 220f;
+                default:        return 200f; // Pistol
+            }
         }
 
         [ClientRpc]
@@ -749,8 +1078,13 @@ namespace Hellfire.Combat
         {
             if (_cachedFxMaterial == null)
             {
-                var s = Shader.Find("Sprites/Default");
-                if (s != null) _cachedFxMaterial = new Material(s);
+                var s = Shader.Find("Universal Render Pipeline/Unlit");
+                if (s == null) s = Shader.Find("Sprites/Default");
+                if (s != null)
+                {
+                    _cachedFxMaterial = new Material(s);
+                    _cachedFxMaterial.color = new Color(1f, 0.9f, 0.4f, 1f);
+                }
             }
             return _cachedFxMaterial;
         }

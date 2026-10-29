@@ -18,12 +18,20 @@ namespace Hellfire.Combat
         {
             if (_matMetalDark != null) return;
 
-            Shader s = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default");
+            Shader s = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Standard");
 
-            _matMetalDark = new Material(s) { color = new Color(0.18f, 0.18f, 0.20f) };
-            _matMetalLight = new Material(s) { color = new Color(0.45f, 0.48f, 0.52f) };
-            _matWood = new Material(s) { color = new Color(0.40f, 0.22f, 0.10f) };
-            _matGrip = new Material(s) { color = new Color(0.10f, 0.10f, 0.10f) };
+            _matMetalDark = CreateMat(s, new Color(0.18f, 0.18f, 0.20f));
+            _matMetalLight = CreateMat(s, new Color(0.45f, 0.48f, 0.52f));
+            _matWood = CreateMat(s, new Color(0.40f, 0.22f, 0.10f));
+            _matGrip = CreateMat(s, new Color(0.10f, 0.10f, 0.10f));
+        }
+
+        private static Material CreateMat(Shader s, Color color)
+        {
+            var mat = new Material(s);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+            return mat;
         }
 
         public static GameObject BuildProceduralGun(WeaponData data, bool isWorldModel = false)

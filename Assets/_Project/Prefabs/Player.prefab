@@ -110,7 +110,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5369624249776172383
 Transform:
   m_ObjectHideFlags: 0
@@ -533,10 +533,11 @@ MonoBehaviour:
   _currentWeapon: {fileID: 11400000, guid: b6db7b6e3d7a32145a8263424cc1968f, type: 2}
   _availableWeapons:
   - {fileID: 11400000, guid: b6db7b6e3d7a32145a8263424cc1968f, type: 2}
-  - {fileID: 11400000, guid: 4c9280da51c842340ad9576dbe64bec3, type: 2}
   - {fileID: 11400000, guid: b64ece583e317f6478ceaf94718915a1, type: 2}
   - {fileID: 11400000, guid: 46356dd8fbaaa034c900df6be4e77b6a, type: 2}
+  - {fileID: 11400000, guid: 4c9280da51c842340ad9576dbe64bec3, type: 2}
   _playerCamera: {fileID: 0}
+  _weaponHolder: {fileID: 5381150835459529816}
   _weaponMuzzlePoint: {fileID: 0}
   _playerHealth: {fileID: 0}
   _audioSource: {fileID: 0}

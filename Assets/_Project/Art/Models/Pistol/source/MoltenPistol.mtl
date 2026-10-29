@@ -1,0 +1,5 @@
+newmtl MoltenPistol_Mat
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+map_Kd ../textures/gltf_embedded_0.jpeg

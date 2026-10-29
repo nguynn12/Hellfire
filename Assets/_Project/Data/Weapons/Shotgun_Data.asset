@@ -15,7 +15,12 @@ MonoBehaviour:
   _weaponName: Shotgun
   _weaponId: shotgun
   _weaponIcon: {fileID: 0}
+  _weaponType: 0
   _baseDamage: 6
+  _attackRateAPS: 4
+  _armorPenetration: 0
+  _critChance: 0.1
+  _critDamageMultiplier: 1.5
   _headMultiplier: 2
   _torsoMultiplier: 1
   _limbMultiplier: 0.75
@@ -26,8 +31,30 @@ MonoBehaviour:
   _isAutomatic: 0
   _magSize: 6
   _reloadTime: 2.2
-  _viewmodelPrefab: {fileID: 0}
-  _worldModelPrefab: {fileID: 0}
+  _meleeRange: 2.5
+  _meleeSwingAngle: 70
+  _viewmodelPrefab: {fileID: 1474349671096700415, guid: 3beaf72cfeb31554bbfe6d4946356df5, type: 3}
+  _worldModelPrefab: {fileID: 1474349671096700401, guid: 5756cafaaf8f4cf8b528b58e6b4eeb05, type: 3}
+  _muzzleFlashPrefab: {fileID: 0}
+  _tracerPrefab: {fileID: 0}
+  _impactEffectPrefab: {fileID: 0}
+  _fleshImpactEffectPrefab: {fileID: 0}
+  _casingPrefab: {fileID: 0}
+  _viewmodelOffset: {x: 0, y: -0.05, z: 0.15}
+  _viewmodelRotation: {x: 0, y: 0, z: 0}
+  _hasAds: 1
+  _adsOffset: {x: -0.25, y: 0.05, z: 0.05}
+  _adsFov: 65
+  _adsSpreadMultiplier: 0.35
+  _kickbackForce: 0.12
+  _kickbackAngle: 6
+  _cameraRecoilPitch: 3
+  _cameraRecoilYaw: 0.65
+  _recoilRecoverySpeed: 9
+  _effectiveRange: 30
+  _minDamageMultiplier: 0.3
   _fireSound: {fileID: 0}
+  _fireSounds: []
   _reloadSound: {fileID: 0}
   _emptySound: {fileID: 0}
+  _meleeSwingSound: {fileID: 0}

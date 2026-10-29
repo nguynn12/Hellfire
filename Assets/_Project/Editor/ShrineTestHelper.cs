@@ -83,16 +83,8 @@ namespace Hellfire.Editor
             triggerCol.radius = 3.0f;
             triggerCol.center = new Vector3(0f, 1.0f, 0f);
 
-            // 7. Thêm 3D Text Prompt
-            GameObject promptObj = new GameObject("PromptText");
-            promptObj.transform.SetParent(shrineObj.transform, false);
-            promptObj.transform.localPosition = new Vector3(0f, 2.4f, 0f);
-            var tmp = promptObj.AddComponent<TextMeshPro>();
-            tmp.text = "[E] Cầu Nguyện Tế Đàn";
-            tmp.fontSize = 5;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = Color.yellow;
-            promptObj.SetActive(false);
+            // 7. Gợi ý tương tác [E] được quản lý bởi HUD on-screen
+            TextMeshPro tmp = null;
 
             // 8. Gắn InteractiveShrine
             var shrine = shrineObj.AddComponent<InteractiveShrine>();
