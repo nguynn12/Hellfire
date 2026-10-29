@@ -19,17 +19,58 @@ namespace Hellfire.Combat
     {
         [SerializeField] private WeaponData _baseData;
         [SerializeField] private int _upgradeLevel = 0;
+        [SerializeField] private int _currentAmmo = 0;
+        [SerializeField] private int _reserveAmmo = 0;
 
         private readonly List<IWeaponModifier> _modifiers = new List<IWeaponModifier>();
 
         public WeaponData BaseData => _baseData;
         public int UpgradeLevel => _upgradeLevel;
+        public int CurrentAmmo { get => _currentAmmo; set => _currentAmmo = Mathf.Max(0, value); }
+        public int ReserveAmmo { get => _reserveAmmo; set => _reserveAmmo = Mathf.Max(0, value); }
         public IReadOnlyList<IWeaponModifier> Modifiers => _modifiers;
 
         public RuntimeWeapon(WeaponData baseData)
         {
             _baseData = baseData ?? throw new ArgumentNullException(nameof(baseData));
             _upgradeLevel = 0;
+            _currentAmmo = _baseData.MagSize;
+            _reserveAmmo = _baseData.MaxReserveAmmo;
+        }
+
+        /// <summary>
+        /// Tiêu hao đạn trong băng khi bắn.
+        /// </summary>
+        public bool ConsumeAmmo(int amount = 1)
+        {
+            if (_currentAmmo >= amount)
+            {
+                _currentAmmo -= amount;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Nạp đạn từ kho dự trữ vào băng đạn. Trả về số lượng đạn nạp thực tế.
+        /// </summary>
+        public int Reload()
+        {
+            int needed = _baseData.MagSize - _currentAmmo;
+            if (needed <= 0 || _reserveAmmo <= 0) return 0;
+            int toAdd = Mathf.Min(needed, _reserveAmmo);
+            _reserveAmmo -= toAdd;
+            _currentAmmo += toAdd;
+            return toAdd;
+        }
+
+        /// <summary>
+        /// Thêm đạn dự trữ (nhặt hòm đạn / power-up).
+        /// </summary>
+        public void AddReserveAmmo(int amount)
+        {
+            if (amount <= 0) return;
+            _reserveAmmo = Mathf.Min(_reserveAmmo + amount, _baseData.MaxReserveAmmo);
         }
 
         /// <summary>

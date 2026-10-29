@@ -71,6 +71,9 @@ namespace Hellfire.Combat
         [Tooltip("Số lượng đạn trong 1 băng")]
         [SerializeField] private int _magSize = 12;
 
+        [Tooltip("Số lượng đạn dự trữ tối đa mang theo")]
+        [SerializeField] private int _maxReserveAmmo = 120;
+
         [Tooltip("Thời gian nạp đạn (giây)")]
         [SerializeField] private float _reloadTime = 1.2f;
 
@@ -156,6 +159,7 @@ namespace Hellfire.Combat
         public bool IsAutomatic => _isAutomatic;
 
         public int MagSize => _magSize;
+        public int MaxReserveAmmo => _maxReserveAmmo > 0 ? _maxReserveAmmo : (_magSize * 6);
         public float ReloadTime => _reloadTime;
 
         public float MeleeRange => _meleeRange;

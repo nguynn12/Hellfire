@@ -34,8 +34,19 @@ namespace Hellfire.Combat
 
         private PlayerMovement _playerMovement;
         private Hellfire.UI.WeaponCrosshairHUD _crosshairHud;
+        private Hellfire.UI.WeaponAmmoHUD _ammoHud;
         private Vector3 _recoilOffset;
         private Vector3 _recoilRotation;
+
+        // ADS, Input Buffering, Sway & Bobbing
+        private bool _isAiming = false;
+        private float _currentAdsFactor = 0f;
+        private float _defaultCameraFov = 60f;
+        private bool _hasBufferedFireInput = false;
+        private Vector3 _currentSwayOffset = Vector3.zero;
+        private Vector3 _targetSwayOffset = Vector3.zero;
+        private Vector3 _bobOffset = Vector3.zero;
+        private float _bobTimer = 0f;
 
         // ================= GLOBAL WEAPON STATS (FALLBACK OFFLINE + NETWORK VARIABLES) =================
         private float _rawGlobalDamageMultiplier = 1.0f;
@@ -93,6 +104,7 @@ namespace Hellfire.Combat
 
         // Events for UI HUD
         public event Action<int, int> OnAmmoChanged;              // currentAmmo, magSize
+        public event Action<int, int, int> OnAmmoDetailsChanged;   // currentAmmo, magSize, reserveAmmo
         public event Action<string> OnWeaponChanged;               // weaponName
         public event Action<bool> OnReloadStateChanged;           // isReloading
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
@@ -105,7 +117,11 @@ namespace Hellfire.Combat
         public IReadOnlyList<IWeaponModifier> GlobalModifiers => _globalModifiers;
 
         public int CurrentAmmo => _currentAmmo;
+        public int CurrentReserveAmmo => CurrentRuntimeWeapon != null ? CurrentRuntimeWeapon.ReserveAmmo : (_currentWeapon != null ? _currentWeapon.MaxReserveAmmo : 0);
         public bool IsReloading => _isReloading;
+        public float ReloadProgress => (_isReloading && _currentWeapon != null && _currentWeapon.ReloadTime > 0.01f) ? Mathf.Clamp01(1.0f - (_reloadTimer / _currentWeapon.ReloadTime)) : 0f;
+        public float CurrentAdsFactor => _currentAdsFactor;
+        public bool IsAiming => _isAiming;
 
         private void Awake()
         {
@@ -141,6 +157,11 @@ namespace Hellfire.Combat
             {
                 _crosshairHud = GetComponent<Hellfire.UI.WeaponCrosshairHUD>();
                 if (_crosshairHud == null) _crosshairHud = gameObject.AddComponent<Hellfire.UI.WeaponCrosshairHUD>();
+            }
+            if (_ammoHud == null)
+            {
+                _ammoHud = GetComponent<Hellfire.UI.WeaponAmmoHUD>();
+                if (_ammoHud == null) _ammoHud = gameObject.AddComponent<Hellfire.UI.WeaponAmmoHUD>();
             }
         }
 
@@ -238,10 +259,54 @@ namespace Hellfire.Combat
                 }
             }
 
+            HandleAdsInput();
+            HandleViewmodelSwayAndBobbing();
             HandleWeaponSwitching();
             HandleReloading();
             HandleAttackInput();
             HandleRecoilRecovery();
+        }
+
+        private void HandleAdsInput()
+        {
+            _isAiming = Mouse.current != null && Mouse.current.rightButton.isPressed 
+                        && !_isReloading && _currentWeapon != null && _currentWeapon.HasAds;
+
+            _currentAdsFactor = Mathf.MoveTowards(_currentAdsFactor, _isAiming ? 1.0f : 0.0f, Time.deltaTime * 10f);
+
+            if (_playerCamera != null && _currentWeapon != null)
+            {
+                _playerCamera.fieldOfView = Mathf.Lerp(_defaultCameraFov, _currentWeapon.AdsFov, _currentAdsFactor);
+            }
+        }
+
+        private void HandleViewmodelSwayAndBobbing()
+        {
+            // 1. Mouse Sway: Độ trễ và nghiêng theo quán tính lia chuột
+            Vector2 mouseDelta = Vector2.zero;
+            if (Mouse.current != null && Cursor.lockState == CursorLockMode.Locked)
+            {
+                mouseDelta = Mouse.current.delta.ReadValue() * 0.0015f;
+            }
+            float swayX = Mathf.Clamp(-mouseDelta.x, -0.04f, 0.04f);
+            float swayY = Mathf.Clamp(-mouseDelta.y, -0.04f, 0.04f);
+            _targetSwayOffset = new Vector3(swayX, swayY, 0f);
+            _currentSwayOffset = Vector3.Lerp(_currentSwayOffset, _targetSwayOffset, Time.deltaTime * 12f);
+            _targetSwayOffset = Vector3.Lerp(_targetSwayOffset, Vector3.zero, Time.deltaTime * 8f);
+
+            // 2. Movement Bobbing: Nhấp nhô tự nhiên theo bước chân
+            if (_playerMovement != null && _playerMovement.IsMoving)
+            {
+                float speedMult = _playerMovement.IsSprinting ? 14f : 9f;
+                _bobTimer += Time.deltaTime * speedMult;
+                float bobX = Mathf.Cos(_bobTimer * 0.5f) * 0.012f;
+                float bobY = Mathf.Sin(_bobTimer) * 0.012f;
+                _bobOffset = new Vector3(bobX, bobY, 0f);
+            }
+            else
+            {
+                _bobOffset = Vector3.Lerp(_bobOffset, Vector3.zero, Time.deltaTime * 8f);
+            }
         }
 
         private void HandleRecoilRecovery()
@@ -250,12 +315,13 @@ namespace Hellfire.Combat
             _recoilOffset = Vector3.Lerp(_recoilOffset, Vector3.zero, Time.deltaTime * recoverySpeed);
             _recoilRotation = Vector3.Lerp(_recoilRotation, Vector3.zero, Time.deltaTime * recoverySpeed);
 
-            if (_currentViewmodelInstance != null)
+            if (_currentViewmodelInstance != null && _currentWeapon != null)
             {
-                Vector3 basePos = _currentWeapon != null ? _currentWeapon.ViewmodelOffset : Vector3.zero;
-                Vector3 baseRot = _currentWeapon != null ? _currentWeapon.ViewmodelRotation : Vector3.zero;
+                Vector3 basePos = Vector3.Lerp(_currentWeapon.ViewmodelOffset, _currentWeapon.AdsOffset, _currentAdsFactor);
+                Vector3 baseRot = _currentWeapon.ViewmodelRotation;
+                Vector3 motionOffset = (_currentSwayOffset + _bobOffset) * (1.0f - _currentAdsFactor * 0.75f);
 
-                _currentViewmodelInstance.transform.localPosition = basePos + _recoilOffset;
+                _currentViewmodelInstance.transform.localPosition = basePos + _recoilOffset + motionOffset;
                 _currentViewmodelInstance.transform.localRotation = Quaternion.Euler(baseRot + _recoilRotation);
             }
         }
@@ -276,11 +342,27 @@ namespace Hellfire.Combat
             if (index < 0 || index >= _availableWeapons.Count || _availableWeapons[index] == null) return;
             if (index == _currentWeaponIndex && _currentWeapon == _availableWeapons[index]) return;
 
+            // Lưu số đạn của vũ khí hiện tại vào RuntimeWeapon
+            if (CurrentRuntimeWeapon != null)
+            {
+                CurrentRuntimeWeapon.CurrentAmmo = _currentAmmo;
+            }
+
             _currentWeaponIndex = index;
             _currentWeapon = _availableWeapons[index];
-            _currentAmmo = _currentWeapon.MagSize;
             _isReloading = false;
+            _hasBufferedFireInput = false;
             _nextFireTime = Time.time + 0.15f;
+
+            // Khôi phục số đạn đã lưu của vũ khí mới
+            if (CurrentRuntimeWeapon != null)
+            {
+                _currentAmmo = CurrentRuntimeWeapon.CurrentAmmo;
+            }
+            else
+            {
+                _currentAmmo = _currentWeapon.MagSize;
+            }
 
             UpdateWeaponVisuals(index);
             NotifyWeaponUI();
@@ -295,6 +377,14 @@ namespace Hellfire.Combat
 
         private GameObject _currentViewmodelInstance;
         private GameObject _currentWorldModelInstance;
+
+        private void TriggerAmmoChanged()
+        {
+            int mag = _currentWeapon != null ? _currentWeapon.MagSize : 0;
+            int reserve = CurrentReserveAmmo;
+            OnAmmoChanged?.Invoke(_currentAmmo, mag);
+            OnAmmoDetailsChanged?.Invoke(_currentAmmo, mag, reserve);
+        }
 
         public void UpdateWeaponVisuals(int index)
         {
@@ -510,10 +600,12 @@ namespace Hellfire.Combat
 
         private void HandleReloading()
         {
-            // Bấm R để nạp đạn bất cứ khi nào đạn chưa đầy băng
+            // Bấm R để nạp đạn bất cứ khi nào đạn chưa đầy băng và còn đạn dự trữ (hoặc InfiniteAmmo)
             if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame && !_isReloading && _currentWeapon != null)
             {
-                if (_currentAmmo < _currentWeapon.MagSize)
+                bool isInfinite = OfflineManager.Instance != null && OfflineManager.Instance.InfiniteAmmo;
+                int reserve = CurrentReserveAmmo;
+                if (_currentAmmo < _currentWeapon.MagSize && (reserve > 0 || isInfinite))
                 {
                     StartReload();
                 }
@@ -531,6 +623,11 @@ namespace Hellfire.Combat
 
         private void StartReload()
         {
+            if (_isReloading || _currentWeapon == null) return;
+            bool isInfinite = OfflineManager.Instance != null && OfflineManager.Instance.InfiniteAmmo;
+            if (_currentAmmo >= _currentWeapon.MagSize) return;
+            if (CurrentReserveAmmo <= 0 && !isInfinite) return;
+
             _isReloading = true;
             _reloadTimer = _currentWeapon.ReloadTime;
             OnReloadStateChanged?.Invoke(true);
@@ -544,12 +641,31 @@ namespace Hellfire.Combat
         private void CompleteReload()
         {
             _isReloading = false;
-            if (_currentWeapon != null)
+            bool isInfinite = OfflineManager.Instance != null && OfflineManager.Instance.InfiniteAmmo;
+
+            if (isInfinite)
             {
-                _currentAmmo = _currentWeapon.MagSize; // Luôn nạp đầy băng, đạn dự trữ là vô hạn!
+                if (CurrentRuntimeWeapon != null) CurrentRuntimeWeapon.CurrentAmmo = CurrentRuntimeWeapon.BaseData.MagSize;
+                _currentAmmo = _currentWeapon != null ? _currentWeapon.MagSize : _currentAmmo;
             }
+            else if (CurrentRuntimeWeapon != null)
+            {
+                CurrentRuntimeWeapon.Reload();
+                _currentAmmo = CurrentRuntimeWeapon.CurrentAmmo;
+            }
+            else if (_currentWeapon != null)
+            {
+                _currentAmmo = _currentWeapon.MagSize;
+            }
+
             OnReloadStateChanged?.Invoke(false);
-            OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon != null ? _currentWeapon.MagSize : 0);
+            TriggerAmmoChanged();
+
+            // Cơ chế sấy liên thanh (Full-Auto): Nếu người chơi vẫn đang giữ chuột trái thì tiếp tục bắn ngay
+            if (_currentWeapon != null && _currentWeapon.IsAutomatic && Mouse.current != null && Mouse.current.leftButton.isPressed && _currentAmmo > 0)
+            {
+                _nextFireTime = Time.time + 0.05f;
+            }
         }
 
         private void CancelReload()
@@ -567,16 +683,32 @@ namespace Hellfire.Combat
             bool triggerPressed = false;
             if (Mouse.current != null)
             {
-                triggerPressed = _currentWeapon.IsAutomatic
-                    ? Mouse.current.leftButton.isPressed
-                    : Mouse.current.leftButton.wasPressedThisFrame;
+                if (_currentWeapon.IsAutomatic)
+                {
+                    triggerPressed = Mouse.current.leftButton.isPressed;
+                }
+                else
+                {
+                    if (Mouse.current.leftButton.wasPressedThisFrame)
+                    {
+                        triggerPressed = true;
+                        // Input buffering cho Semi-Auto (Pistol/Shotgun/Rifle):
+                        // Lưu lại lệnh bấm nếu nhấp sớm hơn thời gian hồi nòng trong khoảng 0.15s
+                        if (Time.time < _nextFireTime && (_nextFireTime - Time.time) <= 0.15f)
+                        {
+                            _hasBufferedFireInput = true;
+                        }
+                    }
+                }
             }
 
-            if (!triggerPressed) return;
-            if (Time.time < _nextFireTime) return;
-            if (_isReloading) return;
+            bool canFireNow = Time.time >= _nextFireTime && !_isReloading;
+            bool shouldFire = triggerPressed || (_hasBufferedFireInput && canFireNow);
+            if (!shouldFire || !canFireNow) return;
 
-            // Nếu hết đạn trong băng: tự động nạp đạn vô hạn
+            _hasBufferedFireInput = false;
+
+            // Nếu hết đạn trong băng: tự động nạp đạn
             if (_currentAmmo <= 0)
             {
                 if (_audioSource != null && _currentWeapon.EmptySound != null)
@@ -584,7 +716,7 @@ namespace Hellfire.Combat
                     _audioSource.PlayOneShot(_currentWeapon.EmptySound);
                 }
                 StartReload();
-                _nextFireTime = Time.time + 0.3f;
+                _nextFireTime = Time.time + 0.25f;
                 return;
             }
 
@@ -595,9 +727,17 @@ namespace Hellfire.Combat
         {
             if (OfflineManager.Instance == null || !OfflineManager.Instance.InfiniteAmmo)
             {
-                _currentAmmo = Mathf.Max(0, _currentAmmo - 1);
+                if (CurrentRuntimeWeapon != null)
+                {
+                    CurrentRuntimeWeapon.ConsumeAmmo(1);
+                    _currentAmmo = CurrentRuntimeWeapon.CurrentAmmo;
+                }
+                else
+                {
+                    _currentAmmo = Mathf.Max(0, _currentAmmo - 1);
+                }
             }
-            OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon.MagSize);
+            TriggerAmmoChanged();
 
             // Tính toán tốc độ ra đòn kết hợp hệ số tốc bắn toàn cục
             float finalAps = _currentWeapon.AttackRateAPS * GlobalAttackSpeedMultiplier;
@@ -617,9 +757,11 @@ namespace Hellfire.Combat
             float range = _currentWeapon.Range;
             Vector3 muzzlePos = GetMuzzlePosition();
 
+            float effectiveSpread = _currentWeapon.Spread * Mathf.Lerp(1.0f, _currentWeapon.AdsSpreadMultiplier, _currentAdsFactor);
+
             for (int i = 0; i < pellets; i++)
             {
-                Vector3 shootDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
+                Vector3 shootDir = CalculateSpreadDirection(cameraForward, effectiveSpread, seed + i);
                 Vector3 endPoint;
                 bool hasHit = PerformRaycastFiltered(cameraPos, shootDir, range, out var hit);
                 if (hasHit)
