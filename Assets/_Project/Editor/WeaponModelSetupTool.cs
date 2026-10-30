@@ -54,7 +54,7 @@ namespace Hellfire.Editor
             var prefabPistolWorld = CreatePistolWorldPrefab(matPistol);
 
             // 3. Gán Viewmodel & WorldModel Prefab vào Pistol_Data.asset
-            AssignPrefabToWeaponData("Pistol_Data.asset", prefabPistolVM, prefabPistolWorld, new Vector3(0f, 0f, 0.12f), Vector3.zero);
+            AssignPrefabToWeaponData("Pistol_Data.asset", prefabPistolVM, prefabPistolWorld, new Vector3(0.24f, -0.20f, 0.45f), Vector3.zero);
 
             // 4. Cập nhật Player.prefab với Pistol làm súng khởi đầu
             UpdatePlayerPrefab(isPistolDefault: true);
@@ -129,7 +129,7 @@ namespace Hellfire.Editor
             var prefabPistolWorld = CreatePistolWorldPrefab(matPistol);
 
             // 3. Gán Viewmodel Prefab vào các ScriptableObject WeaponData
-            AssignPrefabToWeaponData("Pistol_Data.asset", prefabPistolVM, prefabPistolWorld, new Vector3(0f, 0f, 0.12f), Vector3.zero);
+            AssignPrefabToWeaponData("Pistol_Data.asset", prefabPistolVM, prefabPistolWorld, new Vector3(0.24f, -0.20f, 0.45f), Vector3.zero);
             AssignPrefabToWeaponData("Shotgun_Data.asset", prefabShotgun, prefabShotgunWorld, new Vector3(0f, -0.05f, 0.15f), Vector3.zero);
             AssignPrefabToWeaponData("Rifle_Data.asset", prefabRifle, prefabRifleWorld, new Vector3(0f, -0.05f, 0.15f), Vector3.zero);
             AssignPrefabToWeaponData("SMG_Data.asset", prefabSmg, prefabSmgWorld, new Vector3(0f, -0.05f, 0.1f), Vector3.zero);
@@ -498,7 +498,7 @@ namespace Hellfire.Editor
             // Xoay quanh trục Y +90 độ để đưa nòng súng về phía trước (+Z forward)
             // Scale: 0.11f để súng có chiều dài thực tế ~22cm vừa vặn góc nhìn FPS
             model.transform.localPosition = new Vector3(0f, -0.02f, 0f);
-            model.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+            model.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
             model.transform.localScale = Vector3.one * 0.11f;
 
             var renderers = model.GetComponentsInChildren<MeshRenderer>(true);
@@ -633,6 +633,9 @@ namespace Hellfire.Editor
                 var viewmodel = instance.transform.Find("CameraPivot/PlayerCamera/WeaponViewmodel");
                 if (viewmodel != null)
                 {
+                    viewmodel.localPosition = Vector3.zero;
+                    viewmodel.localRotation = Quaternion.identity;
+                    viewmodel.localScale = Vector3.one;
                     so.FindProperty("_weaponHolder").objectReferenceValue = viewmodel;
                     var gunMesh = viewmodel.Find("GunMesh");
                     if (gunMesh != null)

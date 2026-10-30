@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using Hellfire.Combat;
+using Hellfire.Items;
 using Hellfire.Networking;
 using Unity.Netcode;
 using UnityEngine;
@@ -31,6 +32,8 @@ namespace Hellfire.Player
         private float _rawBonusMaxHealth = 0f;
         private float _rawArmor = 0f;
         private float _rawMoveSpeedMultiplier = MinSpeedMultiplier;
+        private int _rawRedCrystals = 10;
+        private int _rawGreenCrystals = 10;
 
         // ================= NETWORK VARIABLES (SERVER-AUTHORITATIVE) =================
         /// <summary>
@@ -61,11 +64,33 @@ namespace Hellfire.Player
         );
 
         /// <summary>
+        /// Pha Lê Đỏ (Dùng cho Tế Đàn Thân Thể / StatsAltar).
+        /// </summary>
+        public NetworkVariable<int> RedCrystals { get; } = new NetworkVariable<int>(
+            10,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
+        /// <summary>
+        /// Pha Lê Xanh (Dùng cho Bàn Cường Hóa Vũ Khí / WeaponWorkbench).
+        /// </summary>
+        public NetworkVariable<int> GreenCrystals { get; } = new NetworkVariable<int>(
+            10,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
+        /// <summary>
         /// Thuộc tính truy cập nhanh chỉ số hiện tại (hoạt động đồng thời Online và Offline).
         /// </summary>
         public float CurrentBonusMaxHealth => IsSpawned ? BonusMaxHealth.Value : _rawBonusMaxHealth;
         public float CurrentArmor => IsSpawned ? Armor.Value : _rawArmor;
         public float CurrentMoveSpeedMultiplier => IsSpawned ? MoveSpeedMultiplier.Value : _rawMoveSpeedMultiplier;
+        public int CurrentRedCrystals => IsSpawned ? RedCrystals.Value : _rawRedCrystals;
+        public int CurrentGreenCrystals => IsSpawned ? GreenCrystals.Value : _rawGreenCrystals;
+
+        public event Action<int, int> OnCrystalsChanged; // redCrystals, greenCrystals
 
         /// <summary>
         /// Trả về hệ số tốc độ cơ bản/hiện tại cho PlayerMovement khi chưa spawn hoặc offline.
@@ -99,13 +124,18 @@ namespace Hellfire.Player
             _rawBonusMaxHealth = BonusMaxHealth.Value;
             _rawArmor = Armor.Value;
             _rawMoveSpeedMultiplier = MoveSpeedMultiplier.Value;
+            _rawRedCrystals = RedCrystals.Value;
+            _rawGreenCrystals = GreenCrystals.Value;
 
             BonusMaxHealth.OnValueChanged += HandleBonusHealthChanged;
             Armor.OnValueChanged += HandleArmorChanged;
             MoveSpeedMultiplier.OnValueChanged += HandleSpeedChanged;
+            RedCrystals.OnValueChanged += HandleRedCrystalsChanged;
+            GreenCrystals.OnValueChanged += HandleGreenCrystalsChanged;
 
             // Kích hoạt event ban đầu cho UI
             NotifyStatsChanged();
+            NotifyCrystalsChanged();
         }
 
         public override void OnNetworkDespawn()
@@ -113,6 +143,8 @@ namespace Hellfire.Player
             BonusMaxHealth.OnValueChanged -= HandleBonusHealthChanged;
             Armor.OnValueChanged -= HandleArmorChanged;
             MoveSpeedMultiplier.OnValueChanged -= HandleSpeedChanged;
+            RedCrystals.OnValueChanged -= HandleRedCrystalsChanged;
+            GreenCrystals.OnValueChanged -= HandleGreenCrystalsChanged;
 
             if (IsServer)
             {
@@ -138,19 +170,87 @@ namespace Hellfire.Player
             NotifyStatsChanged();
         }
 
+        private void HandleRedCrystalsChanged(int prev, int curr)
+        {
+            _rawRedCrystals = curr;
+            NotifyCrystalsChanged();
+        }
+
+        private void HandleGreenCrystalsChanged(int prev, int curr)
+        {
+            _rawGreenCrystals = curr;
+            NotifyCrystalsChanged();
+        }
+
         private void NotifyStatsChanged()
         {
             OnStatsChanged?.Invoke(CurrentBonusMaxHealth, CurrentArmor, CurrentMoveSpeedMultiplier);
         }
 
+        public void NotifyCrystalsChanged()
+        {
+            OnCrystalsChanged?.Invoke(CurrentRedCrystals, CurrentGreenCrystals);
+        }
+
+        // ================= QUẢN LÝ TIÊU HAO PHA LÊ (CRYSTAL SYSTEM) =================
+        public int GetCrystals(ShrineType shrineType)
+        {
+            return shrineType == ShrineType.BodyShrine ? CurrentRedCrystals : CurrentGreenCrystals;
+        }
+
+        public bool CanAfford(ShrineType shrineType, int cost)
+        {
+            return GetCrystals(shrineType) >= cost;
+        }
+
+        public bool TrySpendCrystals(ShrineType shrineType, int cost)
+        {
+            if (!GameModeHelper.IsServerOrOffline) return false;
+            if (!CanAfford(shrineType, cost)) return false;
+
+            if (shrineType == ShrineType.BodyShrine)
+            {
+                int next = CurrentRedCrystals - cost;
+                _rawRedCrystals = next;
+                if (IsSpawned) RedCrystals.Value = next;
+            }
+            else
+            {
+                int next = CurrentGreenCrystals - cost;
+                _rawGreenCrystals = next;
+                if (IsSpawned) GreenCrystals.Value = next;
+            }
+
+            NotifyCrystalsChanged();
+            return true;
+        }
+
+        public void AddCrystals(ShrineType shrineType, int amount)
+        {
+            if (!GameModeHelper.IsServerOrOffline) return;
+            if (shrineType == ShrineType.BodyShrine)
+            {
+                int next = CurrentRedCrystals + amount;
+                _rawRedCrystals = next;
+                if (IsSpawned) RedCrystals.Value = next;
+            }
+            else
+            {
+                int next = CurrentGreenCrystals + amount;
+                _rawGreenCrystals = next;
+                if (IsSpawned) GreenCrystals.Value = next;
+            }
+            NotifyCrystalsChanged();
+        }
+
         // ================= QUẢN LÝ LỊCH SỬ TẾ ĐÀN (SHRINE TRACKING) =================
 
         /// <summary>
-        /// Kiểm tra xem người chơi này đã từng dùng tế đàn có ID này chưa (Server-Authoritative hoặc Offline).
+        /// Đã bỏ cơ chế khóa 1 lần theo yêu cầu: Người chơi có thể dùng lặp lại nhiều lần miễn còn đủ Pha Lê.
         /// </summary>
         public bool HasUsedShrine(int shrineId)
         {
-            return _usedShrineIds.Contains(shrineId);
+            return false;
         }
 
         /// <summary>
@@ -160,12 +260,11 @@ namespace Hellfire.Player
         {
             if (!GameModeHelper.IsServerOrOffline)
             {
-                Debug.LogWarning("[PlayerStats] Chỉ Server mới có quyền ghi nhận Shrine!");
                 return;
             }
 
             _usedShrineIds.Add(shrineId);
-            Debug.Log($"[PlayerStats] Người chơi {NetworkObjectId} đã dùng Tế đàn #{shrineId}. Tổng số tế đàn đã dùng: {_usedShrineIds.Count}");
+            Debug.Log($"[PlayerStats] Người chơi {NetworkObjectId} đã dùng Tế đàn #{shrineId}.");
         }
 
         // ================= NÂNG CẤP CHỈ SỐ CƠ THỂ (BODY BUFF) =================

@@ -30,20 +30,21 @@ MonoBehaviour:
   _spread: 0.012
   _isAutomatic: 0
   _magSize: 12
+  _maxReserveAmmo: 120
   _reloadTime: 1.2
   _meleeRange: 2.5
   _meleeSwingAngle: 70
-  _viewmodelPrefab: {fileID: 5692894731973041758, guid: 85281da10ca610246be2780eb809a963, type: 3}
-  _worldModelPrefab: {fileID: 5692894731973041701, guid: 98581ed44ef14a2898551e9ebedf05a6, type: 3}
+  _viewmodelPrefab: {fileID: 842739001072416431, guid: bde84c3090af08d428f954ccff01b425, type: 3}
+  _worldModelPrefab: {fileID: 6486015530339960198, guid: 8bb4ad3f62890a44e853f563ea227663, type: 3}
   _muzzleFlashPrefab: {fileID: 0}
   _tracerPrefab: {fileID: 0}
   _impactEffectPrefab: {fileID: 0}
   _fleshImpactEffectPrefab: {fileID: 0}
   _casingPrefab: {fileID: 0}
-  _viewmodelOffset: {x: 0, y: 0, z: 0.12}
+  _viewmodelOffset: {x: 0.24, y: -0.2, z: 0.45}
   _viewmodelRotation: {x: 0, y: 0, z: 0}
   _hasAds: 1
-  _adsOffset: {x: -0.25, y: 0.05, z: 0.05}
+  _adsOffset: {x: 0, y: -0.12, z: 0.35}
   _adsFov: 65
   _adsSpreadMultiplier: 0.35
   _kickbackForce: 0.04

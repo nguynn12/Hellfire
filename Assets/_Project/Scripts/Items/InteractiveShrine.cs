@@ -60,14 +60,24 @@ namespace Hellfire.Items
         [SerializeField] private AudioSource _audioSource;
         [SerializeField] private AudioClip _interactSound;
 
+        // Chi phí Pha Lê theo cơ chế mới (Chọn thẻ: 2 Pha Lê, Đổi thẻ: 1 Pha Lê)
+        public const int UpgradeCost = 2;
+        public const int RerollCost = 1;
+
         private bool _isUsedByLocalPlayer = false;
         private bool _isLocalPlayerInRange = false;
         private List<UpgradeOptionData> _cachedOptions;
 
+        private Collider[] _cachedColliders;
+        private Camera _cachedMainCamera;
+        private GameObject _cachedLocalPlayerObj;
+        private GUIStyle _cachedPromptStyle;
+        private GUIStyle _cachedFallbackPanelStyle;
+
         public int ShrineId => _shrineId;
         public ShrineType Type => _shrineType;
         public string ShrineName => _shrineName;
-        public bool IsUsedByLocalPlayer => _isUsedByLocalPlayer;
+        public bool IsUsedByLocalPlayer => false;
 
         public void SetShrineId(int id)
         {
@@ -85,6 +95,8 @@ namespace Hellfire.Items
 
         private void Awake()
         {
+            _cachedColliders = GetComponents<Collider>();
+
             if (_promptText == null) _promptText = GetComponentInChildren<TextMeshPro>();
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             if (_glowController == null) _glowController = GetComponentInChildren<GlowLightController>();
@@ -164,7 +176,7 @@ namespace Hellfire.Items
                     case ShrineType.BodyShrine:
                         return new Color(1.0f, 0.15f, 0.15f, 1.0f); // Đỏ Rực (Máu / Sinh mệnh)
                     case ShrineType.WeaponModifierShrine:
-                        return new Color(0.85f, 0.25f, 1.0f, 1.0f); // Tím Huyền Bí (Vũ khí / Ma thuật)
+                        return new Color(0.15f, 1.0f, 0.35f, 1.0f); // Xanh Lá / Xanh Lục Bảo (Bàn Cường Hóa Vũ Khí)
                     case ShrineType.HybridShrine:
                     default:
                         return new Color(0.15f, 0.9f, 0.85f, 1.0f); // Xanh Lam Ngọc (Hỗn hợp)
@@ -266,45 +278,48 @@ namespace Hellfire.Items
 
         private void CheckLocalPlayerInteraction()
         {
-            GameObject localPlayerObj = null;
-
-            if (PlayerMovement.LocalInstance != null)
+            if (_cachedLocalPlayerObj == null)
             {
-                localPlayerObj = PlayerMovement.LocalInstance.gameObject;
-            }
-            else if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null && NetworkManager.Singleton.LocalClient.PlayerObject != null)
-            {
-                localPlayerObj = NetworkManager.Singleton.LocalClient.PlayerObject.gameObject;
-            }
-            else
-            {
-                // Fallback khi test Offline: tìm Player trong Scene
-                var playerMove = FindAnyObjectByType<PlayerMovement>();
-                if (playerMove != null)
+                if (PlayerMovement.LocalInstance != null)
                 {
-                    localPlayerObj = playerMove.gameObject;
+                    _cachedLocalPlayerObj = PlayerMovement.LocalInstance.gameObject;
+                }
+                else if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null && NetworkManager.Singleton.LocalClient.PlayerObject != null)
+                {
+                    _cachedLocalPlayerObj = NetworkManager.Singleton.LocalClient.PlayerObject.gameObject;
+                }
+                else
+                {
+                    var playerMove = FindAnyObjectByType<PlayerMovement>();
+                    if (playerMove != null) _cachedLocalPlayerObj = playerMove.gameObject;
                 }
             }
 
-            if (localPlayerObj == null) return;
+            if (_cachedLocalPlayerObj == null) return;
 
-            // Tính khoảng cách từ người chơi đến bề mặt gần nhất của Collider (nếu có), thay vì chỉ đo từ tâm
-            var colliders = GetComponents<Collider>();
-            float dist = float.MaxValue;
-            if (colliders != null && colliders.Length > 0)
+            // Dùng mảng colliders đã cache thay vì gọi GetComponents mỗi frame
+            if (_cachedColliders == null || _cachedColliders.Length == 0)
             {
-                foreach (var col in colliders)
+                _cachedColliders = GetComponents<Collider>();
+            }
+
+            Vector3 playerPos = _cachedLocalPlayerObj.transform.position;
+            float dist = float.MaxValue;
+            if (_cachedColliders != null && _cachedColliders.Length > 0)
+            {
+                for (int i = 0; i < _cachedColliders.Length; i++)
                 {
-                    if (col.enabled)
+                    var col = _cachedColliders[i];
+                    if (col != null && col.enabled)
                     {
-                        float d = Vector3.Distance(col.ClosestPoint(localPlayerObj.transform.position), localPlayerObj.transform.position);
+                        float d = Vector3.Distance(col.ClosestPoint(playerPos), playerPos);
                         if (d < dist) dist = d;
                     }
                 }
             }
             else
             {
-                dist = Vector3.Distance(transform.position, localPlayerObj.transform.position);
+                dist = Vector3.Distance(transform.position, playerPos);
             }
 
             // Nếu người chơi ở trong bán kính tương tác hoặc đang chạm vào collider
@@ -319,11 +334,11 @@ namespace Hellfire.Items
                         ? "[E] Mở Bàn Cường Hóa"
                         : "[E] Cầu Nguyện Tế Đàn";
 
-                    // Chỉ xoay LookRotation nếu là 3D World Space Text (không nằm trong Canvas UI)
-                    var cam = Camera.main != null ? Camera.main : FindAnyObjectByType<Camera>();
-                    if (cam != null && _promptText.GetComponentInParent<Canvas>() == null)
+                    // Dùng camera đã cache thay vì quét Camera.main mỗi frame
+                    if (_cachedMainCamera == null) _cachedMainCamera = Camera.main;
+                    if (_cachedMainCamera != null && _promptText.GetComponentInParent<Canvas>() == null)
                     {
-                        _promptText.transform.rotation = Quaternion.LookRotation(_promptText.transform.position - cam.transform.position);
+                        _promptText.transform.rotation = Quaternion.LookRotation(_promptText.transform.position - _cachedMainCamera.transform.position);
                     }
                 }
             }
@@ -343,7 +358,7 @@ namespace Hellfire.Items
                 else if (Keyboard.current.escapeKey.wasPressedThisFrame)
                 {
                     _showFallbackChoiceGUI = false;
-                    var pm = FindAnyObjectByType<PlayerMovement>();
+                    var pm = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance : FindAnyObjectByType<PlayerMovement>();
                     if (pm != null) pm.SetCursorLock(true);
                 }
             }
@@ -355,14 +370,19 @@ namespace Hellfire.Items
         {
             if (_isUsedByLocalPlayer) return;
 
-            // 1. Luôn hiển thị gợi ý tương tác [E] giữa màn hình (đảm bảo 100% người chơi luôn thấy)
+            // 1. Luôn hiển thị gợi ý tương tác [E] giữa màn hình (dùng style đã cache)
             if (_isLocalPlayerInRange && !_showFallbackChoiceGUI && (ShrineChoiceModalUI.Instance == null || !ShrineChoiceModalUI.Instance.IsOpen))
             {
-                GUIStyle promptStyle = new GUIStyle(GUI.skin.box);
-                promptStyle.fontSize = 22;
-                promptStyle.fontStyle = FontStyle.Bold;
-                promptStyle.alignment = TextAnchor.MiddleCenter;
-                promptStyle.normal.textColor = Color.yellow;
+                if (_cachedPromptStyle == null)
+                {
+                    _cachedPromptStyle = new GUIStyle(GUI.skin.box)
+                    {
+                        fontSize = 22,
+                        fontStyle = FontStyle.Bold,
+                        alignment = TextAnchor.MiddleCenter,
+                        normal = { textColor = Color.yellow }
+                    };
+                }
 
                 float w = 340f;
                 float h = 50f;
@@ -373,23 +393,28 @@ namespace Hellfire.Items
                     ? "[E] Mở Bàn Cường Hóa"
                     : "[E] Cầu Nguyện Tế Đàn";
 
-                GUI.Box(new Rect(x, y, w, h), promptText, promptStyle);
+                GUI.Box(new Rect(x, y, w, h), promptText, _cachedPromptStyle);
             }
 
             // 2. Giao diện Fallback 3 thẻ bài nếu Canvas UI chưa sẵn sàng
             if (_showFallbackChoiceGUI && _cachedOptions != null && _cachedOptions.Count >= 3)
             {
-                GUIStyle panelStyle = new GUIStyle(GUI.skin.box);
-                panelStyle.fontSize = 24;
-                panelStyle.fontStyle = FontStyle.Bold;
-                panelStyle.alignment = TextAnchor.UpperCenter;
+                if (_cachedFallbackPanelStyle == null)
+                {
+                    _cachedFallbackPanelStyle = new GUIStyle(GUI.skin.box)
+                    {
+                        fontSize = 24,
+                        fontStyle = FontStyle.Bold,
+                        alignment = TextAnchor.UpperCenter
+                    };
+                }
 
                 float panelW = Screen.width * 0.7f;
                 float panelH = Screen.height * 0.6f;
                 float panelX = (Screen.width - panelW) / 2f;
                 float panelY = (Screen.height - panelH) / 2f;
 
-                GUI.Box(new Rect(panelX, panelY, panelW, panelH), "\n=== CHỌN BAN PHƯỚC TẾ ĐÀN ===", panelStyle);
+                GUI.Box(new Rect(panelX, panelY, panelW, panelH), "\n=== CHỌN BAN PHƯỚC TẾ ĐÀN ===", _cachedFallbackPanelStyle);
 
                 float cardW = (panelW - 60f) / 3f;
                 float cardH = panelH * 0.6f;
@@ -400,7 +425,8 @@ namespace Hellfire.Items
                 {
                     var opt = _cachedOptions[i];
                     Rect btnRect = new Rect(startX + i * (cardW + 10f), cardY, cardW, cardH);
-                    string label = $"[PHÍM {i + 1}]\n\n{opt.Title}\n\n{opt.Description}\n\n(Bấm để chọn)";
+                    string starText = opt.GetStarIcons();
+                    string label = $"{starText} ({opt.GetTierName()})\n\n{opt.Title}\n\n{opt.Description}\n\n(Bấm để chọn)";
                     if (GUI.Button(btnRect, label))
                     {
                         _showFallbackChoiceGUI = false;
@@ -412,8 +438,6 @@ namespace Hellfire.Items
 
         private void OpenChoiceUI()
         {
-            if (_isUsedByLocalPlayer) return;
-
             if (_cachedOptions == null || _cachedOptions.Count == 0)
             {
                 GenerateOptions();
@@ -421,30 +445,50 @@ namespace Hellfire.Items
 
             string title = _shrineType == ShrineType.WeaponModifierShrine ? "BÀN CƯỜNG HÓA VŨ KHÍ" : "BAN PHƯỚC TẾ ĐÀN";
             string subtitle = _shrineType == ShrineType.WeaponModifierShrine
-                ? "Nâng cấp hỏa lực cho TẤT CẢ vũ khí (giữ nguyên khi đổi súng)"
-                : "Chọn 1 trong 3 ban phước vĩnh viễn (Phím [1], [2], [3] hoặc Click)";
+                ? $"Mỗi lần nâng cấp tốn {UpgradeCost} Pha Lê • Làm mới tốn {RerollCost} Pha Lê"
+                : $"Mỗi lần ban phước tốn {UpgradeCost} Pha Lê • Làm mới tốn {RerollCost} Pha Lê";
 
             bool uiOpened = false;
 
-            // 1. Thử mở qua Singleton Canvas UI
-            if (ShrineChoiceModalUI.Instance != null)
-            {
-                ShrineChoiceModalUI.Instance.Open(title, subtitle, _cachedOptions, OnOptionSelectedLocally);
-                uiOpened = ShrineChoiceModalUI.Instance.IsOpen;
-            }
-
-            // 2. Thử tìm Canvas UI trong Scene
-            if (!uiOpened)
+            // 1. Đảm bảo ShrineChoiceModalUI luôn tồn tại trong Scene
+            if (ShrineChoiceModalUI.Instance == null)
             {
                 var modal = FindAnyObjectByType<ShrineChoiceModalUI>();
-                if (modal != null)
+                if (modal == null)
                 {
-                    modal.Open(title, subtitle, _cachedOptions, OnOptionSelectedLocally);
-                    uiOpened = modal.IsOpen;
+                    string modalResPath = _shrineType == ShrineType.WeaponModifierShrine
+                        ? "UI/WeaponWorkbenchModal"
+                        : "UI/ShrineChoiceModal";
+                    var modalPrefab = Resources.Load<GameObject>(modalResPath) ?? Resources.Load<GameObject>("UI/ShrineChoiceModal");
+                    if (modalPrefab != null)
+                    {
+                        Instantiate(modalPrefab);
+                    }
+                    else
+                    {
+                        var go = new GameObject("ShrineChoiceModalUI");
+                        go.AddComponent<ShrineChoiceModalUI>();
+                    }
                 }
             }
 
-            // 3. Nếu chưa có Canvas UI, tự động kích hoạt Fallback OnGUI
+            if (ShrineChoiceModalUI.Instance != null)
+            {
+                ShrineChoiceModalUI.Instance.Open(
+                    title, 
+                    subtitle, 
+                    _cachedOptions, 
+                    OnOptionSelectedLocally,
+                    _shrineType,
+                    UpgradeCost,
+                    RerollCost,
+                    OnRerollLocally,
+                    OnCloseLocally
+                );
+                uiOpened = ShrineChoiceModalUI.Instance.IsOpen;
+            }
+
+            // 2. Dự phòng an toàn tuyệt đối nếu Canvas bị ẩn
             if (!uiOpened)
             {
                 _showFallbackChoiceGUI = true;
@@ -455,10 +499,13 @@ namespace Hellfire.Items
             }
         }
 
+        private void OnCloseLocally()
+        {
+            _showFallbackChoiceGUI = false;
+        }
+
         private void OnOptionSelectedLocally(int choiceIndex)
         {
-            if (_isUsedByLocalPlayer) return;
-
             if (GameModeHelper.IsOffline || !IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
             {
                 ApplyUpgradeOffline(choiceIndex);
@@ -466,6 +513,34 @@ namespace Hellfire.Items
             else
             {
                 InteractServerRpc(choiceIndex);
+            }
+        }
+
+        private void OnRerollLocally()
+        {
+            var playerMove = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance : FindAnyObjectByType<PlayerMovement>();
+            if (playerMove == null) return;
+
+            var playerStats = playerMove.GetComponent<PlayerStats>();
+            if (playerStats == null) return;
+
+            if (GameModeHelper.IsOffline || !IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            {
+                if (!playerStats.TrySpendCrystals(_shrineType, RerollCost))
+                {
+                    Debug.LogWarning($"[InteractiveShrine] Không đủ {RerollCost} Pha Lê để đổi thẻ!");
+                    return;
+                }
+
+                GenerateOptions(true);
+                if (ShrineChoiceModalUI.Instance != null && ShrineChoiceModalUI.Instance.IsOpen)
+                {
+                    ShrineChoiceModalUI.Instance.RefreshOptions(_cachedOptions);
+                }
+            }
+            else
+            {
+                RerollServerRpc();
             }
         }
 
@@ -477,6 +552,12 @@ namespace Hellfire.Items
             var playerStats = playerMove.GetComponent<PlayerStats>();
             var weaponCtrl = playerMove.GetComponent<WeaponController>();
             if (playerStats == null) return;
+
+            if (!playerStats.TrySpendCrystals(_shrineType, UpgradeCost))
+            {
+                Debug.LogWarning($"[InteractiveShrine] Không đủ {UpgradeCost} Pha Lê để nâng cấp!");
+                return;
+            }
 
             if (_cachedOptions == null || _cachedOptions.Count == 0)
             {
@@ -521,22 +602,27 @@ namespace Hellfire.Items
                         if (selectedOpt.Id == "wpn_damage")
                             weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusDamagePercent: selectedOpt.PrimaryValue);
                         else if (selectedOpt.Id == "wpn_aps")
-                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusDamagePercent: 0f, bonusApsPercent: selectedOpt.PrimaryValue);
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusApsPercent: selectedOpt.PrimaryValue);
+                        else if (selectedOpt.Id == "wpn_reload")
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusReloadSpeedPercent: selectedOpt.PrimaryValue);
+                        else if (selectedOpt.Id == "wpn_accuracy")
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusAccuracyPercent: selectedOpt.PrimaryValue);
+                        else if (selectedOpt.Id == "wpn_mag")
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusMagPercent: selectedOpt.PrimaryValue);
+                        else if (selectedOpt.Id == "wpn_recoil")
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusRecoilReduction: selectedOpt.PrimaryValue);
                         else if (selectedOpt.Id == "wpn_pen")
-                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusDamagePercent: 0f, bonusApsPercent: 0f, bonusArmorPen: selectedOpt.PrimaryValue);
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusArmorPen: selectedOpt.PrimaryValue);
                         else if (selectedOpt.Id == "wpn_crit")
                         {
                             weaponCtrl.ApplyGlobalWeaponUpgradeServer(
-                                bonusDamagePercent: 0f,
-                                bonusApsPercent: 0f,
-                                bonusArmorPen: 0f,
                                 bonusCritChance: selectedOpt.PrimaryValue,
                                 bonusCritMultiplier: selectedOpt.SecondaryValue
                             );
                         }
                         else
                         {
-                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(0.15f, 0.08f, 5f, 0.05f, 0.2f);
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusDamagePercent: 0.15f, bonusApsPercent: 0.08f, bonusArmorPen: 5f);
                         }
 
                         successMsg = $"Đã cường hóa vũ khí: {selectedOpt.Title}!";
@@ -544,9 +630,13 @@ namespace Hellfire.Items
                     break;
             }
 
-            _isUsedByLocalPlayer = true;
-            ApplyUsedVisualLocally();
-            Debug.Log($"<color=#00FF88>[InteractiveShrine] (Offline) {successMsg}</color>");
+            // Sinh ngay 3 thẻ mới để người chơi có thể tiếp tục nâng cấp nếu còn Pha Lê
+            GenerateOptions(true);
+            if (ShrineChoiceModalUI.Instance != null && ShrineChoiceModalUI.Instance.IsOpen)
+            {
+                ShrineChoiceModalUI.Instance.RefreshOptions(_cachedOptions);
+            }
+            Debug.Log($"<color=#00FF88>[InteractiveShrine] (Offline) Đã tiêu hao {UpgradeCost} Pha Lê. {successMsg}</color>");
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
@@ -577,10 +667,10 @@ namespace Hellfire.Items
                 return;
             }
 
-            // 2. Kiểm tra xem người chơi này đã từng dùng tế đàn này chưa
-            if (playerStats.HasUsedShrine(_shrineId))
+            // 2. Kiểm tra và tiêu hao Pha Lê tương ứng
+            if (!playerStats.TrySpendCrystals(_shrineType, UpgradeCost))
             {
-                NotifyFeedbackClientRpc("Bạn đã nhận ban phước từ tế đàn này rồi!", false, GetTargetClientRpcParams(senderClientId));
+                NotifyFeedbackClientRpc($"Không đủ {UpgradeCost} Pha Lê để nâng cấp!", false, GetTargetClientRpcParams(senderClientId));
                 return;
             }
 
@@ -634,20 +724,37 @@ namespace Hellfire.Items
                         }
                         else if (selectedOpt.Id == "wpn_aps")
                         {
-                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusDamagePercent: 0f, bonusApsPercent: selectedOpt.PrimaryValue);
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusApsPercent: selectedOpt.PrimaryValue);
                             successMsg = $"+{Mathf.RoundToInt(selectedOpt.PrimaryValue * 100)}% Tốc Độ Bắn (Áp dụng TẤT CẢ vũ khí)!";
+                        }
+                        else if (selectedOpt.Id == "wpn_reload")
+                        {
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusReloadSpeedPercent: selectedOpt.PrimaryValue);
+                            successMsg = $"+{Mathf.RoundToInt(selectedOpt.PrimaryValue * 100)}% Tốc Độ Nạp Đạn (Áp dụng TẤT CẢ vũ khí)!";
+                        }
+                        else if (selectedOpt.Id == "wpn_accuracy")
+                        {
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusAccuracyPercent: selectedOpt.PrimaryValue);
+                            successMsg = $"+{Mathf.RoundToInt(selectedOpt.PrimaryValue * 100)}% Độ Chính Xác / Giảm Tản Đạn (Áp dụng TẤT CẢ vũ khí)!";
+                        }
+                        else if (selectedOpt.Id == "wpn_mag")
+                        {
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusMagPercent: selectedOpt.PrimaryValue);
+                            successMsg = $"+{Mathf.RoundToInt(selectedOpt.PrimaryValue * 100)}% Dung Lượng Băng Đạn (Áp dụng TẤT CẢ vũ khí)!";
+                        }
+                        else if (selectedOpt.Id == "wpn_recoil")
+                        {
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusRecoilReduction: selectedOpt.PrimaryValue);
+                            successMsg = $"-{Mathf.RoundToInt(selectedOpt.PrimaryValue * 100)}% Độ Giật Súng & Camera (Áp dụng TẤT CẢ vũ khí)!";
                         }
                         else if (selectedOpt.Id == "wpn_pen")
                         {
-                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusDamagePercent: 0f, bonusApsPercent: 0f, bonusArmorPen: selectedOpt.PrimaryValue);
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusArmorPen: selectedOpt.PrimaryValue);
                             successMsg = $"+{selectedOpt.PrimaryValue} Xuyên Giáp (Áp dụng TẤT CẢ vũ khí)!";
                         }
                         else if (selectedOpt.Id == "wpn_crit")
                         {
                             weaponCtrl.ApplyGlobalWeaponUpgradeServer(
-                                bonusDamagePercent: 0f,
-                                bonusApsPercent: 0f,
-                                bonusArmorPen: 0f,
                                 bonusCritChance: selectedOpt.PrimaryValue,
                                 bonusCritMultiplier: selectedOpt.SecondaryValue
                             );
@@ -655,8 +762,7 @@ namespace Hellfire.Items
                         }
                         else
                         {
-                            // Nâng cấp tổng hợp toàn diện
-                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(0.15f, 0.08f, 5f, 0.05f, 0.2f);
+                            weaponCtrl.ApplyGlobalWeaponUpgradeServer(bonusDamagePercent: 0.15f, bonusApsPercent: 0.08f, bonusArmorPen: 5f);
                             successMsg = "Cường Hóa Toàn Diện Hỏa Lực Cho Tất Cả Vũ Khí!";
                         }
                         success = true;
@@ -666,12 +772,12 @@ namespace Hellfire.Items
 
             if (success)
             {
-                // Ghi nhận lịch sử người chơi đã dùng tế đàn này
                 playerStats.RecordShrineUsed(_shrineId);
-
-                // Dập lửa và tắt visual tế đàn riêng cho máy người này
-                ExtinguishShrineClientRpc(GetTargetClientRpcParams(senderClientId));
                 NotifyFeedbackClientRpc(successMsg, true, GetTargetClientRpcParams(senderClientId));
+
+                // Đổi 3 thẻ mới và gửi về cho Client tiếp tục chọn
+                GenerateOptions(true);
+                RefreshClientChoicesClientRpc(GetTargetClientRpcParams(senderClientId));
             }
             else
             {
@@ -679,102 +785,188 @@ namespace Hellfire.Items
             }
         }
 
-        private void GenerateOptions()
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void RerollServerRpc(RpcParams rpcParams = default)
+        {
+            ulong senderClientId = rpcParams.Receive.SenderClientId;
+            if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(senderClientId, out var client) || client.PlayerObject == null) return;
+            GameObject playerObj = client.PlayerObject.gameObject;
+            var playerStats = playerObj.GetComponent<PlayerStats>();
+            if (playerStats == null) return;
+
+            if (!playerStats.TrySpendCrystals(_shrineType, RerollCost))
+            {
+                NotifyFeedbackClientRpc($"Không đủ {RerollCost} Pha Lê để đổi thẻ!", false, GetTargetClientRpcParams(senderClientId));
+                return;
+            }
+
+            GenerateOptions(true);
+            RefreshClientChoicesClientRpc(GetTargetClientRpcParams(senderClientId));
+        }
+
+        [ClientRpc]
+        private void RefreshClientChoicesClientRpc(ClientRpcParams rpcParams = default)
+        {
+            GenerateOptions(true);
+            if (ShrineChoiceModalUI.Instance != null && ShrineChoiceModalUI.Instance.IsOpen)
+            {
+                ShrineChoiceModalUI.Instance.RefreshOptions(_cachedOptions);
+            }
+        }
+
+        private void GenerateOptions(bool randomize = false)
         {
             _cachedOptions = new List<UpgradeOptionData>();
-            var rng = new System.Random(_shrineId * 7919 + 17);
+            var rng = randomize ? new System.Random() : new System.Random(_shrineId * 7919 + 17);
 
             if (_shrineType == ShrineType.BodyShrine)
             {
-                _cachedOptions.Add(new UpgradeOptionData
+                var bodyPool = new List<System.Func<UpgradeOptionData>>
                 {
-                    Id = "hp",
-                    Title = "Sinh Lực Bất Diệt",
-                    Description = "+30 Máu Tối Đa\nTăng lượng máu tối đa vĩnh viễn.",
-                    BadgeText = "[THÂN THỂ]",
-                    Category = UpgradeCategory.BodyStat,
-                    PrimaryValue = 30f
-                });
-                _cachedOptions.Add(new UpgradeOptionData
+                    () => CreateStarOption("hp", "Sinh Lực Bất Diệt", "THÂN THỂ", UpgradeCategory.BodyStat, 30f, 0f, "Máu Tối Đa", rng),
+                    () => CreateStarOption("armor", "Giáp Hắc Thiết", "THÂN THỂ", UpgradeCategory.BodyStat, 15f, 0f, "Giáp Thân Thể", rng),
+                    () => CreateStarOption("speed", "Thần Hành Bộ", "THÂN THỂ", UpgradeCategory.BodyStat, 0.12f, 0f, "Tốc Độ Chạy", rng),
+                    () => CreateStarOption("hp", "Huyết Khí Tinh Hoa", "THÂN THỂ", UpgradeCategory.BodyStat, 40f, 0f, "Máu Tối Đa", rng),
+                    () => CreateStarOption("armor", "Kim Cang Hộ Thể", "THÂN THỂ", UpgradeCategory.BodyStat, 20f, 0f, "Giáp Thân Thể", rng)
+                };
+
+                for (int i = bodyPool.Count - 1; i > 0; i--)
                 {
-                    Id = "armor",
-                    Title = "Giáp Hắc Thiết",
-                    Description = "+15 Giáp Thân Thể\nGiảm đáng kể mọi sát thương nhận vào.",
-                    BadgeText = "[THÂN THỂ]",
-                    Category = UpgradeCategory.BodyStat,
-                    PrimaryValue = 15f
-                });
-                _cachedOptions.Add(new UpgradeOptionData
+                    int j = rng.Next(i + 1);
+                    var temp = bodyPool[i];
+                    bodyPool[i] = bodyPool[j];
+                    bodyPool[j] = temp;
+                }
+
+                for (int i = 0; i < 3 && i < bodyPool.Count; i++)
                 {
-                    Id = "speed",
-                    Title = "Thần Hành Bộ",
-                    Description = "+12% Tốc Độ Di Chuyển\nTăng tốc độ chạy, né đòn cơ động.",
-                    BadgeText = "[THÂN THỂ]",
-                    Category = UpgradeCategory.BodyStat,
-                    PrimaryValue = 0.12f
-                });
+                    _cachedOptions.Add(bodyPool[i]());
+                }
             }
             else if (_shrineType == ShrineType.WeaponModifierShrine)
             {
-                _cachedOptions.Add(new UpgradeOptionData
+                var weaponPool = new List<System.Func<UpgradeOptionData>>
                 {
-                    Id = "wpn_damage",
-                    Title = "Hỏa Lực Cuồng Nộ",
-                    Description = "+20% Sát Thương Toàn Cục\nÁp dụng cho TẤT CẢ vũ khí (giữ nguyên khi đổi súng).",
-                    BadgeText = "[VŨ KHÍ]",
-                    Category = UpgradeCategory.GlobalWeapon,
-                    PrimaryValue = 0.20f
-                });
-                _cachedOptions.Add(new UpgradeOptionData
+                    () => CreateStarOption("wpn_damage", "Hỏa Lực Cuồng Nộ", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.20f, 0f, "Sát Thương Toàn Cục", rng),
+                    () => CreateStarOption("wpn_aps", "Xả Đạn Thần Tốc", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.15f, 0f, "Tốc Độ Bắn", rng),
+                    () => CreateStarOption("wpn_reload", "Thay Đạn Siêu Tốc", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.25f, 0f, "Tốc Độ Nạp Đạn", rng),
+                    () => CreateStarOption("wpn_accuracy", "Bách Phát Bách Trúng", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.20f, 0f, "Độ Chính Xác (Giảm Tản Đạn)", rng),
+                    () => CreateStarOption("wpn_mag", "Băng Đạn Mở Rộng", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.25f, 0f, "Dung Lượng Băng Đạn", rng),
+                    () => CreateStarOption("wpn_recoil", "Ổn Định Báng Súng", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.25f, 0f, "Giảm Độ Giật", rng),
+                    () => CreateStarOption("wpn_pen", "Đạn Phá Giáp", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 15f, 0f, "Xuyên Giáp", rng),
+                    () => CreateStarOption("wpn_crit", "Điểm Huyệt Tử Thần", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.10f, 0.30f, "Chí Mạng & Sát Thương Crit", rng)
+                };
+
+                // Trộn ngẫu nhiên (Fisher-Yates Shuffle) bằng RNG deterministic
+                for (int i = weaponPool.Count - 1; i > 0; i--)
                 {
-                    Id = "wpn_aps",
-                    Title = "Xả Đạn Thần Tốc",
-                    Description = "+15% Tốc Độ Bắn\nTăng nhịp bắn cho mọi loại súng.",
-                    BadgeText = "[VŨ KHÍ]",
-                    Category = UpgradeCategory.GlobalWeapon,
-                    PrimaryValue = 0.15f
-                });
-                _cachedOptions.Add(new UpgradeOptionData
+                    int j = rng.Next(i + 1);
+                    var temp = weaponPool[i];
+                    weaponPool[i] = weaponPool[j];
+                    weaponPool[j] = temp;
+                }
+
+                for (int i = 0; i < 3 && i < weaponPool.Count; i++)
                 {
-                    Id = "wpn_crit",
-                    Title = "Điểm Huyệt Tử Thần",
-                    Description = "+10% Chí Mạng & +30% Sát Thương Crit\nÁp dụng cho tất cả các loại súng.",
-                    BadgeText = "[VŨ KHÍ]",
-                    Category = UpgradeCategory.GlobalWeapon,
-                    PrimaryValue = 0.10f,
-                    SecondaryValue = 0.30f
-                });
+                    _cachedOptions.Add(weaponPool[i]());
+                }
             }
             else // Hybrid
             {
-                _cachedOptions.Add(new UpgradeOptionData
+                var hybridPool = new List<System.Func<UpgradeOptionData>>
                 {
-                    Id = "wpn_damage",
-                    Title = "Cường Hóa Sát Thương",
-                    Description = "+15% Sát Thương cho tất cả vũ khí.",
-                    BadgeText = "[VŨ KHÍ]",
-                    Category = UpgradeCategory.GlobalWeapon,
-                    PrimaryValue = 0.15f
-                });
-                _cachedOptions.Add(new UpgradeOptionData
+                    () => CreateStarOption("wpn_damage", "Cường Hóa Sát Thương", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.18f, 0f, "Sát Thương Toàn Cục", rng),
+                    () => CreateStarOption("hp", "Cường Hóa Sinh Lực", "THÂN THỂ", UpgradeCategory.BodyStat, 25f, 0f, "Máu Tối Đa", rng),
+                    () => CreateStarOption("wpn_reload", "Thay Đạn Thần Tốc", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.20f, 0f, "Tốc Độ Nạp Đạn", rng),
+                    () => CreateStarOption("armor", "Giáp Hắc Thiết", "THÂN THỂ", UpgradeCategory.BodyStat, 15f, 0f, "Giáp Thân Thể", rng),
+                    () => CreateStarOption("wpn_recoil", "Ổn Định Báng Súng", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.20f, 0f, "Giảm Độ Giật", rng),
+                    () => CreateStarOption("speed", "Thần Hành Bộ", "THÂN THỂ", UpgradeCategory.BodyStat, 0.10f, 0f, "Tốc Độ Chạy", rng),
+                    () => CreateStarOption("wpn_accuracy", "Tập Trung Ngắm Bắn", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.18f, 0f, "Độ Chính Xác", rng),
+                    () => CreateStarOption("wpn_mag", "Băng Đạn Mở Rộng", "VŨ KHÍ", UpgradeCategory.GlobalWeapon, 0.20f, 0f, "Dung Lượng Băng Đạn", rng)
+                };
+
+                for (int i = hybridPool.Count - 1; i > 0; i--)
                 {
-                    Id = "hp",
-                    Title = "Cường Hóa Máu",
-                    Description = "+25 Máu Tối Đa cho người chơi.",
-                    BadgeText = "[THÂN THỂ]",
-                    Category = UpgradeCategory.BodyStat,
-                    PrimaryValue = 25f
-                });
-                _cachedOptions.Add(new UpgradeOptionData
+                    int j = rng.Next(i + 1);
+                    var temp = hybridPool[i];
+                    hybridPool[i] = hybridPool[j];
+                    hybridPool[j] = temp;
+                }
+
+                for (int i = 0; i < 3 && i < hybridPool.Count; i++)
                 {
-                    Id = "wpn_pen",
-                    Title = "Đạn Phá Giáp",
-                    Description = "+15 Xuyên Giáp cho tất cả vũ khí.",
-                    BadgeText = "[VŨ KHÍ]",
-                    Category = UpgradeCategory.GlobalWeapon,
-                    PrimaryValue = 15f
-                });
+                    _cachedOptions.Add(hybridPool[i]());
+                }
             }
+        }
+
+        private UpgradeOptionData CreateStarOption(
+            string id,
+            string title,
+            string badgeText,
+            UpgradeCategory category,
+            float basePrimary,
+            float baseSecondary,
+            string statName,
+            System.Random rng
+        )
+        {
+            // Tỷ lệ sao ngẫu nhiên: 1 Sao (60%), 2 Sao (30%), 3 Sao (10%)
+            int roll = rng.Next(100);
+            int stars = 1;
+            float multiplier = 1.0f; // 100%
+
+            if (roll >= 90)
+            {
+                stars = 3;
+                multiplier = 2.0f; // 200% thưởng
+            }
+            else if (roll >= 60)
+            {
+                stars = 2;
+                multiplier = 1.5f; // 150% thưởng
+            }
+
+            float finalPrimary = basePrimary * multiplier;
+            float finalSecondary = baseSecondary * multiplier;
+
+            string starIcons = stars == 3 ? "★★★" : (stars == 2 ? "★★☆" : "★☆☆");
+            string tierName = stars == 3 ? "HUYỀN THOẠI (+200%)" : (stars == 2 ? "HIẾM (+150%)" : "CƠ BẢN (+100%)");
+
+            string desc;
+            if (id == "hp" || id == "armor" || id == "wpn_pen")
+            {
+                desc = $"+{Mathf.RoundToInt(finalPrimary)} {statName}";
+            }
+            else if (id == "wpn_crit")
+            {
+                desc = $"+{Mathf.RoundToInt(finalPrimary * 100f)}% Tỉ Lệ & +{Mathf.RoundToInt(finalSecondary * 100f)}% DMG Crit";
+            }
+            else if (id == "wpn_recoil")
+            {
+                desc = $"-{Mathf.RoundToInt(finalPrimary * 100f)}% Độ Giật Súng";
+            }
+            else if (id == "wpn_accuracy")
+            {
+                desc = $"-{Mathf.RoundToInt(finalPrimary * 100f)}% Độ Lệch Đạn";
+            }
+            else
+            {
+                desc = $"+{Mathf.RoundToInt(finalPrimary * 100f)}% {statName}";
+            }
+
+            return new UpgradeOptionData
+            {
+                Id = id,
+                Title = $"{title}",
+                Description = desc,
+                BadgeText = $"{badgeText}",
+                Category = category,
+                PrimaryValue = finalPrimary,
+                SecondaryValue = finalSecondary,
+                Stars = stars,
+                StarMultiplier = multiplier
+            };
         }
 
         [ClientRpc]

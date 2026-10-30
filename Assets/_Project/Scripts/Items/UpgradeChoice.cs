@@ -17,11 +17,39 @@ namespace Hellfire.Items
     public struct UpgradeOptionData
     {
         public string Id;
-        public string Title;          // Ví dụ: "Cường Hóa Sát Thương"
-        public string Description;    // Ví dụ: "+20% Sát thương cho tất cả vũ khí"
+        public string Title;          // Ví dụ: "Sinh Lực Bất Diệt"
+        public string Description;    // Ví dụ: "+30 Máu Tối Đa"
         public string BadgeText;      // "[VŨ KHÍ]" hoặc "[THÂN THỂ]"
         public UpgradeCategory Category;
-        public float PrimaryValue;    // Giá trị cộng thêm chính
+        public float PrimaryValue;    // Giá trị cộng thêm chính (đã nhân hệ số sao)
         public float SecondaryValue;  // Giá trị cộng thêm phụ (nếu có)
+        public int Stars;             // Số sao phẩm chất: 1, 2 hoặc 3 sao
+        public float StarMultiplier;  // Hệ số thưởng thêm: 1.0f (100%), 1.5f (150%), 2.0f (200%)
+
+        /// <summary>
+        /// Trả về chuỗi ký tự hiển thị sao (ví dụ: "★☆☆", "★★☆", "★★★")
+        /// </summary>
+        public string GetStarIcons()
+        {
+            switch (Stars)
+            {
+                case 3: return "★★★";
+                case 2: return "★★☆";
+                default: return "★☆☆";
+            }
+        }
+
+        /// <summary>
+        /// Tên phẩm chất theo số sao
+        /// </summary>
+        public string GetTierName()
+        {
+            switch (Stars)
+            {
+                case 3: return "HUYỀN THOẠI (200%)";
+                case 2: return "HIẾM (150%)";
+                default: return "CƠ BẢN (100%)";
+            }
+        }
     }
 }

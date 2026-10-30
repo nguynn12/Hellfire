@@ -54,9 +54,10 @@ namespace Hellfire.Combat
         /// <summary>
         /// Nạp đạn từ kho dự trữ vào băng đạn. Trả về số lượng đạn nạp thực tế.
         /// </summary>
-        public int Reload()
+        public int Reload(int targetMagSize = -1)
         {
-            int needed = _baseData.MagSize - _currentAmmo;
+            int effectiveMag = targetMagSize > 0 ? targetMagSize : _baseData.MagSize;
+            int needed = effectiveMag - _currentAmmo;
             if (needed <= 0 || _reserveAmmo <= 0) return 0;
             int toAdd = Mathf.Min(needed, _reserveAmmo);
             _reserveAmmo -= toAdd;

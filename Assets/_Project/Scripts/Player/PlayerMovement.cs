@@ -276,10 +276,13 @@ namespace Hellfire.Player
                 return;
             }
 
-            // Click chuột trái vào màn hình Game tự động khóa chuột
+            // Click chuột trái vào màn hình Game tự động khóa chuột (trừ khi đang mở bảng chọn thẻ hoặc menu)
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !_isCursorLocked)
             {
-                SetCursorLock(true);
+                if (Hellfire.UI.ShrineChoiceModalUI.Instance == null || !Hellfire.UI.ShrineChoiceModalUI.Instance.IsOpen)
+                {
+                    SetCursorLock(true);
+                }
             }
 
             HandleCursorToggle();

@@ -63,6 +63,8 @@ namespace Hellfire.Combat
             Destroy(gameObject, 4.0f);
         }
 
+        private static Mesh _sharedCapsuleMesh;
+
         private void SetupBulletMesh(Material mat, Color color)
         {
             var meshFilter = gameObject.GetComponent<MeshFilter>();
@@ -71,10 +73,13 @@ namespace Hellfire.Combat
             _meshRenderer = gameObject.GetComponent<MeshRenderer>();
             if (_meshRenderer == null) _meshRenderer = gameObject.AddComponent<MeshRenderer>();
 
-            // Tạo mesh capsule hoặc sphere kéo dẹt
-            var tempObj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            meshFilter.sharedMesh = tempObj.GetComponent<MeshFilter>().sharedMesh;
-            Destroy(tempObj);
+            if (_sharedCapsuleMesh == null)
+            {
+                var tempObj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                _sharedCapsuleMesh = tempObj.GetComponent<MeshFilter>().sharedMesh;
+                Destroy(tempObj);
+            }
+            meshFilter.sharedMesh = _sharedCapsuleMesh;
 
             transform.localScale = new Vector3(0.022f, 0.022f, 0.09f);
 

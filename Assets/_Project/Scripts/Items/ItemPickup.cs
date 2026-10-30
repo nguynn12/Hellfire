@@ -55,12 +55,29 @@ namespace Hellfire.Items
             NetworkVariableWritePermission.Server
         );
 
+        private readonly NetworkVariable<int> _netAmmoInMag = new NetworkVariable<int>(
+            -1,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
+        private readonly NetworkVariable<int> _netReserveAmmo = new NetworkVariable<int>(
+            -1,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
+        private int _rawAmmoInMag = -1;
+        private int _rawReserveAmmo = -1;
+
         private Vector3 _initialPosition;
         private bool _hasDespawned = false;
 
         public ItemPickupType Type => (ItemPickupType)_netPickupType.Value;
         public PowerUpData PowerUp => _powerUpData;
         public WeaponData Weapon => _weaponData;
+        public int CurrentAmmoInMag => (NetworkObject != null && NetworkObject.IsSpawned) ? _netAmmoInMag.Value : _rawAmmoInMag;
+        public int CurrentReserveAmmo => (NetworkObject != null && NetworkObject.IsSpawned) ? _netReserveAmmo.Value : _rawReserveAmmo;
 
         private void Awake()
         {
@@ -130,10 +147,16 @@ namespace Hellfire.Items
         }
 
         /// <summary>
-        /// Cấu hình vũ khí trên Server trước khi Spawn ra mạng.
+        /// Cấu hình vũ khí trên Server trước khi Spawn ra mạng (hỗ trợ bảo lưu số đạn).
         /// </summary>
-        public void InitializeWeapon(WeaponData data)
+        public void InitializeWeapon(WeaponData data, int ammoInMag = -1, int reserveAmmo = -1)
         {
+            int finalMag = ammoInMag >= 0 ? ammoInMag : (data != null ? data.MagSize : 0);
+            int finalReserve = reserveAmmo >= 0 ? reserveAmmo : (data != null ? data.MaxReserveAmmo : 0);
+
+            _rawAmmoInMag = finalMag;
+            _rawReserveAmmo = finalReserve;
+
             if (GameModeHelper.IsOffline)
             {
                 _pickupType = ItemPickupType.Weapon;
@@ -154,6 +177,8 @@ namespace Hellfire.Items
             {
                 _netPickupType.Value = (int)ItemPickupType.Weapon;
                 _netItemId.Value = data != null ? data.WeaponId : string.Empty;
+                _netAmmoInMag.Value = finalMag;
+                _netReserveAmmo.Value = finalReserve;
             }
 
             UpdateVisuals();
@@ -197,7 +222,8 @@ namespace Hellfire.Items
             else if (activeType == ItemPickupType.Weapon && _weaponData != null)
             {
                 displayColor = new Color(1f, 0.6f, 0.1f); // Màu cam vũ khí
-                displayName = $"{_weaponData.WeaponName}\n<size=70%>Sát thương: {_weaponData.BaseDamage} | Băng: {_weaponData.MagSize}</size>";
+                int mag = CurrentAmmoInMag >= 0 ? CurrentAmmoInMag : _weaponData.MagSize;
+                displayName = $"{_weaponData.WeaponName}\n<size=70%>Đạn: {mag}/{_weaponData.MagSize} | Sát thương: {_weaponData.BaseDamage}</size>";
             }
 
             if (_meshRenderer != null)
@@ -296,8 +322,8 @@ namespace Hellfire.Items
             {
                 if (_weaponData != null && weaponController != null)
                 {
-                    weaponController.AddOrSwitchWeapon(_weaponData);
-                    Debug.Log($"[ItemPickup] Người chơi đã nhặt vũ khí: {_weaponData.WeaponName}");
+                    weaponController.AddOrSwitchWeapon(_weaponData, CurrentAmmoInMag, CurrentReserveAmmo);
+                    Debug.Log($"[ItemPickup] Người chơi đã nhặt vũ khí: {_weaponData.WeaponName} (Đạn: {CurrentAmmoInMag}/{CurrentReserveAmmo})");
                     if (!GameModeHelper.IsOffline)
                     {
                         PlayPickupSoundClientRpc(transform.position);
