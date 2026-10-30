@@ -1,5 +1,7 @@
 # Hellfire — Đặc tả kỹ thuật (Technical Specification)
 
+> **Phạm vi áp dụng (quan trọng)**: Tài liệu này là đặc tả RIÊNG của chủ dự án, dùng để điều khiển AI lập trình (Antigravity). Các thành viên khác trong nhóm (Phước, Benz2311...) KHÔNG bị ràng buộc bởi nó và có thể tự thêm tính năng mới. Code do họ viết được coi là **phần được tích hợp**, không phải lỗi vi phạm đặc tả. AI KHÔNG ĐƯỢC hoàn nguyên hay viết lại chúng; việc của AI là làm cho chúng tương thích với hệ thống hiện có (xem mục 19).
+
 **Mục đích tài liệu**: Đây là tài liệu tham chiếu kỹ thuật duy nhất (single source of truth) cho dự án. Mọi lập trình viên hoặc AI hỗ trợ code khi đọc tài liệu này phải hiểu chính xác cơ chế cần cài đặt mà không cần suy đoán thêm. Nếu một chi tiết không có trong tài liệu này, đó là chi tiết chưa được quyết định — không tự bịa ra cách làm, hãy hỏi lại hoặc đánh dấu `TODO`.
 
 **Phiên bản tài liệu**: 1.0
@@ -516,6 +518,9 @@ Danh sách nhanh để kiểm tra khi code hoặc review code — nếu vi phạ
 - [ ] Quái chỉ spawn khi phòng chuyển `Locked`; boss chỉ spawn khi phòng boss `Locked` (mục 17.5).
 - [ ] Linh hồn là `NetworkVariable<int>` do Server ghi, mỗi người một ví, reset mỗi lượt (mục 17.7).
 - [ ] Shop: 5 món giống nhau cho mọi người; tập "đã mua" tách riêng từng người; Server xác thực mọi giao dịch (mục 17.8).
+- [ ] Đạn dự trữ VẪN VÔ HẠN (mục 18, 19.3); không có đạn dự trữ hữu hạn trong `WeaponController`/`RuntimeWeapon`.
+- [ ] Cảm giác súng của Benz (WeaponSwayBobbing, WeaponRecoil, WeaponAimDownSights, WeaponMotionCoordinator) được gắn vào `Player.prefab` THẬT và chỉ chạy phía chủ sở hữu (thuần hình ảnh); hitscan vẫn do Server xác nhận (mục 19.2).
+- [ ] `RangedZombieAI` có prefab chính thức, đã đăng ký NetworkPrefabs và nằm trong bảng trọng số spawn của phòng Combat (mục 19.4).
 
 ---
 
@@ -645,7 +650,7 @@ Hiện quái spawn lệch ngẫu nhiên quanh tâm phòng và rương đặt ở
 
 ### 16.12 Chưa làm ở bản này (giới hạn phạm vi có chủ đích)
 
-Hệ thống ping, kill feed, damage numbers, bảng điểm trực tiếp, minimap có đánh dấu quái, tách âm lượng nhạc/hiệu ứng, độ giật súng/đèn nháy nòng súng. AI/lập trình viên **KHÔNG ĐƯỢC** tự thêm các mục này; muốn thêm phải cập nhật đặc tả trước.
+Hệ thống ping, kill feed, damage numbers, bảng điểm trực tiếp, minimap có đánh dấu quái, tách âm lượng nhạc/hiệu ứng. (Cảm giác súng gồm sway/bobbing, giật, ADS đã được tích hợp, xem mục 19.2.) AI/lập trình viên **KHÔNG ĐƯỢC** tự thêm các mục này; muốn thêm phải cập nhật đặc tả trước.
 
 ---
 
@@ -772,3 +777,47 @@ Nhiều đợt quái trong một phòng, phòng mini-boss, phòng bí mật, ch�
 - Tế đàn chọn 1 trong 3 (`InteractiveShrine`), mỗi người chơi dùng một lần mỗi tế đàn.
 
 Các điểm này **được công nhận là đúng** và thắng các mô tả cũ ở mục 3, 6.1, 6.2 nếu mâu thuẫn (ví dụ về "đạn dự trữ"). AI/lập trình viên KHÔNG ĐƯỢC hoàn nguyên chúng.
+
+---
+
+## 19. Tích hợp từ các thành viên khác — Giai đoạn 4.7
+
+> Mục này ghi nhận những gì chủ dự án đã quyết định **giữ lại** từ công việc của Benz2311 và Phước. Nếu mâu thuẫn với mục 3, 5, 6, 16.12 thì **mục 19 thắng**.
+
+### 19.1 Nguyên tắc
+
+- Nền tích hợp là nhánh `merge/phuoc-fixes` (đã gộp bản sửa của Phước, đã đạt toàn bộ bất biến mục 14). Mọi tích hợp mới làm trên một nhánh con của nó, không động vào `main`.
+- AI KHÔNG hoàn nguyên, không viết lại từ đầu, không đổi tên các script của người khác. Chỉ sửa tối thiểu để chúng biên dịch, chạy đúng trên mạng, và không phá các bất biến ở mục 14.
+- Các scene/prefab test do họ tạo (`TestCombatJuice`, `TestArcherAI`, `TestShrine`...) giữ làm công cụ dev; không đưa vào luồng chơi thật.
+
+### 19.2 Cảm giác súng của Benz2311 — ĐÃ CHỐT: GIỮ LẠI
+
+- Gồm `WeaponSwayBobbing`, `WeaponRecoil`, `WeaponAimDownSights`, `WeaponMotionCoordinator` (commit `0037194`, nhánh `feature/sprint-1-combat-juice`), kèm các thay đổi nhỏ trong `WeaponController`/`WeaponData`.
+- **Các component này hiện chỉ được gắn vào `Player_CombatJuice_Test.prefab`.** PHẢI gắn chúng vào **`Player.prefab` thật**, trên cùng GameObject viewmodel mà công cụ `HellfireCombatJuiceSetup` đã dùng cho prefab test, để ván chơi thật có cảm giác súng.
+- Chỉ chạy trên máy **chủ sở hữu** (`IsOwner`/`CanLocalControl`), thuần hình ảnh. KHÔNG được làm đổi luật mục 3.1: Server vẫn tự raycast xác nhận và tính sát thương; hướng bắn gửi lên Server là hướng thực của camera tại thời điểm bắn.
+- Công tắc "Giảm rung màn hình" (mục 16.9) PHẢI áp dụng cho hiệu ứng giật/rung mới nếu có rung màn hình.
+
+### 19.3 Đạn — ĐÃ CHỐT: VẪN VÔ HẠN
+
+- Đạn dự trữ vô hạn như mục 18; băng đạn vẫn hữu hạn. Nhánh `test-weapons` của Phước có đạn dự trữ hữu hạn (mặc định 120) nhưng **không có nguồn tiếp đạn**: phần này KHÔNG được tích hợp. Khi tích hợp công việc của Phước về sau, đạn vô hạn thắng.
+
+### 19.4 Quái tầm xa `RangedZombieAI` của Benz2311 — ĐÃ CHỐT: THÊM VÀO
+
+- Quái thứ 4 của phòng Combat (tên hiển thị "Zombie tầm xa"). Kế thừa `EnemyStateMachine`, chạy CHỈ trên Server (mục 5.1), có phát hiện, kiểm tra tầm nhìn, giữ khoảng cách và đòn tấn công có báo trước; hiệu ứng gửi bằng `ClientRpc`.
+- Cần một **prefab chính thức** (không dùng `Enemy_Archer_Test.prefab`): cấu trúc giống các prefab quái hiện có (`NetworkObject`, `NetworkTransform` với `AuthorityMode = Server`, `Health` + hitbox, `NavMeshAgent`, `RangedZombieAI`, `RangedZombieVisuals`), đăng ký vào `DefaultNetworkPrefabs` qua Inspector của Unity.
+- Thưởng Linh hồn `_soulsReward = 8` (như Archer). Hệ số số lượng theo số người (mục 15.3) áp dụng như quái thường. KHÔNG dùng làm quái do boss triệu hồi.
+- `DungeonEnemySpawner` đổi sang chọn loại quái theo **trọng số `[SerializeField] int`**, mặc định: Imp 40, Archer 25, Zombie tầm xa 15, Brute 20 (tổng 100). Mọi vị trí spawn vẫn qua `NavMesh.SamplePosition` (mục 15.2).
+
+### 19.5 Chưa tích hợp ở bản này
+
+- Nhánh `test-weapons` của Phước (model súng 3D, crosshair HUD, ammo HUD, FX pool, giật/ADS riêng): chờ Phước rebase lên nền mới; phần giật/ADS của Phước KHÔNG dùng vì đã chọn bản của Benz.
+- Công cụ test offline thứ ba của Benz (`LocalTestHostBootstrap`, `OfflineDummyHealth`, `TargetDummyFeedback`): không mang vào.
+- `WeaponVisualEffects` của Benz: chỉ mang vào nếu gắn được mà không phải sửa `WeaponController` nhiều; nếu không thì bỏ và báo lại.
+
+### 19.6 Tiêu chí nghiệm thu
+
+1. Unity biên dịch sạch, Console không lỗi đỏ; checklist mục 14 vẫn Đạt (đặc biệt: `Player.prefab AuthorityMode = 1`, một `OnDestroy` trong `PlayerMovement`, bản vá cờ spawn xong).
+2. Vào ván thật: có sway/bobbing khi đi, giật khi bắn, ADS khi giữ chuột phải; Client và Host đều thấy đúng và sát thương vẫn do Server xác nhận.
+3. Đạn dự trữ vẫn vô hạn: hết băng thì nạp lại được mãi.
+4. Phòng Combat thỉnh thoảng có Zombie tầm xa: nó giữ khoảng cách, bắn có báo trước, chết thì cả đội nhận 8 Linh hồn, tổng kết lượt chơi ghi nhận hạ gục.
+5. Cổng sắt vẫn giữ quái trong phòng, phòng vẫn chỉ mở khi diệt hết (kể cả Zombie tầm xa).
