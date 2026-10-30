@@ -475,6 +475,7 @@ MonoBehaviour:
   _playerBodyMesh: {fileID: 2142467901949786052}
   _weaponViewmodel: {fileID: 6457979424595455948}
   _health: {fileID: 0}
+  _playerStats: {fileID: 0}
   _walkSpeed: 4.5
   _sprintSpeed: 7
   _backwardMultiplier: 0.7
@@ -483,6 +484,7 @@ MonoBehaviour:
   _mouseSensitivity: 2
   _pitchClampMin: -85
   _pitchClampMax: 85
+  _isOnlineMode: 0
   _playerBodyLayerName: PlayerBody
   _viewmodelLayerName: Viewmodel
 --- !u!114 &8148796173920827955
@@ -498,11 +500,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.Health
   ShowTopMostFoldoutHeaderGroup: 1
-  _maxHealth: 100
+  _baseMaxHealth: 100
   _isPlayer: 1
+  _baseArmor: 0
   _downedDuration: 60
   _reviveHealthPercent: 0.3
-  _despawnDelay: 3
 --- !u!114 &8044882393265108530
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -542,6 +544,7 @@ MonoBehaviour:
   _playerHealth: {fileID: 0}
   _audioSource: {fileID: 0}
   _tracerDuration: 0.05
+  _maxAllowedShootOriginDistance: 3
 --- !u!82 &8184653799288585890
 AudioSource:
   m_ObjectHideFlags: 0
@@ -639,6 +642,106 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &5011223344556677881
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5af45fd901214225b1ba6c6e48bd796a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerStats
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &5011223344556677882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 510c859c23e8d9a42ab5335ade2e4add, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerBuffManager
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &5011223344556677883
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7f53a8120bd40909673966de94e1e07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerWallet
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &489218598500552374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3990227018134108929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 72f452ab282a45fb9052330951a1750e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerIdentity
+  ShowTopMostFoldoutHeaderGroup: 1
+  PlayerName:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue:
+      utf8LengthInBytes: 8
+      bytes:
+        offset0000:
+          byte0000: 80
+          byte0001: 108
+          byte0002: 97
+          byte0003: 121
+          byte0004: 101
+          byte0005: 114
+          byte0006: 32
+          byte0007: 49
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        byte0016: 0
+        byte0017: 0
+        byte0018: 0
+        byte0019: 0
+        byte0020: 0
+        byte0021: 0
+        byte0022: 0
+        byte0023: 0
+        byte0024: 0
+        byte0025: 0
+        byte0026: 0
+        byte0027: 0
+        byte0028: 0
+        byte0029: 0
+  ColorIndex:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  IsReady:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
 --- !u!1 &6457979424595455948
 GameObject:
   m_ObjectHideFlags: 0
@@ -648,6 +751,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5381150835459529816}
+  - component: {fileID: 6417377757022507395}
+  - component: {fileID: 6316514081456841377}
+  - component: {fileID: 1912518411114849863}
+  - component: {fileID: 4142404767945708372}
   m_Layer: 7
   m_Name: WeaponViewmodel
   m_TagString: Untagged
@@ -671,6 +778,133 @@ Transform:
   - {fileID: 5369624249776172383}
   m_Father: {fileID: 5768589036763545454}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6417377757022507395
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6457979424595455948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c040f93f8dff243a5a403dba32a2ad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.WeaponAimDownSights
+  _hipPosition: {x: 0.25, y: -0.2, z: 0.5}
+  _hipRotation: {x: 0, y: 0, z: 0}
+  _adsPosition: {x: 0, y: -0.14, z: 0.38}
+  _adsRotation: {x: 0, y: 0, z: 0}
+  _adsFOV: 65
+  _adsTransitionSpeed: 12
+  _toggleMode: 0
+  _adsSpreadMultiplier: 0.5
+  _playerCamera: {fileID: 3801938197726472895}
+  _weaponController: {fileID: 9060686978780575275}
+  _playerMovement: {fileID: 166179427234535869}
+--- !u!114 &6316514081456841377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6457979424595455948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f8a05d3b6bed54a8ba709b3ea90979, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.WeaponSwayBobbing
+  _enableSway: 1
+  _swayPositionAmount: 0.02
+  _maxSwayPosition: 0.06
+  _swayRotationAmount: 2
+  _maxSwayRotation: 5
+  _swaySmoothSpeed: 10
+  _enableBobbing: 1
+  _bobHorizontalAmount: 0.015
+  _bobVerticalAmount: 0.02
+  _walkBobFrequency: 8
+  _sprintBobFrequency: 12
+  _bobRotationRoll: 1.5
+  _bobSmoothSpeed: 8
+  _adsSwayMultiplier: 0.25
+  _adsBobMultiplier: 0.15
+  _characterController: {fileID: 2725908128969272328}
+  _adsComponent: {fileID: 6417377757022507395}
+--- !u!114 &1912518411114849863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6457979424595455948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5850d763bc6fa604a909219afd8c5113, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.WeaponRecoil
+  _defaultProfile:
+    kickBackZ: 0.06
+    kickUpY: 0.025
+    kickPitchX: 3.5
+    kickYawY: 1
+    kickRollZ: 0.8
+    snappiness: 22
+    returnSpeed: 9
+  _pistolProfile:
+    kickBackZ: 0.05
+    kickUpY: 0.02
+    kickPitchX: 3
+    kickYawY: 0.8
+    kickRollZ: 0.5
+    snappiness: 24
+    returnSpeed: 10
+  _rifleProfile:
+    kickBackZ: 0.06
+    kickUpY: 0.025
+    kickPitchX: 2.5
+    kickYawY: 1.2
+    kickRollZ: 0.7
+    snappiness: 20
+    returnSpeed: 11
+  _shotgunProfile:
+    kickBackZ: 0.12
+    kickUpY: 0.06
+    kickPitchX: 7
+    kickYawY: 2
+    kickRollZ: 1.5
+    snappiness: 26
+    returnSpeed: 7
+  _smgProfile:
+    kickBackZ: 0.035
+    kickUpY: 0.015
+    kickPitchX: 1.8
+    kickYawY: 1.4
+    kickRollZ: 0.9
+    snappiness: 28
+    returnSpeed: 14
+  _adsRecoilMultiplier: 0.55
+  _enableCameraKick: 1
+  _cameraKickPitch: 0.8
+  _cameraKickReturnSpeed: 12
+  _weaponController: {fileID: 9060686978780575275}
+  _adsComponent: {fileID: 6417377757022507395}
+  _cameraPivot: {fileID: 6926716154751748396}
+--- !u!114 &4142404767945708372
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6457979424595455948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11e166a92e5d84743b4e39c8c3c132cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.WeaponMotionCoordinator
+  _adsComponent: {fileID: 6417377757022507395}
+  _swayBobbingComponent: {fileID: 6316514081456841377}
+  _recoilComponent: {fileID: 1912518411114849863}
+  _viewmodelTransform: {fileID: 5381150835459529816}
 --- !u!1 &6835410290461769424
 GameObject:
   m_ObjectHideFlags: 0
@@ -740,51 +974,3 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
   _hitboxType: 0
   _damageableTarget: {fileID: 8148796173920827955}
---- !u!114 &5011223344556677881
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3990227018134108929}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5af45fd901214225b1ba6c6e48bd796a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerStats
---- !u!114 &5011223344556677882
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3990227018134108929}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 510c859c23e8d9a42ab5335ade2e4add, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerBuffManager
---- !u!114 &5011223344556677883
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3990227018134108929}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7f53a8120bd40909673966de94e1e07, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerWallet
---- !u!114 &489218598500552374
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3990227018134108929}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 72f452ab282a45fb9052330951a1750e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Player.PlayerIdentity
