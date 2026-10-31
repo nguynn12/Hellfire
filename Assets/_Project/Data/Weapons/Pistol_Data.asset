@@ -54,6 +54,22 @@ MonoBehaviour:
   _recoilRecoverySpeed: 15
   _effectiveRange: 30
   _minDamageMultiplier: 0.3
+  _enableJuiceEffects: 1
+  _useMuzzleFlash: 1
+  _flashDuration: 0.04
+  _spreadDegrees: 2.0
+  _tracerSpeedJitter: 0.1
+  _tracerLength: 3.5
+  _playerPushbackForce: 0.8
+  _enableShellEjection: 1
+  _shellPrefab: {fileID: 0}
+  _shellEjectionVelocity: {x: 3, y: 2.5, z: 0}
+  _enableDecals: 1
+  _bulletDecalPrefab: {fileID: 0}
+  _enableKillSlowMo: 1
+  _killSlowMoScale: 0.25
+  _killSlowMoDuration: 0.3
+  _enemyDeathImpulse: 12.0
   _fireSound: {fileID: 0}
   _fireSounds: []
   _reloadSound: {fileID: 0}

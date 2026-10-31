@@ -338,6 +338,56 @@ namespace Hellfire.AI
             StartCoroutine(DespawnRoutine(3.0f));
         }
 
+        /// <summary>
+        /// Tác động lực đẩy văng quái vật khi chết (Death Impulse / Ragdoll Fling).
+        /// </summary>
+        public void ApplyDeathImpulse(Vector3 hitDirection, float impulseForce)
+        {
+            if (impulseForce <= 0.01f) return;
+
+            if (GameModeHelper.IsOffline || NetworkObject == null || !NetworkObject.IsSpawned)
+            {
+                ExecuteDeathImpulsePhysical(hitDirection, impulseForce);
+            }
+            else if (IsServer)
+            {
+                ExecuteDeathImpulsePhysical(hitDirection, impulseForce);
+                ApplyDeathImpulseClientRpc(hitDirection, impulseForce);
+            }
+        }
+
+        [ClientRpc]
+        private void ApplyDeathImpulseClientRpc(Vector3 hitDirection, float impulseForce)
+        {
+            if (IsServer) return;
+            ExecuteDeathImpulsePhysical(hitDirection, impulseForce);
+        }
+
+        private void ExecuteDeathImpulsePhysical(Vector3 hitDirection, float impulseForce)
+        {
+            if (_navAgent != null)
+            {
+                _navAgent.enabled = false;
+            }
+
+            var rb = GetComponent<Rigidbody>();
+            if (rb == null)
+            {
+                rb = gameObject.AddComponent<Rigidbody>();
+                rb.mass = 35f;
+                rb.linearDamping = 0.5f;
+                rb.angularDamping = 1.0f;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            }
+
+            rb.isKinematic = false;
+            rb.useGravity = true;
+
+            Vector3 forceVector = hitDirection.normalized * impulseForce + Vector3.up * (impulseForce * 0.45f);
+            rb.linearVelocity = forceVector;
+            rb.angularVelocity = UnityEngine.Random.insideUnitSphere * 8f;
+        }
+
         [ClientRpc]
         private void PlayDeathFeedbackClientRpc()
         {

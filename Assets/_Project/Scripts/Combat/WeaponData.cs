@@ -109,6 +109,37 @@ namespace Hellfire.Combat
         [Range(0.05f, 1f)]
         [SerializeField] private float _adsSpreadMultiplier = 0.35f;
 
+        
+        [Header("=== JUICE & GAME FEEL SETTINGS ===")]
+        [SerializeField] private bool _enableJuiceEffects = true;
+
+        [Header("1. Muzzle Flash")]
+        [SerializeField] private bool _useMuzzleFlash = true;
+        [SerializeField] private float _flashDuration = 0.04f;
+
+        [Header("2. Spread & Tracer")]
+        [SerializeField] private float _spreadDegrees = 3.0f;
+        [SerializeField] private float _tracerSpeedJitter = 0.10f; // ±10%
+        [SerializeField] private float _tracerLength = 3.5f;
+
+        [Header("3. Recoil & Pushback")]
+        [SerializeField] private float _playerPushbackForce = 1.8f;
+
+        [Header("4. Shell Ejection")]
+        [SerializeField] private bool _enableShellEjection = true;
+        [SerializeField] private GameObject _shellPrefab;
+        [SerializeField] private Vector3 _shellEjectionVelocity = new Vector3(3f, 2.5f, 0f);
+
+        [Header("5. Decals")]
+        [SerializeField] private bool _enableDecals = true;
+        [SerializeField] private GameObject _bulletDecalPrefab;
+
+        [Header("6. Lethal Shot (Kill Juice)")]
+        [SerializeField] private bool _enableKillSlowMo = true;
+        [SerializeField] private float _killSlowMoScale = 0.25f;
+        [SerializeField] private float _killSlowMoDuration = 0.30f;
+        [SerializeField] private float _enemyDeathImpulse = 14.0f;
+
         [Header("Recoil & Procedural Kickback (Độ giật súng & Camera)")]
         [Tooltip("Lực nảy giật lùi về phía sau của viewmodel khi bắn (mét)")]
         [SerializeField] private float _kickbackForce = 0.05f;
@@ -185,6 +216,23 @@ namespace Hellfire.Combat
         public float CameraRecoilPitch => Mathf.Max(0f, _cameraRecoilPitch);
         public float CameraRecoilYaw => Mathf.Max(0f, _cameraRecoilYaw);
         public float RecoilRecoverySpeed => _recoilRecoverySpeed > 0.1f ? _recoilRecoverySpeed : 12.0f;
+
+        public bool EnableJuiceEffects => _enableJuiceEffects;
+        public bool UseMuzzleFlash => _useMuzzleFlash;
+        public float FlashDuration => _flashDuration > 0.005f ? _flashDuration : 0.04f;
+        public float SpreadDegrees => Mathf.Max(0f, _spreadDegrees);
+        public float TracerSpeedJitter => Mathf.Clamp(_tracerSpeedJitter, 0f, 0.5f);
+        public float TracerLength => Mathf.Max(0.5f, _tracerLength);
+        public float PlayerPushbackForce => Mathf.Max(0f, _playerPushbackForce);
+        public bool EnableShellEjection => _enableShellEjection;
+        public GameObject ShellPrefab => _shellPrefab != null ? _shellPrefab : _casingPrefab;
+        public Vector3 ShellEjectionVelocity => _shellEjectionVelocity;
+        public bool EnableDecals => _enableDecals;
+        public GameObject BulletDecalPrefab => _bulletDecalPrefab;
+        public bool EnableKillSlowMo => _enableKillSlowMo;
+        public float KillSlowMoScale => Mathf.Clamp(_killSlowMoScale, 0.05f, 0.9f);
+        public float KillSlowMoDuration => Mathf.Max(0.05f, _killSlowMoDuration);
+        public float EnemyDeathImpulse => Mathf.Max(0f, _enemyDeathImpulse);
 
         public float EffectiveRange => _effectiveRange > 0.1f ? _effectiveRange : (_range * 0.4f);
         public float MinDamageMultiplier => Mathf.Clamp(_minDamageMultiplier, 0.1f, 1.0f);

@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using Hellfire.Player;
 
 using Hellfire.Networking;
+using Hellfire.Core;
 
 using Unity.Netcode;
 
@@ -2052,6 +2053,8 @@ namespace Hellfire.Combat
             Vector3 cameraPos = _playerCamera.transform.position;
 
             Vector3 cameraForward = _playerCamera.transform.forward;
+            Vector3 cameraRight = _playerCamera.transform.right;
+            Vector3 cameraUp = _playerCamera.transform.up;
 
             int seed = UnityEngine.Random.Range(0, 100000);
 
@@ -2069,7 +2072,16 @@ namespace Hellfire.Combat
 
             float spreadMultiplier = Mathf.Clamp(1.0f - GlobalAccuracyBonus, 0.35f, 1.0f);
 
-            float effectiveSpread = _currentWeapon.Spread * Mathf.Lerp(1.0f, _currentWeapon.AdsSpreadMultiplier, _currentAdsFactor) * spreadMultiplier;
+            float effectiveSpread;
+            if (_currentWeapon.EnableJuiceEffects && _currentWeapon.SpreadDegrees > 0.01f)
+            {
+                float spreadDeg = _currentWeapon.SpreadDegrees * Mathf.Lerp(1.0f, _currentWeapon.AdsSpreadMultiplier, _currentAdsFactor) * spreadMultiplier;
+                effectiveSpread = Mathf.Tan(spreadDeg * Mathf.Deg2Rad * 0.5f);
+            }
+            else
+            {
+                effectiveSpread = _currentWeapon.Spread * Mathf.Lerp(1.0f, _currentWeapon.AdsSpreadMultiplier, _currentAdsFactor) * spreadMultiplier;
+            }
 
 
 
@@ -2149,6 +2161,30 @@ namespace Hellfire.Combat
 
                 _playerMovement.AddCameraRecoil(pitchKick, yawKick);
 
+                // 3. Lực đẩy giật lùi nhân vật (Player Pushback)
+                if (_currentWeapon.EnableJuiceEffects && _currentWeapon.PlayerPushbackForce > 0.01f)
+                {
+                    float pushbackForce = _currentWeapon.PlayerPushbackForce * recoilFactor;
+                    _playerMovement.AddPushback(-cameraForward * pushbackForce);
+                }
+            }
+
+            // 4. Văng vỏ đạn (Shell Casing Ejection)
+            if (_currentWeapon != null && _currentWeapon.EnableJuiceEffects && _currentWeapon.EnableShellEjection)
+            {
+                Transform ejectSocket = FindEjectionSocket(_currentViewmodelInstance != null ? _currentViewmodelInstance.transform : null);
+                Vector3 ejectPos = ejectSocket != null
+                    ? ejectSocket.position
+                    : (muzzlePos - cameraForward * 0.22f + cameraRight * 0.14f + cameraUp * 0.05f);
+
+                WeaponFxPool.GetOrCreate().EjectShell(
+                    ejectPos,
+                    cameraForward,
+                    cameraRight,
+                    cameraUp,
+                    _currentWeapon.ShellEjectionVelocity,
+                    _currentWeapon.ShellPrefab
+                );
             }
 
 
@@ -2361,13 +2397,22 @@ namespace Hellfire.Combat
 
                     {
 
+                        var targetDamageable = hitbox.Damageable;
+                        bool wasDeadBefore = targetDamageable != null && targetDamageable.IsDead;
+
                         var payload = new DamagePayload(attackDamage, armorPen, hitbox.Type, OwnerClientId);
 
                         hitbox.ForwardDamage(payload);
 
 
 
-                        rw.NotifyHit(payload, hitbox.Damageable, _globalModifiers);
+                        rw.NotifyHit(payload, targetDamageable, _globalModifiers);
+
+                        bool isKill = !wasDeadBefore && (targetDamageable != null && targetDamageable.IsDead);
+                        if (isKill)
+                        {
+                            HandleLethalShotJuice(weaponToUse, shootDir, hit.collider.gameObject);
+                        }
 
 
 
@@ -2403,6 +2448,8 @@ namespace Hellfire.Combat
 
                         {
 
+                            bool wasDeadBefore = damageable.IsDead;
+
                             var payload = new DamagePayload(attackDamage, armorPen, HitboxType.Torso, OwnerClientId);
 
                             damageable.TakeDamage(payload);
@@ -2410,6 +2457,12 @@ namespace Hellfire.Combat
 
 
                             rw.NotifyHit(payload, damageable, _globalModifiers);
+
+                            bool isKill = !wasDeadBefore && damageable.IsDead;
+                            if (isKill)
+                            {
+                                HandleLethalShotJuice(weaponToUse, shootDir, hit.collider.gameObject);
+                            }
 
 
 
@@ -2441,7 +2494,7 @@ namespace Hellfire.Combat
 
                             if (GameModeHelper.IsOffline || !IsSpawned)
 
-                                SpawnImpactEffectInternal(hit.point, hit.normal, false);
+                                SpawnImpactEffectInternal(hit.point, hit.normal, false, hit.collider != null ? hit.collider.transform : null);
 
                             else
 
@@ -2868,37 +2921,31 @@ namespace Hellfire.Combat
 
 
         private void SpawnCosmeticBullet(Vector3 start, Vector3 end)
-
         {
-
             var pool = WeaponFxPool.GetOrCreate();
-
             if (pool != null)
-
             {
-
-                pool.PlayTracer(start, end, 0.045f);
-
+                if (_currentWeapon != null && _currentWeapon.EnableJuiceEffects)
+                {
+                    float speed = GetBulletSpeedForCurrentWeapon();
+                    pool.PlayShortTracer(start, end, speed, _currentWeapon.TracerLength, _currentWeapon.TracerSpeedJitter);
+                }
+                else
+                {
+                    pool.PlayTracer(start, end, 0.045f);
+                }
             }
-
         }
 
-
-
         private void SpawnMuzzleFlash(Vector3 muzzlePos)
-
         {
-
             var pool = WeaponFxPool.GetOrCreate();
-
             if (pool != null && _weaponMuzzlePoint != null)
-
             {
-
-                pool.PlayMuzzleFlash(_weaponMuzzlePoint);
-
+                float duration = _currentWeapon != null ? _currentWeapon.FlashDuration : 0.04f;
+                GameObject customPrefab = _currentWeapon != null ? _currentWeapon.MuzzleFlashPrefab : null;
+                pool.PlayMuzzleFlash(_weaponMuzzlePoint, customPrefab, duration);
             }
-
         }
 
 
@@ -2945,20 +2992,73 @@ namespace Hellfire.Combat
 
 
 
-        private void SpawnImpactEffectInternal(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh)
-
+        private void SpawnImpactEffectInternal(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh, Transform hitTransform = null)
         {
-
             var pool = WeaponFxPool.GetOrCreate();
-
             if (pool != null)
-
             {
-
                 pool.PlayImpact(hitPoint, hitNormal, isFlesh);
+                if (!isFlesh && _currentWeapon != null && _currentWeapon.EnableJuiceEffects && _currentWeapon.EnableDecals)
+                {
+                    pool.SpawnBulletDecal(hitPoint, hitNormal, hitTransform, _currentWeapon.BulletDecalPrefab);
+                }
+            }
+        }
 
+        private void HandleLethalShotJuice(WeaponData weapon, Vector3 shootDir, GameObject hitObject)
+        {
+            if (weapon == null || !weapon.EnableJuiceEffects) return;
+
+            // 1. Slow-Motion Hit Stop trên máy người bắn
+            if (weapon.EnableKillSlowMo)
+            {
+                if (GameModeHelper.IsOffline || !IsSpawned || IsOwner)
+                {
+                    Hellfire.Core.TimeDilationManager.TriggerSlowMo(weapon.KillSlowMoScale, weapon.KillSlowMoDuration);
+                }
+                else
+                {
+                    TriggerKillSlowMoClientRpc(weapon.KillSlowMoScale, weapon.KillSlowMoDuration);
+                }
             }
 
+            // 2. Lực văng quái vật (Death Impulse)
+            if (weapon.EnemyDeathImpulse > 0.01f && hitObject != null)
+            {
+                var enemyFsm = hitObject.GetComponentInParent<Hellfire.AI.EnemyStateMachine>();
+                if (enemyFsm != null)
+                {
+                    enemyFsm.ApplyDeathImpulse(shootDir, weapon.EnemyDeathImpulse);
+                }
+            }
+        }
+
+        [ClientRpc]
+        private void TriggerKillSlowMoClientRpc(float scale, float duration)
+        {
+            if (IsOwner)
+            {
+                Hellfire.Core.TimeDilationManager.TriggerSlowMo(scale, duration);
+            }
+        }
+
+        private static Transform FindEjectionSocket(Transform root)
+        {
+            if (root == null) return null;
+            if (root.name.Equals("EjectionPort", System.StringComparison.OrdinalIgnoreCase) ||
+                root.name.Equals("ShellEject", System.StringComparison.OrdinalIgnoreCase) ||
+                root.name.Equals("Socket_Shell", System.StringComparison.OrdinalIgnoreCase) ||
+                root.name.Equals("Eject", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return root;
+            }
+
+            for (int i = 0; i < root.childCount; i++)
+            {
+                var found = FindEjectionSocket(root.GetChild(i));
+                if (found != null) return found;
+            }
+            return null;
         }
 
 

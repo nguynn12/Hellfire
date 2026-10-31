@@ -70,6 +70,7 @@ namespace Hellfire.Player
 
         private float _cameraPitch;
         private float _verticalVelocity;
+        private Vector3 _pushbackVelocity;
         private bool _isCursorLocked = true;
         private PlayerBuffManager _buffManager;
 
@@ -347,6 +348,18 @@ namespace Hellfire.Player
             transform.Rotate(Vector3.up * yawKick);
         }
 
+        /// <summary>
+        /// Thêm lực giật lùi (Pushback) khi bắn các loại súng hạng nặng.
+        /// </summary>
+        public void AddPushback(Vector3 force)
+        {
+            _pushbackVelocity += force;
+            if (_pushbackVelocity.sqrMagnitude > 400f)
+            {
+                _pushbackVelocity = _pushbackVelocity.normalized * 20f;
+            }
+        }
+
         private void HandleLook()
         {
             Vector2 lookDelta = Vector2.zero;
@@ -442,6 +455,11 @@ namespace Hellfire.Player
 
             // 6. Thực thi di chuyển CharacterController
             Vector3 finalMovement = moveDirection * currentSpeed + Vector3.up * _verticalVelocity;
+            if (_pushbackVelocity.sqrMagnitude > 0.001f)
+            {
+                finalMovement += _pushbackVelocity;
+                _pushbackVelocity = Vector3.Lerp(_pushbackVelocity, Vector3.zero, Time.deltaTime * 10f);
+            }
             _characterController.Move(finalMovement * Time.deltaTime);
         }
 
