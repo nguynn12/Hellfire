@@ -60,6 +60,15 @@ namespace Hellfire.Player
         public float SprintSpeed => _sprintSpeed;
         public Camera PlayerCamera => _playerCamera;
 
+        // Abilities Modifiers (P1)
+        public float ExternalSpeedMultiplier { get; set; } = 1.0f;
+        public bool CanSprint { get; set; } = true;
+        public bool IsHorizontalMovementOverridden { get; set; } = false;
+        public Vector3 OverriddenHorizontalVelocity { get; set; } = Vector3.zero;
+
+        public Vector2 CurrentMoveInput { get; private set; }
+        public bool IsSprinting => Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed && CanSprint && CurrentMoveInput.sqrMagnitude > 0.01f;
+
         private float _cameraPitch;
         private float _verticalVelocity;
         private bool _isCursorLocked = true;
@@ -266,9 +275,10 @@ namespace Hellfire.Player
             }
 
             moveInput = moveInput.normalized;
+            CurrentMoveInput = moveInput;
 
             // 2. Xác định tốc độ (đi bộ, chạy nhanh, đi lùi)
-            bool isSprinting = Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed;
+            bool isSprinting = Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed && CanSprint;
             bool isMovingBackward = moveInput.y < -0.1f;
 
             float currentSpeed;
@@ -292,6 +302,9 @@ namespace Hellfire.Player
                 currentSpeed *= _buffManager.SpeedMultiplier;
             }
 
+            // Áp dụng hệ số tốc độ ngoài (Crouch / hiệu ứng khác)
+            currentSpeed *= ExternalSpeedMultiplier;
+
             // 3. Tính hướng di chuyển theo local transform
             Vector3 moveDirection = (transform.forward * moveInput.y + transform.right * moveInput.x).normalized;
 
@@ -307,15 +320,31 @@ namespace Hellfire.Player
             bool jumpPressed = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
             if (jumpPressed && grounded)
             {
-                _verticalVelocity = Mathf.Sqrt(2f * Mathf.Abs(_gravity) * _jumpHeight);
+                PerformJump();
             }
 
             // Áp dụng trọng lực
             _verticalVelocity += _gravity * Time.deltaTime;
 
             // 6. Di chuyển CharacterController
-            Vector3 velocity = moveDirection * currentSpeed + Vector3.up * _verticalVelocity;
+            Vector3 horizontalVelocity;
+            if (IsHorizontalMovementOverridden)
+            {
+                horizontalVelocity = OverriddenHorizontalVelocity;
+            }
+            else
+            {
+                horizontalVelocity = moveDirection * currentSpeed;
+            }
+
+            Vector3 velocity = horizontalVelocity + Vector3.up * _verticalVelocity;
             _characterController.Move(velocity * Time.deltaTime);
+        }
+
+        public void PerformJump(float heightOverride = -1f)
+        {
+            float h = heightOverride > 0f ? heightOverride : _jumpHeight;
+            _verticalVelocity = Mathf.Sqrt(2f * Mathf.Abs(_gravity) * h);
         }
 
         private void ApplyGravityOnly()
