@@ -318,6 +318,8 @@ MonoBehaviour:
   _activeGlowColor: {r: 1, g: 0, b: 0, a: 1}
   _audioSource: {fileID: 0}
   _interactSound: {fileID: 0}
+  _enableFirstOpenBounty: 1
+  _firstOpenBountyAmount: 2
 --- !u!4 &7566391367257165680 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 340412306bd4f8c439ec0d0144900b2e, type: 3}
