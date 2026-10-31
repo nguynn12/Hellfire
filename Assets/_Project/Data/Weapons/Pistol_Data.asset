@@ -34,8 +34,8 @@ MonoBehaviour:
   _reloadTime: 1.2
   _meleeRange: 2.5
   _meleeSwingAngle: 70
-  _viewmodelPrefab: {fileID: 842739001072416431, guid: bde84c3090af08d428f954ccff01b425, type: 3}
-  _worldModelPrefab: {fileID: 6486015530339960198, guid: 8bb4ad3f62890a44e853f563ea227663, type: 3}
+  _viewmodelPrefab: {fileID: 5692894731973041758, guid: 85281da10ca610246be2780eb809a963, type: 3}
+  _worldModelPrefab: {fileID: 5692894731973041701, guid: 98581ed44ef14a2898551e9ebedf05a6, type: 3}
   _muzzleFlashPrefab: {fileID: 0}
   _tracerPrefab: {fileID: 0}
   _impactEffectPrefab: {fileID: 0}
