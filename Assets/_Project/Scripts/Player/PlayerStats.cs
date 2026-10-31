@@ -32,8 +32,8 @@ namespace Hellfire.Player
         private float _rawBonusMaxHealth = 0f;
         private float _rawArmor = 0f;
         private float _rawMoveSpeedMultiplier = MinSpeedMultiplier;
-        private int _rawRedCrystals = 10;
-        private int _rawGreenCrystals = 10;
+        private int _rawRedCrystals = 0;
+        private int _rawGreenCrystals = 0;
 
         // ================= NETWORK VARIABLES (SERVER-AUTHORITATIVE) =================
         /// <summary>
@@ -67,7 +67,7 @@ namespace Hellfire.Player
         /// Pha Lê Đỏ (Dùng cho Tế Đàn Thân Thể / StatsAltar).
         /// </summary>
         public NetworkVariable<int> RedCrystals { get; } = new NetworkVariable<int>(
-            10,
+            0,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server
         );
@@ -76,7 +76,7 @@ namespace Hellfire.Player
         /// Pha Lê Xanh (Dùng cho Bàn Cường Hóa Vũ Khí / WeaponWorkbench).
         /// </summary>
         public NetworkVariable<int> GreenCrystals { get; } = new NetworkVariable<int>(
-            10,
+            0,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server
         );
@@ -243,7 +243,45 @@ namespace Hellfire.Player
             NotifyCrystalsChanged();
         }
 
-        // ================= QUẢN LÝ LỊCH SỬ TẾ ĐÀN (SHRINE TRACKING) =================
+        // ================= QUẢN LÝ LỊCH SỬ TẾ ĐÀN & THƯỞNG MỞ LẦN ĐẦU =================
+        private readonly System.Collections.Generic.HashSet<int> _claimedFirstOpenShrineIds = new System.Collections.Generic.HashSet<int>();
+
+        /// <summary>
+        /// Kiểm tra xem người chơi này đã từng nhận quà mở bàn/tế đàn lần đầu chưa.
+        /// </summary>
+        public bool HasClaimedFirstOpen(int shrineId)
+        {
+            return _claimedFirstOpenShrineIds.Contains(shrineId);
+        }
+
+        /// <summary>
+        /// Xác nhận trao thưởng đá cường hóa lần đầu mở công trình (Chỉ chạy trên Server hoặc Offline).
+        /// </summary>
+        public bool TryClaimFirstOpenReward(int shrineId, ShrineType type, int amount = 2)
+        {
+            if (!GameModeHelper.IsServerOrOffline) return false;
+            if (_claimedFirstOpenShrineIds.Contains(shrineId)) return false;
+
+            _claimedFirstOpenShrineIds.Add(shrineId);
+
+            if (type == ShrineType.WeaponModifierShrine)
+            {
+                AddCrystals(ShrineType.WeaponModifierShrine, amount);
+            }
+            else if (type == ShrineType.BodyShrine)
+            {
+                AddCrystals(ShrineType.BodyShrine, amount);
+            }
+            else
+            {
+                int half = Mathf.Max(1, amount / 2);
+                AddCrystals(ShrineType.BodyShrine, half);
+                AddCrystals(ShrineType.WeaponModifierShrine, half);
+            }
+
+            Debug.Log($"<color=#00FF88>[PlayerStats] Người chơi {NetworkObjectId} nhận thưởng lần đầu mở {type} #{shrineId}: +{amount} đá.</color>");
+            return true;
+        }
 
         /// <summary>
         /// Đã bỏ cơ chế khóa 1 lần theo yêu cầu: Người chơi có thể dùng lặp lại nhiều lần miễn còn đủ Pha Lê.

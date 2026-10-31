@@ -60,6 +60,14 @@ namespace Hellfire.Items
         [SerializeField] private AudioSource _audioSource;
         [SerializeField] private AudioClip _interactSound;
 
+        [Header("First-Time Bounty Configuration")]
+        [Tooltip("Có kích hoạt tặng đá cường hóa trong lần đầu mở bàn/tế đàn không")]
+        [SerializeField] private bool _enableFirstOpenBounty = true;
+        [Tooltip("Số lượng đá thưởng trong lần đầu mở")]
+        [SerializeField] private int _firstOpenBountyAmount = 2;
+
+        private bool _localBountyClaimed = false;
+
         // Chi phí Pha Lê theo cơ chế mới (Chọn thẻ: 2 Pha Lê, Đổi thẻ: 1 Pha Lê)
         public const int UpgradeCost = 2;
         public const int RerollCost = 1;
@@ -438,6 +446,7 @@ namespace Hellfire.Items
 
         private void OpenChoiceUI()
         {
+            CheckAndClaimFirstOpenBounty();
             if (_cachedOptions == null || _cachedOptions.Count == 0)
             {
                 GenerateOptions();
@@ -637,6 +646,79 @@ namespace Hellfire.Items
                 ShrineChoiceModalUI.Instance.RefreshOptions(_cachedOptions);
             }
             Debug.Log($"<color=#00FF88>[InteractiveShrine] (Offline) Đã tiêu hao {UpgradeCost} Pha Lê. {successMsg}</color>");
+        }
+
+        private void CheckAndClaimFirstOpenBounty()
+        {
+            if (!_enableFirstOpenBounty || _localBountyClaimed) return;
+
+            var playerMove = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance : FindAnyObjectByType<PlayerMovement>();
+            if (playerMove == null) return;
+
+            var stats = playerMove.GetComponent<PlayerStats>();
+            if (stats == null) return;
+
+            if (GameModeHelper.IsOffline || !IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            {
+                // Xử lý Offline
+                if (stats.TryClaimFirstOpenReward(_shrineId, _shrineType, _firstOpenBountyAmount))
+                {
+                    _localBountyClaimed = true;
+                    TriggerFirstOpenVisualFeedback(_shrineType, _firstOpenBountyAmount);
+                }
+            }
+            else
+            {
+                // Xử lý Online qua Server RPC
+                ClaimFirstOpenBountyServerRpc();
+            }
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void ClaimFirstOpenBountyServerRpc(RpcParams rpcParams = default)
+        {
+            ulong senderClientId = rpcParams.Receive.SenderClientId;
+            if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(senderClientId, out var client) || client.PlayerObject == null) return;
+
+            var stats = client.PlayerObject.GetComponent<PlayerStats>();
+            if (stats != null && stats.TryClaimFirstOpenReward(_shrineId, _shrineType, _firstOpenBountyAmount))
+            {
+                NotifyFirstOpenBountyClientRpc(_shrineType, _firstOpenBountyAmount, GetTargetClientRpcParams(senderClientId));
+            }
+        }
+
+        [ClientRpc]
+        private void NotifyFirstOpenBountyClientRpc(ShrineType type, int amount, ClientRpcParams rpcParams = default)
+        {
+            _localBountyClaimed = true;
+            TriggerFirstOpenVisualFeedback(type, amount);
+        }
+
+        private void TriggerFirstOpenVisualFeedback(ShrineType type, int amount)
+        {
+            _localBountyClaimed = true;
+
+            string crystalName = type == ShrineType.WeaponModifierShrine ? "Pha Lê Xanh" : "Pha Lê Đỏ";
+            string stationName = type == ShrineType.WeaponModifierShrine ? "Bàn Cường Hóa" : "Tế Đàn";
+            string toastMsg = $"+{amount} {crystalName} (Khai mở {stationName} lần đầu!)";
+            Color toastColor = type == ShrineType.WeaponModifierShrine ? new Color(0.15f, 1f, 0.35f) : new Color(1f, 0.25f, 0.25f);
+
+            Debug.Log($"<color=#00FF88>[FirstOpenBounty] {toastMsg}</color>");
+
+            if (GameplayHUD.Instance != null)
+            {
+                GameplayHUD.Instance.ShowFloatingToast(toastMsg, toastColor);
+            }
+            else
+            {
+                var hud = FindAnyObjectByType<GameplayHUD>();
+                if (hud != null) hud.ShowFloatingToast(toastMsg, toastColor);
+            }
+
+            if (_audioSource != null && _interactSound != null)
+            {
+                _audioSource.PlayOneShot(_interactSound, 0.85f);
+            }
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
