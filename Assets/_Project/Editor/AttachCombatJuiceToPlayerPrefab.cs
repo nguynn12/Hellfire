@@ -9,7 +9,6 @@ namespace Hellfire.Editor
     {
         public const string PlayerPrefabPath = "Assets/_Project/Prefabs/Player.prefab";
 
-        [InitializeOnLoadMethod]
         [MenuItem("Hellfire/Sprint 1/Attach Combat Juice to Real Player Prefab", false, 10)]
         public static void ApplyToRealPlayerPrefab()
         {
@@ -72,9 +71,7 @@ namespace Hellfire.Editor
                 }
                 else
                 {
-                    // Cập nhật lại serialized references nếu cần
-                    PrefabUtility.SaveAsPrefabAsset(prefabRoot, PlayerPrefabPath);
-                    Debug.Log("[AttachCombatJuice] Player.prefab đã có sẵn các component cảm giác súng, đã làm mới reference.");
+                    Debug.Log("[AttachCombatJuice] Player.prefab đã có sẵn các component cảm giác súng, không cần lưu lại.");
                 }
             }
             finally

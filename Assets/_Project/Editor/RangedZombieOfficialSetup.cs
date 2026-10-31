@@ -12,19 +12,12 @@ using UnityEngine.AI;
 
 namespace Hellfire.Editor
 {
-    [InitializeOnLoad]
     public static class RangedZombieOfficialSetup
     {
         public const string OfficialPrefabPath = "Assets/_Project/Prefabs/EnemyRangedZombie.prefab";
         public const string ArcherMaterialPath = "Assets/_Project/Materials/M_ArcherZombie_Test.mat";
         public const string GameplayScenePath = "Assets/_Project/Scenes/Gameplay.unity";
 
-        static RangedZombieOfficialSetup()
-        {
-            EditorApplication.delayCall += EnsureOfficialSetup;
-        }
-
-        [InitializeOnLoadMethod]
         [MenuItem("Hellfire/AI/Setup Official EnemyRangedZombie Prefab", false, 20)]
         public static void EnsureOfficialSetup()
         {
@@ -235,35 +228,11 @@ namespace Hellfire.Editor
             {
                 var so = new SerializedObject(spawner);
                 var rangedProp = so.FindProperty("_rangedZombiePrefab");
-                var impWeightProp = so.FindProperty("_impWeight");
-                var archerWeightProp = so.FindProperty("_archerWeight");
-                var rangedWeightProp = so.FindProperty("_rangedZombieWeight");
-                var bruteWeightProp = so.FindProperty("_bruteWeight");
 
                 bool changed = false;
-                if (rangedProp != null && rangedProp.objectReferenceValue != prefab)
+                if (rangedProp != null && rangedProp.objectReferenceValue == null)
                 {
                     rangedProp.objectReferenceValue = prefab;
-                    changed = true;
-                }
-                if (impWeightProp != null && impWeightProp.intValue != 40)
-                {
-                    impWeightProp.intValue = 40;
-                    changed = true;
-                }
-                if (archerWeightProp != null && archerWeightProp.intValue != 25)
-                {
-                    archerWeightProp.intValue = 25;
-                    changed = true;
-                }
-                if (rangedWeightProp != null && rangedWeightProp.intValue != 15)
-                {
-                    rangedWeightProp.intValue = 15;
-                    changed = true;
-                }
-                if (bruteWeightProp != null && bruteWeightProp.intValue != 20)
-                {
-                    bruteWeightProp.intValue = 20;
                     changed = true;
                 }
 
@@ -272,7 +241,7 @@ namespace Hellfire.Editor
                     so.ApplyModifiedProperties();
                     EditorSceneManager.MarkSceneDirty(scene);
                     EditorSceneManager.SaveScene(scene);
-                    Debug.Log("[RangedZombieOfficialSetup] Đã gán _rangedZombiePrefab và trọng số vào DungeonEnemySpawner trong Gameplay.unity");
+                    Debug.Log("[RangedZombieOfficialSetup] Đã gán _rangedZombiePrefab vào DungeonEnemySpawner trong Gameplay.unity");
                 }
             }
 
