@@ -150,6 +150,12 @@ namespace Hellfire.UI
                 ? PlayerMovement.LocalInstance.GetComponent<PlayerStats>() 
                 : FindAnyObjectByType<PlayerStats>();
 
+            if (_cachedPlayerStats != null)
+            {
+                _cachedPlayerStats.OnCrystalsChanged -= HandleCrystalsChanged;
+                _cachedPlayerStats.OnCrystalsChanged += HandleCrystalsChanged;
+            }
+
             if (_headerTitleText != null) _headerTitleText.text = title;
             if (_headerSubtitleText != null) _headerSubtitleText.text = subtitle;
 
@@ -266,6 +272,11 @@ namespace Hellfire.UI
         {
             if (!_isOpen) return;
 
+            if (_cachedPlayerStats != null)
+            {
+                _cachedPlayerStats.OnCrystalsChanged -= HandleCrystalsChanged;
+            }
+
             _isOpen = false;
             if (_panelRoot != null) _panelRoot.SetActive(false);
 
@@ -277,6 +288,14 @@ namespace Hellfire.UI
             _onChoiceSelectedCallback = null;
             _onRerollCallback = null;
             _onCloseCallback = null;
+        }
+
+        private void HandleCrystalsChanged(int red, int green)
+        {
+            if (_isOpen)
+            {
+                UpdateCardVisuals();
+            }
         }
 
         private void SetPlayerMovementLookEnabled(bool enabled)
