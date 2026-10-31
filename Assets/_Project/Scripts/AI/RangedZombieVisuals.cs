@@ -3,6 +3,7 @@
 // Môi trường thực thi: Client-side (nhận sự kiện từ Server qua ClientRpc).
 
 using System.Collections;
+using Hellfire.Combat;
 using UnityEngine;
 
 namespace Hellfire.AI
@@ -24,9 +25,76 @@ namespace Hellfire.AI
         [SerializeField] private Color _muzzleFlashColor = new Color(1f, 0.3f, 0.1f);
         [SerializeField] private float _muzzleFlashRange = 3.5f;
 
+        [Header("Projectile Prefab (Visual)")]
+        [SerializeField] private GameObject _projectilePrefab;
+
+        [Header("Animator & Character Rig")]
+        [SerializeField] private Animator _animator;
+
+        private UnityEngine.AI.NavMeshAgent _navAgent;
+        private Health _health;
+        private static readonly int SpeedHash = Animator.StringToHash("Speed");
+        private static readonly int AttackHash = Animator.StringToHash("Attack");
+        private static readonly int DieHash = Animator.StringToHash("Die");
+
         private void Awake()
         {
             EnsureLaserSight();
+            if (_animator == null) _animator = GetComponentInChildren<Animator>();
+            _navAgent = GetComponent<UnityEngine.AI.NavMeshAgent>();
+            _health = GetComponent<Health>();
+
+            if (_health != null)
+            {
+                _health.OnDied += HandleDied;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_health != null)
+            {
+                _health.OnDied -= HandleDied;
+            }
+        }
+
+        private void Update()
+        {
+            if (_animator != null)
+            {
+                bool isDead = _health != null && _health.IsDead.Value;
+                if (!isDead)
+                {
+                    float speed = 0f;
+                    if (_navAgent != null && _navAgent.isOnNavMesh)
+                    {
+                        speed = _navAgent.velocity.magnitude;
+                    }
+                    _animator.SetFloat(SpeedHash, speed);
+                }
+            }
+        }
+
+        private void HandleDied(ulong killerId)
+        {
+            TriggerDeathAnimation();
+            if (_laserSight != null) _laserSight.enabled = false;
+        }
+
+        public void TriggerAttackAnimation()
+        {
+            if (_animator != null)
+            {
+                _animator.SetTrigger(AttackHash);
+            }
+        }
+
+        public void TriggerDeathAnimation()
+        {
+            if (_animator != null)
+            {
+                _animator.SetTrigger(DieHash);
+            }
         }
 
         private void EnsureLaserSight()
@@ -41,12 +109,14 @@ namespace Hellfire.AI
                 _laserSight.startWidth = _laserWidth;
                 _laserSight.endWidth = _laserWidth * 0.5f;
                 _laserSight.positionCount = 2;
-                _laserSight.material = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+                _laserSight.sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
                 _laserSight.startColor = _laserColor;
                 _laserSight.endColor = new Color(_laserColor.r, _laserColor.g, _laserColor.b, 0.1f);
                 _laserSight.enabled = false;
             }
         }
+
+        private bool _wasTelegraphActive;
 
         public void SetTelegraphActive(bool active, Vector3 origin = default, Vector3 target = default)
         {
@@ -58,6 +128,35 @@ namespace Hellfire.AI
                 {
                     _laserSight.SetPosition(0, origin);
                     _laserSight.SetPosition(1, target);
+
+                    if (!_wasTelegraphActive)
+                    {
+                        TriggerAttackAnimation();
+                        if (RangedZombieAI.IsDebugLoggingEnabled())
+                        {
+                            Debug.Log("[ArcherDebug] Kích hoạt Attack Animation trên Zombie (vung tay ném).");
+                        }
+                    }
+                }
+            }
+            _wasTelegraphActive = active;
+        }
+
+        public void SpawnClientProjectile(Vector3 origin, Vector3 direction, float speed)
+        {
+#if UNITY_EDITOR
+            if (_projectilePrefab == null)
+            {
+                _projectilePrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Prefabs/Projectile_Hellfire_Orb.prefab");
+            }
+#endif
+            if (_projectilePrefab != null)
+            {
+                var proj = Instantiate(_projectilePrefab, origin, Quaternion.LookRotation(direction));
+                var pComp = proj.GetComponent<ArcherProjectile>();
+                if (pComp != null)
+                {
+                    pComp.Initialize(direction, speed, 0f, 0, transform, false);
                 }
             }
         }
@@ -79,7 +178,7 @@ namespace Hellfire.AI
             lr.SetPosition(1, to);
 
             var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
-            lr.material = mat;
+            lr.sharedMaterial = mat;
             lr.startColor = _tracerStartColor;
             lr.endColor = _tracerEndColor;
 
@@ -105,8 +204,9 @@ namespace Hellfire.AI
             var rend = spark.GetComponent<MeshRenderer>();
             if (rend != null)
             {
-                rend.material = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
-                rend.material.color = isPlayer ? new Color(1f, 0.1f, 0.1f, 1f) : new Color(1f, 0.7f, 0.2f, 1f);
+                var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+                mat.color = isPlayer ? new Color(1f, 0.1f, 0.1f, 1f) : new Color(1f, 0.7f, 0.2f, 1f);
+                rend.sharedMaterial = mat;
             }
 
             Destroy(spark, 0.12f);

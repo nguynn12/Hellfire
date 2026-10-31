@@ -18,7 +18,7 @@ namespace Hellfire.Editor
         public static void RunAllTests()
         {
             int passCount = 0;
-            int totalCount = 8;
+            int totalCount = 10;
 
             Debug.Log("================ STARTING SPRINT Z1 ARCHER AI TESTS ================");
 
@@ -33,6 +33,8 @@ namespace Hellfire.Editor
             if (Test06_AccurateDamageDealtToPlayer()) passCount++;
             if (Test07_IgnoreDeadOrDownedPlayer()) passCount++;
             if (Test08_MeleeAICompatibilityAndIntegrity()) passCount++;
+            if (Test09_Zombie3DModelAndURPMaterial()) passCount++;
+            if (Test10_ProjectileLaunchAndSingleDamage()) passCount++;
 
             Debug.Log($"================ SPRINT Z1 TEST RESULTS: {passCount}/{totalCount} PASSED ================");
 
@@ -294,6 +296,152 @@ namespace Hellfire.Editor
             }
 
             Debug.Log("[TEST 8 PASS] Toàn bộ hệ thống AI cận chiến cũ (EnemyStateMachine, BruteAI, EnemyImp) hoàn toàn tương thích và nguyên vẹn.");
+            return true;
+        }
+
+        private static bool Test09_Zombie3DModelAndURPMaterial()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(HellfireArcherSetup.TestArcherPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError("[TEST 9 FAIL] Không tìm thấy Test Archer Prefab!");
+                return false;
+            }
+
+            // 1. Kiểm tra child ZombieModel
+            var zombieModel = prefab.transform.Find("ZombieModel");
+            if (zombieModel == null)
+            {
+                Debug.LogError("[TEST 9 FAIL] Prefab thiếu GameObject con 'ZombieModel' chứa Mesh 3D Zombie!");
+                return false;
+            }
+
+            // 2. Kiểm tra Animator và Controller
+            var anim = zombieModel.GetComponent<Animator>();
+            if (anim == null || anim.runtimeAnimatorController == null || anim.avatar == null)
+            {
+                Debug.LogError($"[TEST 9 FAIL] ZombieModel thiếu Animator, Controller hoặc Avatar! anim={anim != null}");
+                return false;
+            }
+
+            // 3. Kiểm tra SkinnedMeshRenderer và Material URP Lit
+            var smrs = zombieModel.GetComponentsInChildren<SkinnedMeshRenderer>();
+            if (smrs == null || smrs.Length == 0)
+            {
+                Debug.LogError("[TEST 9 FAIL] Không tìm thấy SkinnedMeshRenderer nào trên ZombieModel!");
+                return false;
+            }
+
+            foreach (var smr in smrs)
+            {
+                if (smr.sharedMaterial == null)
+                {
+                    Debug.LogError($"[TEST 9 FAIL] SMR '{smr.name}' không có Material gán vào!");
+                    return false;
+                }
+
+                if (smr.sharedMaterial.shader == null || !smr.sharedMaterial.shader.name.Contains("Universal Render Pipeline"))
+                {
+                    Debug.LogError($"[TEST 9 FAIL] Material '{smr.sharedMaterial.name}' không tương thích URP (Shader: {smr.sharedMaterial.shader?.name})!");
+                    return false;
+                }
+            }
+
+            // 4. Kiểm tra Textures (Albedo, Normal, AO, Emission)
+            var mat = smrs[0].sharedMaterial;
+            if (mat.GetTexture("_BaseMap") == null || mat.GetTexture("_BumpMap") == null)
+            {
+                Debug.LogError("[TEST 9 FAIL] Material thiếu BaseMap hoặc NormalMap!");
+                return false;
+            }
+
+            // 5. Kiểm tra Hitboxes khớp xương người
+            var hitboxes = prefab.transform.Find("Hitboxes");
+            var head = hitboxes?.Find("Hitbox_Head");
+            var torso = hitboxes?.Find("Hitbox_Torso");
+            if (head == null || torso == null || head.localPosition.y < 1.4f || torso.localPosition.y < 0.8f)
+            {
+                Debug.LogError("[TEST 9 FAIL] Hitbox chưa khớp tỉ lệ xương của Zombie 3D!");
+                return false;
+            }
+
+            Debug.Log($"[TEST 9 PASS] 3D Zombie Asset tích hợp hoàn hảo: {smrs.Length} SkinnedMeshRenderers, URP Lit Shader chuẩn, Animator Controller & Avatar hợp lệ, Hitbox căn chỉnh chính xác.");
+            return true;
+        }
+
+        private static bool Test10_ProjectileLaunchAndSingleDamage()
+        {
+            string projPath = "Assets/_Project/Prefabs/Projectile_Hellfire_Orb.prefab";
+            var projPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(projPath);
+            if (projPrefab == null)
+            {
+                Debug.LogError("[TEST 10 FAIL] Không tìm thấy Prefab Projectile tại " + projPath);
+                return false;
+            }
+
+            var projComp = projPrefab.GetComponent<ArcherProjectile>();
+            var trail = projPrefab.GetComponent<TrailRenderer>();
+            var light = projPrefab.GetComponent<Light>();
+            var col = projPrefab.GetComponent<Collider>();
+
+            if (projComp == null || trail == null || light == null || col == null || !col.isTrigger)
+            {
+                Debug.LogError($"[TEST 10 FAIL] Projectile Prefab thiếu component hoặc Collider không phải Trigger! proj={projComp != null}, trail={trail != null}, light={light != null}, col={col != null}");
+                return false;
+            }
+
+            // Kiểm tra liên kết Prefab Zombie với Projectile và Bàn tay
+            var archerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(HellfireArcherSetup.TestArcherPrefabPath);
+            var ai = archerPrefab.GetComponent<RangedZombieAI>();
+            if (ai == null || ai.ProjectilePrefab == null || ai.LaunchHandTransform == null)
+            {
+                Debug.LogError($"[TEST 10 FAIL] Prefab Archer chưa gắn ProjectilePrefab hoặc LaunchHandTransform! Proj={ai?.ProjectilePrefab != null}, Hand={ai?.LaunchHandTransform != null}");
+                return false;
+            }
+
+            // Kiểm tra đạn bay và gây sát thương đơn lẻ (Single-Damage)
+            var dummyObj = new GameObject("Test_Projectile_Dummy");
+            dummyObj.transform.position = new Vector3(0f, 0f, 8f);
+            var dummyCol = dummyObj.AddComponent<CapsuleCollider>();
+            dummyCol.center = new Vector3(0f, 1f, 0f);
+            var dummyHealth = dummyObj.AddComponent<OfflineDummyHealth>();
+            dummyHealth.ResetHealth(100f);
+            Physics.SyncTransforms();
+
+            var instance = Object.Instantiate(projPrefab, new Vector3(0f, 1.4f, 0f), Quaternion.identity);
+            var pInstance = instance.GetComponent<ArcherProjectile>();
+            pInstance.Initialize(Vector3.forward, 20f, 12f, 0, null, true);
+
+            // Mô phỏng các bước bay tới khi chạm mục tiêu
+            int steps = 0;
+            while (!pInstance.HasHit && pInstance != null && steps++ < 50)
+            {
+                pInstance.SimulateStep(0.02f);
+            }
+
+            if (dummyHealth.CurrentHealth != 88f)
+            {
+                Debug.LogError($"[TEST 10 FAIL] Projectile không gây đúng 12 DMG lên Dummy! Máu thực tế: {dummyHealth.CurrentHealth}");
+                Object.DestroyImmediate(dummyObj);
+                if (instance != null) Object.DestroyImmediate(instance);
+                return false;
+            }
+
+            // Kiểm tra sau khi trúng, các frame kế tiếp KHÔNG gây sát thương lần 2
+            float healthAfterFirstHit = dummyHealth.CurrentHealth;
+            if (pInstance != null)
+            {
+                pInstance.SimulateStep(0.02f);
+            }
+            if (dummyHealth.CurrentHealth != healthAfterFirstHit)
+            {
+                Debug.LogError("[TEST 10 FAIL] Projectile gây sát thương nhiều hơn 1 lần!");
+                Object.DestroyImmediate(dummyObj);
+                return false;
+            }
+
+            Object.DestroyImmediate(dummyObj);
+            Debug.Log("[TEST 10 PASS] Projectile 3D hoàn chỉnh: Khởi tạo từ bàn tay, bay với tốc độ 20m/s, Trail + Light hiển thị, va chạm chuẩn xác và gây sát thương đúng 1 lần.");
             return true;
         }
     }

@@ -16,21 +16,38 @@ namespace Hellfire.AI
         [Header("Z1 Ranged Settings (25 HP, 12 DMG, 3.5 m/s, 10–20m range)")]
         [SerializeField] private float _minComfortDistance = 10f; // < 10m -> Kiting lùi lại
         [SerializeField] private float _maxCombatDistance = 20f;  // 10-20m -> Cự ly tấn công
-        [SerializeField] private float _chargeDuration = 0.45f;    // Thời gian tụ năng lượng (Telegraph) trước khi bắn
+        [SerializeField] private float _chargeDuration = 0.80f;   // Đồng bộ với 0.80s vung tay ném của Zombie@attack
         [SerializeField] private LayerMask _obstacleMask = ~0;    // Layer kiểm tra cản tầm nhìn
+
+        [Header("Hand Bone & Projectile")]
+        [SerializeField] private Transform _launchHandTransform;
+        [SerializeField] private GameObject _projectilePrefab;
+        [SerializeField] private float _projectileSpeed = 20f;
 
         [Header("References")]
         [SerializeField] private RangedZombieVisuals _visuals;
+        [SerializeField] private ZombieInvestigation _investigation;
+        [SerializeField] private ZombieHearing _hearing;
+        [SerializeField] private ZombieGroupAlert _groupAlert;
+        [SerializeField] private ZombieHordeRage _hordeRage;
 
         // Runtime states
         private float _nextAttackTime;
         private bool _isCharging;
         private float _chargeStartTime;
+        private float _rageCooldownMultiplier = 1.0f;
 
         public float MinComfortDistance => _minComfortDistance;
         public float MaxCombatDistance => _maxCombatDistance;
         public float ChargeDuration => _chargeDuration;
         public bool IsCharging => _isCharging;
+        public GameObject ProjectilePrefab => _projectilePrefab;
+        public Transform LaunchHandTransform => _launchHandTransform;
+        public ZombieInvestigation Investigation => _investigation;
+        public ZombieHearing Hearing => _hearing;
+        public ZombieGroupAlert GroupAlert => _groupAlert;
+        public ZombieHordeRage HordeRage => _hordeRage;
+        public float RageCooldownMultiplier => _rageCooldownMultiplier;
 
         protected override void Awake()
         {
@@ -47,6 +64,46 @@ namespace Hellfire.AI
                 _visuals = GetComponent<RangedZombieVisuals>();
                 if (_visuals == null) _visuals = gameObject.AddComponent<RangedZombieVisuals>();
             }
+
+            if (_launchHandTransform == null)
+            {
+                var transforms = GetComponentsInChildren<Transform>();
+                foreach (var t in transforms)
+                {
+                    if (t.name == "Bip01 R Hand" || t.name == "R Hand")
+                    {
+                        _launchHandTransform = t;
+                        break;
+                    }
+                }
+            }
+
+            if (_investigation == null) _investigation = GetComponent<ZombieInvestigation>();
+            if (_hearing == null) _hearing = GetComponent<ZombieHearing>();
+            if (_groupAlert == null) _groupAlert = GetComponent<ZombieGroupAlert>();
+            if (_hordeRage == null) _hordeRage = GetComponent<ZombieHordeRage>();
+        }
+
+        protected override void SetState(EnemyState newState)
+        {
+            if (_navAgent == null)
+            {
+                _navAgent = GetComponent<NavMeshAgent>() ?? gameObject.AddComponent<NavMeshAgent>();
+            }
+
+            base.SetState(newState);
+
+            // Khi Zombie chuyển sang trạng thái chiến đấu (Chase, Attack, Dead), lập tức hủy bỏ điều tra
+            if (newState != EnemyState.Idle && _investigation != null && _investigation.IsInvestigating)
+            {
+                _investigation.CancelInvestigation();
+            }
+
+            // Kích hoạt Group Alert khi vào Chase hoặc Attack nếu có mục tiêu hợp lệ
+            if ((newState == EnemyState.Attack || newState == EnemyState.Chase) && _currentTarget != null && _groupAlert != null)
+            {
+                _groupAlert.BroadcastAlert(_currentTarget.position, _currentTarget);
+            }
         }
 
         public override void OnNetworkSpawn()
@@ -55,14 +112,39 @@ namespace Hellfire.AI
             _nextAttackTime = Time.time + 0.5f;
         }
 
+        protected override void UpdateIdleState()
+        {
+            if (_currentTarget == null || !IsTargetAliveAndValid(_currentTargetHealth))
+            {
+                SearchNearestLivingTarget();
+            }
+
+            if (_currentTarget != null && CheckLineOfSight(_currentTarget, out _))
+            {
+                float distToTarget = Vector3.Distance(transform.position, _currentTarget.position);
+                if (distToTarget >= _minComfortDistance && distToTarget <= _maxCombatDistance)
+                {
+                    SetState(EnemyState.Attack);
+                }
+                else
+                {
+                    SetState(EnemyState.Chase);
+                }
+            }
+        }
+
         protected override void UpdateChaseState()
         {
             if (_currentTarget == null || !IsTargetAliveAndValid(_currentTargetHealth))
             {
-                CancelCharge();
-                _currentTarget = null;
-                SetState(EnemyState.Idle);
-                return;
+                SearchNearestLivingTarget();
+                if (_currentTarget == null || !IsTargetAliveAndValid(_currentTargetHealth))
+                {
+                    CancelCharge();
+                    _currentTarget = null;
+                    SetState(EnemyState.Idle);
+                    return;
+                }
             }
 
             float distToTarget = Vector3.Distance(transform.position, _currentTarget.position);
@@ -106,10 +188,14 @@ namespace Hellfire.AI
         {
             if (_currentTarget == null || !IsTargetAliveAndValid(_currentTargetHealth))
             {
-                CancelCharge();
-                _currentTarget = null;
-                SetState(EnemyState.Idle);
-                return;
+                SearchNearestLivingTarget();
+                if (_currentTarget == null || !IsTargetAliveAndValid(_currentTargetHealth))
+                {
+                    CancelCharge();
+                    _currentTarget = null;
+                    SetState(EnemyState.Idle);
+                    return;
+                }
             }
 
             float distToTarget = Vector3.Distance(transform.position, _currentTarget.position);
@@ -141,6 +227,66 @@ namespace Hellfire.AI
             HandleRangedAttackCycle();
         }
 
+        private void SearchNearestLivingTarget()
+        {
+            float closestDistSqr = _detectionRange * _detectionRange;
+            Transform bestTarget = null;
+            Health bestHealth = null;
+
+            // 1. Quét ConnectedClientsList từ NetworkManager
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+                {
+                    if (client.PlayerObject != null)
+                    {
+                        var health = client.PlayerObject.GetComponent<Health>();
+                        if (IsTargetAliveAndValid(health))
+                        {
+                            float distSqr = (client.PlayerObject.transform.position - transform.position).sqrMagnitude;
+                            if (distSqr < closestDistSqr && CheckLineOfSight(client.PlayerObject.transform, out _))
+                            {
+                                closestDistSqr = distSqr;
+                                bestTarget = client.PlayerObject.transform;
+                                bestHealth = health;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Dự phòng (Fallback) cho Scene Test hoặc khi PlayerObject chưa gán: Quét đối tượng có tag "Player"
+            if (bestTarget == null)
+            {
+                var playerObjects = GameObject.FindGameObjectsWithTag("Player");
+                foreach (var pObj in playerObjects)
+                {
+                    var health = pObj.GetComponent<Health>() ?? pObj.GetComponentInParent<Health>();
+                    if (IsTargetAliveAndValid(health))
+                    {
+                        float distSqr = (pObj.transform.position - transform.position).sqrMagnitude;
+                        if (distSqr < closestDistSqr && CheckLineOfSight(pObj.transform, out _))
+                        {
+                            closestDistSqr = distSqr;
+                            bestTarget = pObj.transform;
+                            bestHealth = health;
+                        }
+                    }
+                }
+            }
+
+            if (bestTarget != null)
+            {
+                _currentTarget = bestTarget;
+                _currentTargetHealth = bestHealth;
+                if (IsDebugLoggingEnabled())
+                {
+                    float dist = Vector3.Distance(transform.position, _currentTarget.position);
+                    Debug.Log($"[ArcherDebug] Zombie phát hiện Player: {_currentTarget.name} tại cự ly {dist:F1}m (LoS: True).");
+                }
+            }
+        }
+
         private void HandleRangedAttackCycle()
         {
             Vector3 shootOrigin = GetShootOrigin();
@@ -151,6 +297,11 @@ namespace Hellfire.AI
             {
                 _isCharging = true;
                 _chargeStartTime = Time.time;
+
+                if (IsDebugLoggingEnabled())
+                {
+                    Debug.Log($"[ArcherDebug] Bắt đầu Attack Telegraph ({_chargeDuration:F2}s) nhắm vào {_currentTarget.name}.");
+                }
 
                 // Bật tia ngắm cảnh báo (Telegraph) tới Client
                 NotifyTelegraphClientRpc(true, shootOrigin, targetAimPoint);
@@ -166,7 +317,7 @@ namespace Hellfire.AI
                 if (Time.time - _chargeStartTime >= _chargeDuration)
                 {
                     _isCharging = false;
-                    _nextAttackTime = Time.time + _attackCooldown;
+                    _nextAttackTime = Time.time + (_attackCooldown * _rageCooldownMultiplier);
 
                     NotifyTelegraphClientRpc(false, Vector3.zero, Vector3.zero);
                     ExecuteRangedShot(shootOrigin, targetAimPoint);
@@ -182,49 +333,70 @@ namespace Hellfire.AI
             _attackDamage = 12f;
             _attackRange = 18f;
             _attackCooldown = 1.6f;
-            _chargeDuration = 0.45f;
+            _chargeDuration = 0.80f;
             _minComfortDistance = 10f;
             _maxCombatDistance = 20f;
+            _projectileSpeed = 18f;
+        }
+
+        public void SetProjectilePrefabForTest(GameObject prefab)
+        {
+            _projectilePrefab = prefab;
         }
 
         private void ExecuteRangedShot(Vector3 shootOrigin, Vector3 targetAimPoint)
         {
             Physics.SyncTransforms();
             Vector3 shootDir = (targetAimPoint - shootOrigin).normalized;
-            Vector3 endPoint = shootOrigin + shootDir * _maxCombatDistance;
-            bool hitPlayer = false;
 
-            // Raycast kiểm tra trúng đích Server-Authoritative
-            var hits = Physics.RaycastAll(shootOrigin, shootDir, _maxCombatDistance, _obstacleMask, QueryTriggerInteraction.Ignore);
-            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            // Spawn cách vị trí bàn tay 0.35m theo hướng bắn để không chạm phải collider cánh tay/bàn tay
+            Vector3 spawnPos = shootOrigin + shootDir * 0.35f;
 
-            foreach (var hit in hits)
+            // 1. Phóng Projectile Server-Authoritative (tính va chạm và sát thương 12 DMG trên Server)
+#if UNITY_EDITOR
+            if (_projectilePrefab == null)
             {
-                // Bỏ qua collider của chính quái này
-                if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
-
-                endPoint = hit.point;
-
-                // Kiểm tra xem va chạm có phải là Player / IDamageable hay không
-                var damageable = hit.collider.GetComponentInParent<IDamageable>();
-                if (damageable != null && !damageable.IsDead)
+                _projectilePrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Prefabs/Projectile_Hellfire_Orb.prefab");
+            }
+#endif
+            if (_projectilePrefab != null)
+            {
+                var projObj = Instantiate(_projectilePrefab, spawnPos, Quaternion.LookRotation(shootDir));
+                var proj = projObj.GetComponent<ArcherProjectile>();
+                if (proj != null)
                 {
-                    damageable.TakeDamage(_attackDamage, HitboxType.Torso, NetworkObjectId);
-                    hitPlayer = true;
-                }
+                    bool isServerAuth = !IsSpawned || IsServer;
+                    proj.Initialize(shootDir, _projectileSpeed, _attackDamage, NetworkObjectId, transform, isServerAuth);
 
-                // Tia đạn dừng lại ở vật cản đầu tiên (dù là Player hay Tường chắn) -> KHÔNG bắn xuyên tường
-                break;
+                    if (IsDebugLoggingEnabled())
+                    {
+                        string handName = _launchHandTransform != null ? _launchHandTransform.name : "Root";
+                        Debug.Log($"[ArcherDebug] Projectile Hellfire Orb đã spawn tại {handName} (pos: {spawnPos}) hướng về {_currentTarget?.name} với vận tốc {_projectileSpeed}m/s.");
+                    }
+
+#if UNITY_EDITOR
+                    if (!Application.isPlaying)
+                    {
+                        int safetyMaxSteps = 300;
+                        while (!proj.HasHit && proj != null && safetyMaxSteps-- > 0)
+                        {
+                            proj.SimulateStep(0.05f);
+                        }
+                    }
+#endif
+                }
             }
 
-            // Phát hiệu ứng Tracer & Muzzle Flash
+            // 2. Đồng bộ đạn bay trực quan tới các Client trong Multiplayer
             if (IsSpawned && NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
             {
-                PlayRangedShotFeedbackClientRpc(shootOrigin, endPoint, hitPlayer);
+                PlayProjectileLaunchClientRpc(spawnPos, shootDir, _projectileSpeed);
             }
-            else if (_visuals != null)
+
+            // 3. Hiệu ứng lóe sáng tại bàn tay khi phóng (Muzzle Flash)
+            if (_visuals != null)
             {
-                _visuals.PlayShootVfx(shootOrigin, endPoint, hitPlayer);
+                _visuals.PlayShootVfx(shootOrigin, shootOrigin + shootDir * 1.5f, false);
             }
         }
 
@@ -257,6 +429,10 @@ namespace Hellfire.AI
 
         public Vector3 GetShootOrigin()
         {
+            if (_launchHandTransform != null)
+            {
+                return _launchHandTransform.position;
+            }
             return transform.position + Vector3.up * 1.4f;
         }
 
@@ -312,6 +488,17 @@ namespace Hellfire.AI
         }
 
         [ClientRpc]
+        private void PlayProjectileLaunchClientRpc(Vector3 origin, Vector3 dir, float speed)
+        {
+            if (IsServer) return; // Server already spawned the authoritative projectile
+            if (_visuals != null)
+            {
+                _visuals.SpawnClientProjectile(origin, dir, speed);
+                _visuals.PlayShootVfx(origin, origin + dir * 1.5f, false);
+            }
+        }
+
+        [ClientRpc]
         private void PlayRangedShotFeedbackClientRpc(Vector3 from, Vector3 to, bool hitPlayer)
         {
             if (_visuals != null)
@@ -331,6 +518,36 @@ namespace Hellfire.AI
         {
             Vector3 origin = GetShootOrigin();
             ExecuteRangedShot(origin, targetPos);
+        }
+
+        public static bool IsDebugLoggingEnabled()
+        {
+#if UNITY_EDITOR
+            var activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            return activeScene.name == "TestArcherAI" || activeScene.name == "TestCombatJuice" || activeScene.name == "TestZombieHearing" || activeScene.name == "TestZombieGroupAI";
+#else
+            return false;
+#endif
+        }
+
+        // ================= Z3 HORDE RAGE & GROUP ALERT SUPPORT =================
+        public void SetRageAttackCooldownMultiplier(float multiplier)
+        {
+            _rageCooldownMultiplier = Mathf.Clamp(multiplier, 0.5f, 1.0f);
+        }
+
+        public void EngageSpottedPlayer(Transform target)
+        {
+            if (target == null) return;
+            _currentTarget = target;
+            _currentTargetHealth = target.GetComponent<Health>() ?? target.GetComponentInParent<Health>();
+            SetState(EnemyState.Chase);
+        }
+
+        public bool HasLineOfSightForTest(Transform target)
+        {
+            if (target == null) return false;
+            return CheckLineOfSight(target, out _);
         }
     }
 }

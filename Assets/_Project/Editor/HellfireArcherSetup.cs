@@ -54,24 +54,63 @@ namespace Hellfire.Editor
             var hpProp = typeof(Health).GetField("_maxHealth", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             if (hpProp != null) hpProp.SetValue(health, 25f);
 
-            // 4. Model Placeholder (Capsule thon cao màu đỏ thẫm quỷ dữ với Material Asset)
-            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            body.name = "Model";
-            body.transform.SetParent(root.transform);
-            body.transform.localPosition = new Vector3(0f, 0.8f, 0f);
-            body.transform.localScale = new Vector3(0.8f, 1.6f, 0.8f);
+            // 4. Model (3D Rigged Zombie Model or fallback Capsule)
+            string zombieModelPath = "Assets/_Project/Art/RangedZombie/Model/Zombie.FBX";
+            string controllerPath = "Assets/_Project/Art/RangedZombie/Animations/Zombie_Archer_Animator.controller";
+            string materialPath = "Assets/_Project/Art/RangedZombie/Model/Materials/Zombie.mat";
 
-            var rend = body.GetComponent<MeshRenderer>();
-            var archerMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Materials/M_ArcherZombie_Test.mat");
-            if (archerMat != null) rend.sharedMaterial = archerMat;
+            var zombieModelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(zombieModelPath);
+            var animController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(controllerPath);
+            var zombieMat = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
 
-            // Xóa collider của model để dùng Hitbox chuyên biệt
-            Object.DestroyImmediate(body.GetComponent<Collider>());
+            Animator zombieAnim = null;
+
+            if (zombieModelAsset != null)
+            {
+                var zombieInstance = Object.Instantiate(zombieModelAsset, root.transform);
+                zombieInstance.name = "ZombieModel";
+                zombieInstance.transform.localPosition = Vector3.zero;
+                zombieInstance.transform.localRotation = Quaternion.identity;
+                zombieInstance.transform.localScale = Vector3.one;
+
+                zombieAnim = zombieInstance.GetComponent<Animator>();
+                if (zombieAnim == null) zombieAnim = zombieInstance.AddComponent<Animator>();
+                if (animController != null) zombieAnim.runtimeAnimatorController = animController;
+                zombieAnim.applyRootMotion = false;
+
+                // Load avatar
+                Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(zombieModelPath);
+                foreach (var a in subAssets)
+                {
+                    if (a is Avatar av) { zombieAnim.avatar = av; break; }
+                }
+
+                if (zombieMat != null)
+                {
+                    foreach (var smr in zombieInstance.GetComponentsInChildren<SkinnedMeshRenderer>())
+                    {
+                        smr.sharedMaterial = zombieMat;
+                    }
+                }
+            }
+            else
+            {
+                var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                body.name = "Model";
+                body.transform.SetParent(root.transform);
+                body.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+                body.transform.localScale = new Vector3(0.8f, 1.6f, 0.8f);
+
+                var rend = body.GetComponent<MeshRenderer>();
+                var archerMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Materials/M_ArcherZombie_Test.mat");
+                if (archerMat != null) rend.sharedMaterial = archerMat;
+                Object.DestroyImmediate(body.GetComponent<Collider>());
+            }
 
             // 4b. Nhãn 3D nổi bật: ARCHER ZOMBIE – TEST (Quay mặt về phía Player)
             var labelObj = new GameObject("Label_Floating");
             labelObj.transform.SetParent(root.transform);
-            labelObj.transform.localPosition = new Vector3(0f, 2.3f, 0f);
+            labelObj.transform.localPosition = new Vector3(0f, 2.15f, 0f);
             labelObj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
             var textMesh = labelObj.AddComponent<TextMesh>();
             textMesh.text = "ARCHER ZOMBIE – TEST";
@@ -81,22 +120,82 @@ namespace Hellfire.Editor
             textMesh.anchor = TextAnchor.MiddleCenter;
             textMesh.color = new Color(1f, 0.85f, 0.1f, 1f); // Màu vàng rực
 
-            // 4c. Điểm ngắm / Mắt quỷ phát sáng để xác định hướng quay mặt
-            var eyeObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            eyeObj.name = "Eye_Visor";
-            eyeObj.transform.SetParent(root.transform);
-            eyeObj.transform.localPosition = new Vector3(0f, 1.4f, 0.35f);
-            eyeObj.transform.localScale = new Vector3(0.4f, 0.12f, 0.15f);
-            Object.DestroyImmediate(eyeObj.GetComponent<Collider>());
-            var eyeRend = eyeObj.GetComponent<MeshRenderer>();
-            if (eyeRend != null && archerMat != null) eyeRend.sharedMaterial = archerMat;
-
             // 5. Hitboxes (Head x2.0, Torso x1.0, Limb x0.75)
             SetupHitboxes(root, new Vector3(0.8f, 1.6f, 0.8f), health);
 
             // 6. Visuals & AI Component
             var visuals = root.AddComponent<RangedZombieVisuals>();
             var ai = root.AddComponent<RangedZombieAI>();
+
+            string projPrefabPath = "Assets/_Project/Prefabs/Projectile_Hellfire_Orb.prefab";
+            GameObject projPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(projPrefabPath);
+
+            // Tìm bàn tay phải của quái
+            Transform rightHand = null;
+            foreach (var t in root.GetComponentsInChildren<Transform>())
+            {
+                if (t.name == "Bip01 R Hand" || t.name == "R Hand")
+                {
+                    rightHand = t;
+                    break;
+                }
+            }
+
+            if (visuals != null)
+            {
+                var soVis = new SerializedObject(visuals);
+                if (zombieAnim != null)
+                {
+                    var animProp = soVis.FindProperty("_animator");
+                    if (animProp != null) animProp.objectReferenceValue = zombieAnim;
+                }
+                if (projPrefab != null)
+                {
+                    var projProp = soVis.FindProperty("_projectilePrefab");
+                    if (projProp != null) projProp.objectReferenceValue = projPrefab;
+                }
+                soVis.ApplyModifiedProperties();
+            }
+
+            if (ai != null)
+            {
+                var soAI = new SerializedObject(ai);
+                if (rightHand != null)
+                {
+                    var handProp = soAI.FindProperty("_launchHandTransform");
+                    if (handProp != null) handProp.objectReferenceValue = rightHand;
+                }
+                if (projPrefab != null)
+                {
+                    var projProp = soAI.FindProperty("_projectilePrefab");
+                    if (projProp != null) projProp.objectReferenceValue = projPrefab;
+                }
+                var speedProp = soAI.FindProperty("_projectileSpeed");
+                if (speedProp != null) speedProp.floatValue = 20f;
+
+                var chargeProp = soAI.FindProperty("_chargeDuration");
+                if (chargeProp != null) chargeProp.floatValue = 0.80f;
+
+                soAI.ApplyModifiedProperties();
+            }
+
+            // 6. ZombieHearing & ZombieInvestigation (Đợt Z2)
+            var hearing = root.AddComponent<ZombieHearing>();
+            hearing.HearingRadius = 20f;
+            hearing.EnableHearing = true;
+
+            var investigation = root.AddComponent<ZombieInvestigation>();
+            investigation.SearchDuration = 4.0f;
+
+            if (ai != null)
+            {
+                var soAI = new SerializedObject(ai);
+                var invProp = soAI.FindProperty("_investigation");
+                if (invProp != null) invProp.objectReferenceValue = investigation;
+                var hearProp = soAI.FindProperty("_hearing");
+                if (hearProp != null) hearProp.objectReferenceValue = hearing;
+                soAI.ApplyModifiedProperties();
+            }
 
             // Lưu Prefab
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, TestArcherPrefabPath);
@@ -117,9 +216,9 @@ namespace Hellfire.Editor
             // Head (Sphere)
             var headObj = new GameObject("Hitbox_Head");
             headObj.transform.SetParent(hitboxesRoot.transform);
-            headObj.transform.localPosition = new Vector3(0f, 1.36f, 0f);
+            headObj.transform.localPosition = new Vector3(0f, 1.64f, 0.05f);
             var headCol = headObj.AddComponent<SphereCollider>();
-            headCol.radius = 0.28f;
+            headCol.radius = 0.22f;
             var headId = headObj.AddComponent<HitboxIdentifier>();
             headId.SetHitboxType(HitboxType.Head);
             headId.SetDamageableTarget(health);
@@ -127,10 +226,11 @@ namespace Hellfire.Editor
             // Torso (Capsule)
             var torsoObj = new GameObject("Hitbox_Torso");
             torsoObj.transform.SetParent(hitboxesRoot.transform);
-            torsoObj.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+            torsoObj.transform.localPosition = new Vector3(0f, 1.05f, 0f);
             var torsoCol = torsoObj.AddComponent<CapsuleCollider>();
-            torsoCol.radius = scale.x * 0.4f;
-            torsoCol.height = scale.y * 0.6f;
+            torsoCol.radius = 0.32f;
+            torsoCol.height = 0.85f;
+            torsoCol.direction = 1;
             var torsoId = torsoObj.AddComponent<HitboxIdentifier>();
             torsoId.SetHitboxType(HitboxType.Torso);
             torsoId.SetDamageableTarget(health);
@@ -138,9 +238,9 @@ namespace Hellfire.Editor
             // Limbs (Box)
             var limbsObj = new GameObject("Hitbox_Limbs");
             limbsObj.transform.SetParent(hitboxesRoot.transform);
-            limbsObj.transform.localPosition = new Vector3(0f, 0.24f, 0f);
+            limbsObj.transform.localPosition = new Vector3(0f, 0.45f, 0f);
             var limbsCol = limbsObj.AddComponent<BoxCollider>();
-            limbsCol.size = new Vector3(scale.x * 0.7f, scale.y * 0.3f, scale.z * 0.7f);
+            limbsCol.size = new Vector3(0.55f, 0.9f, 0.55f);
             var limbsId = limbsObj.AddComponent<HitboxIdentifier>();
             limbsId.SetHitboxType(HitboxType.Limb);
             limbsId.SetDamageableTarget(health);
