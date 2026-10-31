@@ -626,6 +626,27 @@ namespace Hellfire.Editor
 
         public static void RegisterPrefabsToNetworkManagerInternal(params GameObject[] prefabs)
         {
+            // 1. Đăng ký vào tất cả NetworkPrefabsList assets (bao gồm DefaultNetworkPrefabs.asset)
+            string[] guids = AssetDatabase.FindAssets("t:NetworkPrefabsList");
+            foreach (var guid in guids)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                var prefabsList = AssetDatabase.LoadAssetAtPath<NetworkPrefabsList>(assetPath);
+                if (prefabsList != null)
+                {
+                    foreach (var p in prefabs)
+                    {
+                        if (p != null && !prefabsList.Contains(p))
+                        {
+                            prefabsList.Add(new NetworkPrefab { Prefab = p });
+                            EditorUtility.SetDirty(prefabsList);
+                            Debug.Log($"[HellfirePhase4Setup] Đã đăng ký {p.name} vào NetworkPrefabsList: {assetPath}");
+                        }
+                    }
+                }
+            }
+
+            // 2. Đăng ký vào NetworkManager.prefab
             var nmPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkManagerPrefabPath);
             if (nmPrefab == null) return;
 
@@ -721,7 +742,7 @@ namespace Hellfire.Editor
             }
 
             // 2. Cập nhật HUD Canvas với Overlays và Guardian Shield Indicator
-            var canvas = GameObject.FindObjectOfType<Canvas>();
+            var canvas = Object.FindAnyObjectByType<Canvas>();
             if (canvas != null)
             {
                 SetupHUDOverlays(canvas.transform);

@@ -214,7 +214,6 @@ namespace Hellfire.UI
             UpdateHostStartButtonState();
             UpdateClientReadyButtonState();
         }
-
         private void HandleClientListChanged(ulong clientId)
         {
             UpdateUI();
@@ -371,7 +370,8 @@ namespace Hellfire.UI
             var nm = NetworkManager.Singleton;
             if (nm == null) return;
 
-            int connectedCount = nm.ConnectedClientsIds.Count;
+            var clientIds = nm.ConnectedClientsIds;
+            int connectedCount = clientIds.Count;
             int maxPlayers = NetworkConnectManager.Instance != null ? NetworkConnectManager.Instance.MaxPlayers : 4;
 
             if (_playerCountText != null)
@@ -379,13 +379,11 @@ namespace Hellfire.UI
                 _playerCountText.text = $"Người chơi: {connectedCount}/{maxPlayers}";
             }
 
-            var clientIds = new List<ulong>(nm.ConnectedClientsIds);
-
             for (int i = 0; i < _playerSlotTexts.Count; i++)
             {
                 if (_playerSlotTexts[i] == null) continue;
 
-                if (i < clientIds.Count)
+                if (i < connectedCount)
                 {
                     ulong id = clientIds[i];
                     bool isSlotHost = id == NetworkManager.ServerClientId;

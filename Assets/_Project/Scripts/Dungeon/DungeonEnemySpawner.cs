@@ -17,10 +17,17 @@ namespace Hellfire.Dungeon
     {
         public static DungeonEnemySpawner Instance { get; private set; }
 
-        [Header("Enemy Prefabs (Mục 6.2)")]
+        [Header("Enemy Prefabs (Mục 6.2 & 19.4)")]
         [SerializeField] private GameObject _impPrefab;
         [SerializeField] private GameObject _archerPrefab;
+        [SerializeField] private GameObject _rangedZombiePrefab;
         [SerializeField] private GameObject _brutePrefab;
+
+        [Header("Enemy Spawn Weights (Mục 19.4: Tổng 100)")]
+        [SerializeField] private int _impWeight = 40;
+        [SerializeField] private int _archerWeight = 25;
+        [SerializeField] private int _rangedZombieWeight = 15;
+        [SerializeField] private int _bruteWeight = 20;
 
         [Header("Boss Prefab (Mục 5.2)")]
         [SerializeField] private GameObject _bossPrefab;
@@ -98,17 +105,27 @@ namespace Hellfire.Dungeon
 
             for (int i = 0; i < enemyCount; i++)
             {
-                // Chọn ngẫu nhiên loại quái: 50% Imp, 30% Archer, 20% Brute (Mục 6.2 & 17.5)
-                int roll = rng.Next(100);
+                // Chọn loại quái theo trọng số [SerializeField] int: Imp 40, Archer 25, Zombie tầm xa 15, Brute 20 (Mục 19.4)
+                int totalWeight = _impWeight + _archerWeight + _rangedZombieWeight + _bruteWeight;
+                if (totalWeight <= 0) totalWeight = 100;
+                int roll = rng.Next(totalWeight);
                 GameObject prefabToSpawn = _impPrefab;
 
-                if (roll >= 50 && roll < 80 && _archerPrefab != null)
+                if (roll < _impWeight)
+                {
+                    prefabToSpawn = _impPrefab;
+                }
+                else if (roll < _impWeight + _archerWeight)
                 {
                     prefabToSpawn = _archerPrefab;
                 }
-                else if (roll >= 80 && _brutePrefab != null)
+                else if (roll < _impWeight + _archerWeight + _rangedZombieWeight)
                 {
-                    prefabToSpawn = _brutePrefab;
+                    prefabToSpawn = _rangedZombiePrefab != null ? _rangedZombiePrefab : _archerPrefab;
+                }
+                else
+                {
+                    prefabToSpawn = _brutePrefab != null ? _brutePrefab : _impPrefab;
                 }
 
                 if (prefabToSpawn == null) prefabToSpawn = _impPrefab;

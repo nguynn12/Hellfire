@@ -555,7 +555,12 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _impPrefab: {fileID: 8187070297308079450, guid: 00da543e2f861034b9cb7af4e9a3a4e1, type: 3}
   _archerPrefab: {fileID: 7969770292399175977, guid: efb1be9e6dfc50e43a88343100361528, type: 3}
+  _rangedZombiePrefab: {fileID: 708636117460699387, guid: 896be1d1454c848dfa8d4507eb236e8e, type: 3}
   _brutePrefab: {fileID: 1018357453883910435, guid: d40eec4abca24924f8301c0739e80b5d, type: 3}
+  _impWeight: 40
+  _archerWeight: 25
+  _rangedZombieWeight: 15
+  _bruteWeight: 20
   _bossPrefab: {fileID: 5937095992736994228, guid: d3e9d3ba396165e4a9237c2794c12a48, type: 3}
   _minEnemiesPerNormalRoom: 2
   _maxEnemiesPerNormalRoom: 4

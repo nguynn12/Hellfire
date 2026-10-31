@@ -1,4 +1,4 @@
-// Script: WeaponController.cs
+﻿// Script: WeaponController.cs
 // Mục đích: Quản lý toàn bộ vũ khí súng tầm xa (Ranged Guns), bắn Hitscan, nạp đạn vô hạn không giới hạn số lần.
 //           Hỗ trợ Nâng Cấp Vũ Khí Toàn Cục (Global Weapon Stats & Modifiers) — giữ nguyên và áp dụng cho TẤT CẢ vũ khí khi đổi súng.
 // Môi trường thực thi: Cả hai (Client dự đoán & phát hiệu ứng, Server xác thực & trừ máu).
@@ -81,6 +81,7 @@ namespace Hellfire.Combat
         public event Action<bool> OnHitTargetConfirmed;           // isHeadshot
         public event Action<int> OnWeaponUpgraded;                 // newLevel
         public event Action OnKillConfirmed;                      // Kill confirmation (Mục 16.7)
+        public event Action OnWeaponFired;                        // Đợt 1: Kích hoạt hiệu ứng giật súng (Recoil)
 
         public WeaponData CurrentWeaponData => CurrentRuntimeWeapon != null ? CurrentRuntimeWeapon.BaseData : _currentWeapon;
         public RuntimeWeapon CurrentRuntimeWeapon => (_runtimeWeapons != null && _currentWeaponIndex >= 0 && _currentWeaponIndex < _runtimeWeapons.Count) ? _runtimeWeapons[_currentWeaponIndex] : null;
@@ -91,6 +92,7 @@ namespace Hellfire.Combat
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
         public int GlobalUpgradeLevel => GlobalUpgradeLevelNet.Value;
+        public bool IsAimingDownSights { get; set; }
 
         private void Awake()
         {
@@ -165,7 +167,7 @@ namespace Hellfire.Combat
 
         private void Update()
         {
-            if (!IsOwner) return;
+            if (!GameModeHelper.CanLocalControl(this)) return;
 
             // Nếu người chơi đang gục hoặc chết -> Không cho phép bắn / nạp đạn
             if (_playerHealth != null && (_playerHealth.IsDowned.Value || _playerHealth.IsDead.Value))
@@ -240,7 +242,7 @@ namespace Hellfire.Combat
             SwitchWeapon(index);
 
             // Đồng bộ về Client sở hữu nếu Server gọi
-            if (IsServer && !IsOwner)
+            if (IsServer && !IsOwner && !GameModeHelper.IsOffline)
             {
                 SwitchWeaponClientRpc(index);
             }
@@ -349,6 +351,7 @@ namespace Hellfire.Combat
             // Tính toán tốc độ ra đòn kết hợp hệ số tốc bắn toàn cục
             float finalAps = _currentWeapon.AttackRateAPS * GlobalAttackSpeedMultiplierNet.Value;
             _nextFireTime = Time.time + (1.0f / Mathf.Max(0.1f, finalAps));
+            OnWeaponFired?.Invoke();
 
             if (_audioSource != null && _currentWeapon.FireSound != null)
             {
@@ -362,15 +365,23 @@ namespace Hellfire.Combat
             // Vẽ tracer đạn cosmetic cục bộ cho người bắn
             int pellets = _currentWeapon.PelletCount;
             float range = _currentWeapon.Range;
+            float effectiveSpread = IsAimingDownSights ? _currentWeapon.Spread * 0.5f : _currentWeapon.Spread;
             for (int i = 0; i < pellets; i++)
             {
-                Vector3 shootDir = CalculateSpreadDirection(cameraForward, _currentWeapon.Spread, seed + i);
+                Vector3 shootDir = CalculateSpreadDirection(cameraForward, effectiveSpread, seed + i);
                 Vector3 endPoint = Physics.Raycast(cameraPos, shootDir, out var hit, range) ? hit.point : cameraPos + shootDir * range;
                 DrawCosmeticTracer(GetMuzzlePosition(), endPoint);
             }
 
-            // Gửi ServerRpc yêu cầu Server xác thực độc lập
-            FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            // Gửi ServerRpc yêu cầu Server xác thực độc lập hoặc chạy cục bộ khi Offline
+            if (GameModeHelper.IsOffline)
+            {
+                ExecuteHitscanFireLogic(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            }
+            else
+            {
+                FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+            }
 
             // Khi đạn hiện tại về 0: Tự động bắt đầu nạp đạn ngay lập tức
             if (_currentAmmo <= 0)
@@ -381,6 +392,11 @@ namespace Hellfire.Combat
 
         [ServerRpc]
         private void FireServerRpc(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
+        {
+            ExecuteHitscanFireLogic(clientOrigin, baseDirection, seed, weaponIndex);
+        }
+
+        public void ExecuteHitscanFireLogic(Vector3 clientOrigin, Vector3 baseDirection, int seed, int weaponIndex)
         {
             RuntimeWeapon rw = GetRuntimeWeaponByIndex(weaponIndex);
             if (rw == null) return;
@@ -421,7 +437,10 @@ namespace Hellfire.Combat
                         var hitHealth = hit.collider.GetComponentInParent<Health>();
                         if (hitHealth != null && hitHealth.NetworkObjectId != NetworkObjectId)
                         {
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                            if (GameModeHelper.IsOffline)
+                                SpawnImpactEffectInternal(hit.point, hit.normal, true);
+                            else
+                                SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
                             continue;
                         }
                     }
@@ -450,9 +469,18 @@ namespace Hellfire.Combat
                         var payload = new DamagePayload(attackDamage, armorPen, hitbox.Type, OwnerClientId);
                         hitbox.ForwardDamage(payload);
 
-                        rw.NotifyHit(payload, hitbox.Damageable);
-                        NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
-                        SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                        rw.NotifyHit(payload, hitbox.Damageable, _globalModifiers);
+
+                        if (GameModeHelper.IsOffline)
+                        {
+                            OnHitTargetConfirmed?.Invoke(hitbox.Type == HitboxType.Head);
+                            SpawnImpactEffectInternal(hit.point, hit.normal, true);
+                        }
+                        else
+                        {
+                            NotifyHitConfirmClientRpc(hitbox.Type == HitboxType.Head);
+                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                        }
                     }
                     else
                     {
@@ -462,13 +490,25 @@ namespace Hellfire.Combat
                             var payload = new DamagePayload(attackDamage, armorPen, HitboxType.Torso, OwnerClientId);
                             damageable.TakeDamage(payload);
 
-                            rw.NotifyHit(payload, damageable);
-                            NotifyHitConfirmClientRpc(false);
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                            rw.NotifyHit(payload, damageable, _globalModifiers);
+
+                            if (GameModeHelper.IsOffline)
+                            {
+                                OnHitTargetConfirmed?.Invoke(false);
+                                SpawnImpactEffectInternal(hit.point, hit.normal, true);
+                            }
+                            else
+                            {
+                                NotifyHitConfirmClientRpc(false);
+                                SpawnImpactEffectClientRpc(hit.point, hit.normal, true);
+                            }
                         }
                         else
                         {
-                            SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
+                            if (GameModeHelper.IsOffline)
+                                SpawnImpactEffectInternal(hit.point, hit.normal, false);
+                            else
+                                SpawnImpactEffectClientRpc(hit.point, hit.normal, false);
                         }
                     }
                 }
@@ -497,7 +537,7 @@ namespace Hellfire.Combat
             float bonusCritMultiplier = 0.2f
         )
         {
-            if (!IsServer)
+            if (!GameModeHelper.IsServerOrOffline)
             {
                 Debug.LogWarning("[WeaponController] Chỉ Server mới có quyền nâng cấp vũ khí!");
                 return;
@@ -519,7 +559,7 @@ namespace Hellfire.Combat
         /// </summary>
         public void AddGlobalModifierServer(IWeaponModifier modifier)
         {
-            if (!IsServer || modifier == null) return;
+            if (!GameModeHelper.IsServerOrOffline || modifier == null) return;
             if (!_globalModifiers.Contains(modifier))
             {
                 _globalModifiers.Add(modifier);
@@ -532,7 +572,7 @@ namespace Hellfire.Combat
         /// </summary>
         public void UpgradeCurrentWeaponServer(int levels = 1)
         {
-            if (!IsServer) return;
+            if (!GameModeHelper.IsServerOrOffline) return;
             for (int i = 0; i < levels; i++)
             {
                 ApplyGlobalWeaponUpgradeServer(0.20f, 0.08f, 5f, 0.04f, 0.15f);
@@ -596,6 +636,11 @@ namespace Hellfire.Combat
             }
         }
 
+        private void SpawnImpactEffectInternal(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh)
+        {
+            StartCoroutine(ImpactEffectRoutine(hitPoint, hitNormal, isFlesh));
+        }
+
         [ClientRpc]
         public void NotifyKillConfirmedClientRpc()
         {
@@ -608,7 +653,7 @@ namespace Hellfire.Combat
         [ClientRpc]
         private void SpawnImpactEffectClientRpc(Vector3 hitPoint, Vector3 hitNormal, bool isFlesh)
         {
-            StartCoroutine(ImpactEffectRoutine(hitPoint, hitNormal, isFlesh));
+            SpawnImpactEffectInternal(hitPoint, hitNormal, isFlesh);
         }
 
         private IEnumerator ImpactEffectRoutine(Vector3 pos, Vector3 normal, bool isFlesh)

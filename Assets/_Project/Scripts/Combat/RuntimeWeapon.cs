@@ -178,13 +178,21 @@ namespace Hellfire.Combat
         }
 
         /// <summary>
-        /// Kích hoạt callback OnHit cho toàn bộ các modifier đã gắn trên vũ khí.
+        /// Kích hoạt callback OnHit cho toàn bộ các modifier đã gắn trên vũ khí và modifier toàn cục (Mục 10).
         /// </summary>
-        public void NotifyHit(DamagePayload payload, IDamageable target)
+        public void NotifyHit(DamagePayload payload, IDamageable target, IReadOnlyList<IWeaponModifier> globalModifiers = null)
         {
             for (int i = 0; i < _modifiers.Count; i++)
             {
                 _modifiers[i]?.OnHit(payload, target);
+            }
+
+            if (globalModifiers != null)
+            {
+                for (int i = 0; i < globalModifiers.Count; i++)
+                {
+                    globalModifiers[i]?.OnHit(payload, target);
+                }
             }
         }
     }

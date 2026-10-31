@@ -64,7 +64,7 @@ namespace Hellfire.Player
             Health nearestDowned = null;
             float nearestDist = _reviveDistance;
 
-            var allHealths = FindObjectsByType<Health>(FindObjectsSortMode.None);
+            var allHealths = FindObjectsByType<Health>(FindObjectsInactive.Exclude);
             foreach (var h in allHealths)
             {
                 if (h == null || h == _myHealth || !h.IsPlayer) continue;
@@ -114,9 +114,6 @@ namespace Hellfire.Player
                 _currentReviveProgress += Time.deltaTime;
                 OnReviveProgressChanged?.Invoke(_currentReviveProgress, _reviveHoldDuration);
 
-                // Gửi cập nhật cho Server
-                HoldReviveServerRpc(_currentReviveTarget.NetworkObjectId, Time.deltaTime);
-
                 if (_currentReviveProgress >= _reviveHoldDuration)
                 {
                     // Hoàn tất cứu: Gửi yêu cầu Server khôi phục máu
@@ -147,9 +144,12 @@ namespace Hellfire.Player
             }
         }
 
-        // ================= SERVER RPC VALIDATION =================
+        // ================= SERVER RPC VALIDATION & TIMING =================
 
-        [ServerRpc]
+        private float _serverReviveStartTime;
+        private ulong _serverReviveTargetId;
+
+        [Rpc(SendTo.Server)]
         private void StartReviveServerRpc(ulong targetNetworkId)
         {
             if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkId, out var targetNetObj))
@@ -169,43 +169,27 @@ namespace Hellfire.Player
                 return;
             }
 
-            Debug.Log($"[PlayerRevive] Client {OwnerClientId} bắt đầu cứu người chơi {targetNetworkId}");
+            _serverReviveTargetId = targetNetworkId;
+            _serverReviveStartTime = Time.time;
+            Debug.Log($"[PlayerRevive] Server: Bắt đầu theo dõi quá trình cứu của Client {OwnerClientId} cho mục tiêu {targetNetworkId}");
         }
 
-        [ServerRpc]
-        private void HoldReviveServerRpc(ulong targetNetworkId, float deltaHoldTime)
-        {
-            if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkId, out var targetNetObj))
-            {
-                return;
-            }
-
-            var targetHealth = targetNetObj.GetComponent<Health>();
-            if (targetHealth == null || !targetHealth.IsDowned.Value || targetHealth.IsDead.Value)
-            {
-                return;
-            }
-
-            // Server kiểm tra khoảng cách hợp lệ (Mục 3.3)
-            float dist = Vector3.Distance(transform.position, targetNetObj.transform.position);
-            if (dist > _reviveDistance + 1.0f)
-            {
-                Debug.LogWarning($"[PlayerRevive] Cứu thất bại do Client {OwnerClientId} đã di chuyển ra ngoài phạm vi!");
-                return;
-            }
-
-            // Khi người cứu hoàn tất đủ 3 giây, Server thực thi hồi sinh
-            // (Client gửi hold delta và hoàn thành trên Server)
-            if (deltaHoldTime >= _reviveHoldDuration || targetHealth.IsDowned.Value)
-            {
-                // Server gọi hàm hồi sinh
-                // Để đảm bảo an toàn, khi đủ điều kiện Server sẽ khôi phục 30% máu
-            }
-        }
-
-        [ServerRpc]
+        [Rpc(SendTo.Server)]
         public void CompleteReviveServerRpc(ulong targetNetworkId)
         {
+            if (_serverReviveTargetId != targetNetworkId)
+            {
+                Debug.LogWarning($"[PlayerRevive] Server: Từ chối hoàn tất cứu vì mục tiêu không khớp {_serverReviveTargetId} != {targetNetworkId}");
+                return;
+            }
+
+            float heldTime = Time.time - _serverReviveStartTime;
+            if (heldTime < _reviveHoldDuration - 0.25f)
+            {
+                Debug.LogWarning($"[PlayerRevive] Server: Từ chối cứu vì thời gian giữ chưa đủ ({heldTime:F2}s / {_reviveHoldDuration}s)");
+                return;
+            }
+
             if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkId, out var targetNetObj))
             {
                 return;
@@ -222,12 +206,20 @@ namespace Hellfire.Player
             {
                 targetHealth.ServerRevive();
                 Networking.MatchSummaryManager.RecordRevive(OwnerClientId);
+                _serverReviveTargetId = 0;
+                _serverReviveStartTime = 0f;
+                Debug.Log($"[PlayerRevive] Server: Cứu thành công mục tiêu {targetNetworkId} bởi Client {OwnerClientId}");
             }
         }
 
-        [ServerRpc]
+        [Rpc(SendTo.Server)]
         private void CancelReviveServerRpc(ulong targetNetworkId)
         {
+            if (_serverReviveTargetId == targetNetworkId)
+            {
+                _serverReviveTargetId = 0;
+                _serverReviveStartTime = 0f;
+            }
             Debug.Log($"[PlayerRevive] Client {OwnerClientId} đã hủy cứu người chơi {targetNetworkId}");
         }
     }

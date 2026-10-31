@@ -161,7 +161,7 @@ namespace Hellfire.UI
 
         private void SetPlayerMovementLookEnabled(bool enabled)
         {
-            var playerMove = FindObjectOfType<PlayerMovement>();
+            var playerMove = PlayerMovement.LocalInstance != null ? PlayerMovement.LocalInstance : FindAnyObjectByType<PlayerMovement>();
             if (playerMove != null)
             {
                 playerMove.SetCursorLock(enabled);
@@ -178,7 +178,7 @@ namespace Hellfire.UI
             var canvas = GetComponentInParent<Canvas>();
             if (canvas == null)
             {
-                canvas = FindObjectOfType<Canvas>();
+                canvas = FindAnyObjectByType<Canvas>();
                 if (canvas != null)
                 {
                     transform.SetParent(canvas.transform, false);
