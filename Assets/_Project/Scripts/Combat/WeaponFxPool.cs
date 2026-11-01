@@ -303,17 +303,25 @@ namespace Hellfire.Combat
             var rend = shell.GetComponent<Renderer>();
             if (rend != null) rend.sharedMaterial = _sharedBrassMaterial;
 
-            var col = shell.GetComponent<CapsuleCollider>() ?? shell.GetComponent<Collider>();
+            var col = shell.GetComponent<Collider>();
             if (col != null)
             {
                 col.isTrigger = false;
             }
 
-            var rb = shell.GetComponent<Rigidbody>() ?? shell.AddComponent<Rigidbody>();
-            rb.mass = 0.08f;
-            rb.linearDamping = 0.2f;
-            rb.angularDamping = 0.5f;
-            rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            var rb = shell.GetComponent<Rigidbody>();
+            if (rb == null)
+            {
+                rb = shell.AddComponent<Rigidbody>();
+            }
+
+            if (rb != null)
+            {
+                rb.mass = 0.08f;
+                rb.linearDamping = 0.2f;
+                rb.angularDamping = 0.5f;
+                rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            }
 
             shell.SetActive(false);
             return shell;
