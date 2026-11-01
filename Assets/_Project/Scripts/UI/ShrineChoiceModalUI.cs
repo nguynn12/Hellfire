@@ -159,17 +159,42 @@ namespace Hellfire.UI
             if (_headerTitleText != null) _headerTitleText.text = title;
             if (_headerSubtitleText != null) _headerSubtitleText.text = subtitle;
 
+            var rt = GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                rt.localScale = Vector3.one;
+            }
+
+            if (_panelRoot != null)
+            {
+                var prt = _panelRoot.GetComponent<RectTransform>();
+                if (prt != null)
+                {
+                    prt.anchorMin = Vector2.zero;
+                    prt.anchorMax = Vector2.one;
+                    prt.offsetMin = Vector2.zero;
+                    prt.offsetMax = Vector2.zero;
+                    prt.localScale = Vector3.one;
+                }
+            }
+
             UpdateCardVisuals();
 
-            _isOpen = true;
             bool hasValidUGUI = (_panelRoot != null && _cardContainers != null && _cardContainers.Length >= 3 && _cardContainers[0] != null);
             if (hasValidUGUI)
             {
+                _isOpen = true;
                 _panelRoot.SetActive(true);
             }
             else
             {
+                _isOpen = false;
                 if (_panelRoot != null) _panelRoot.SetActive(false);
+                return;
             }
 
             // Mở khóa chuột để người chơi bấm nút
@@ -334,6 +359,15 @@ namespace Hellfire.UI
                     _cardButtons = modalComp._cardButtons;
                     if (_panelRoot != null)
                     {
+                        var prt = _panelRoot.GetComponent<RectTransform>();
+                        if (prt != null)
+                        {
+                            prt.anchorMin = Vector2.zero;
+                            prt.anchorMax = Vector2.one;
+                            prt.offsetMin = Vector2.zero;
+                            prt.offsetMax = Vector2.zero;
+                            prt.localScale = Vector3.one;
+                        }
                         _panelRoot.SetActive(false);
                         return;
                     }

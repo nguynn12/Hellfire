@@ -885,33 +885,20 @@ namespace Hellfire.UI
         }
 
         private void HandleAmmoChanged(int currentAmmo, int magSize)
-
         {
-
             if (_ammoText != null)
-
             {
-
-                _ammoText.text = $"{currentAmmo} / {magSize}";
-
+                _ammoText.text = $"{currentAmmo} <size=18><color=#A8C4E0>/ {magSize}</color></size>";
             }
-
         }
 
         private void HandleAmmoDetailsChanged(int currentAmmo, int magSize, int reserveAmmo)
-
         {
-
             if (_ammoText != null)
-
             {
-
                 string reserveStr = reserveAmmo > 9999 ? "∞" : reserveAmmo.ToString();
-
-                _ammoText.text = $"{currentAmmo} / {magSize}  ({reserveStr})";
-
+                _ammoText.text = $"{currentAmmo} <size=18><color=#A8C4E0>/ {magSize}  ({reserveStr})</color></size>";
             }
-
         }
 
         private void HandleWeaponChanged(string weaponName)

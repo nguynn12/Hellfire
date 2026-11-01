@@ -27,15 +27,15 @@ namespace Hellfire.Items
         public float StarMultiplier;  // Hệ số thưởng thêm: 1.0f (100%), 1.5f (150%), 2.0f (200%)
 
         /// <summary>
-        /// Trả về chuỗi ký tự hiển thị sao (ví dụ: "★☆☆", "★★☆", "★★★")
+        /// Trả về chuỗi ký tự hiển thị sao (sử dụng glyph ★ hợp lệ với font LiberationSans SDF và Rich Text màu sắc)
         /// </summary>
         public string GetStarIcons()
         {
             switch (Stars)
             {
-                case 3: return "★★★";
-                case 2: return "★★☆";
-                default: return "★☆☆";
+                case 3: return "★ ★ ★";
+                case 2: return "★ ★ <color=#555555>★</color>";
+                default: return "★ <color=#555555>★ ★</color>";
             }
         }
 

@@ -1813,97 +1813,51 @@ namespace Hellfire.Editor
 
 
             // Tên vũ khí
-
             var nameObj = new GameObject("WeaponNameText", typeof(RectTransform), typeof(TextMeshProUGUI));
-
             nameObj.transform.SetParent(weaponPanel.transform, false);
-
             var nRect = nameObj.GetComponent<RectTransform>();
-
             nRect.anchorMin = new Vector2(0f, 1f);
-
-            nRect.anchorMax = new Vector2(0.7f, 1f);
-
+            nRect.anchorMax = new Vector2(0.65f, 1f);
             nRect.pivot = new Vector2(0f, 1f);
-
             nRect.anchoredPosition = new Vector2(14f, -10f);
-
-            nRect.sizeDelta = new Vector2(0f, 26f);
-
+            nRect.sizeDelta = new Vector2(0f, 22f);
             var nTmp = nameObj.GetComponent<TextMeshProUGUI>();
-
             nTmp.text = "ASSAULT RIFLE";
-
-            nTmp.fontSize = 17f;
-
+            nTmp.fontSize = 15f;
             nTmp.fontStyle = FontStyles.Bold;
-
             nTmp.alignment = TextAlignmentOptions.Left;
-
             nTmp.color = Color.white;
 
-
-
             // Chế độ bắn Badge
-
             var badgeObj = new GameObject("FireModeBadge", typeof(RectTransform), typeof(TextMeshProUGUI));
-
             badgeObj.transform.SetParent(weaponPanel.transform, false);
-
             var bdRect = badgeObj.GetComponent<RectTransform>();
-
-            bdRect.anchorMin = new Vector2(0.7f, 1f);
-
+            bdRect.anchorMin = new Vector2(0.65f, 1f);
             bdRect.anchorMax = new Vector2(1f, 1f);
-
             bdRect.pivot = new Vector2(1f, 1f);
-
             bdRect.anchoredPosition = new Vector2(-14f, -10f);
-
-            bdRect.sizeDelta = new Vector2(0f, 26f);
-
+            bdRect.sizeDelta = new Vector2(0f, 22f);
             var bdTmp = badgeObj.GetComponent<TextMeshProUGUI>();
-
             bdTmp.text = "AUTO | AIM";
-
-            bdTmp.fontSize = 13f;
-
+            bdTmp.fontSize = 12f;
             bdTmp.fontStyle = FontStyles.Bold;
-
             bdTmp.alignment = TextAlignmentOptions.Right;
-
             bdTmp.color = new Color(0.2f, 0.95f, 1f);
 
-
-
             // Số đạn hiện tại / Tối đa
-
             var ammoObj = new GameObject("AmmoText", typeof(RectTransform), typeof(TextMeshProUGUI));
-
             ammoObj.transform.SetParent(weaponPanel.transform, false);
-
             var aRect = ammoObj.GetComponent<RectTransform>();
-
             aRect.anchorMin = new Vector2(0f, 0f);
-
-            aRect.anchorMax = new Vector2(0.65f, 0.7f);
-
+            aRect.anchorMax = new Vector2(1f, 0f);
             aRect.pivot = new Vector2(0f, 0f);
-
-            aRect.anchoredPosition = new Vector2(14f, 14f);
-
-            aRect.sizeDelta = new Vector2(0f, 44f);
-
+            aRect.anchoredPosition = new Vector2(14f, 12f);
+            aRect.sizeDelta = new Vector2(-28f, 40f);
             var aTmp = ammoObj.GetComponent<TextMeshProUGUI>();
-
-            aTmp.text = "30 <size=19><color=#D8E8FF>/ 30 (∞)</color></size>";
-
-            aTmp.fontSize = 38f;
-
+            aTmp.text = "30 <size=18><color=#D8E8FF>/ 30 (∞)</color></size>";
+            aTmp.fontSize = 32f;
             aTmp.fontStyle = FontStyles.Bold;
-
             aTmp.alignment = TextAlignmentOptions.Left;
-
             aTmp.color = Color.white;
 
 
@@ -2466,6 +2420,15 @@ namespace Hellfire.Editor
                 if (cs != null) Object.DestroyImmediate(cs);
                 var gr = hudChild.GetComponent<GraphicRaycaster>();
                 if (gr != null) Object.DestroyImmediate(gr);
+                var hRect = hudChild.GetComponent<RectTransform>();
+                if (hRect != null)
+                {
+                    hRect.anchorMin = Vector2.zero;
+                    hRect.anchorMax = Vector2.one;
+                    hRect.offsetMin = Vector2.zero;
+                    hRect.offsetMax = Vector2.zero;
+                    hRect.localScale = Vector3.one;
+                }
             }
 
             // 3. Tích hợp ShrineChoiceModal vào GameUI_System
@@ -2480,6 +2443,15 @@ namespace Hellfire.Editor
                 if (cs != null) Object.DestroyImmediate(cs);
                 var gr = modalChild.GetComponent<GraphicRaycaster>();
                 if (gr != null) Object.DestroyImmediate(gr);
+                var mRect = modalChild.GetComponent<RectTransform>();
+                if (mRect != null)
+                {
+                    mRect.anchorMin = Vector2.zero;
+                    mRect.anchorMax = Vector2.one;
+                    mRect.offsetMin = Vector2.zero;
+                    mRect.offsetMax = Vector2.zero;
+                    mRect.localScale = Vector3.one;
+                }
             }
 
             PrefabUtility.SaveAsPrefabAsset(systemRoot, GameUISystemPrefabPath);
