@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8323572754160634289}
+  - component: {fileID: 8192837461928374103}
   m_Layer: 7
   m_Name: ViewModel_Shotgun
   m_TagString: Untagged
@@ -186,3 +187,19 @@ Transform:
   - {fileID: 8449889078847926190}
   m_Father: {fileID: 8323572754160634289}
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+--- !u!114 &8192837461928374103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1474349671096700415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1d7b251c6d843039a5573703d0dd824, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hellfire.Combat::ShotgunWeapon
+  _data: {fileID: 11400000, guid: 46356dd8fbaaa034c900df6be4e77b6a, type: 2}
+  _muzzlePoint: {fileID: 5459325088958819580}
+  _ejectionPort: {fileID: 0}
+  _audioSource: {fileID: 0}

@@ -40,6 +40,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6831772247173734592}
+  - component: {fileID: 8192837461928374104}
   m_Layer: 7
   m_Name: ViewModel_SMG
   m_TagString: Untagged
@@ -186,3 +187,19 @@ Transform:
   - {fileID: 2535556529001076727}
   m_Father: {fileID: 6831772247173734592}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8192837461928374104
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6554927534906365148}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c15b1916cee4a9bab40188300b5bd0c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hellfire.Combat::AutomaticWeapon
+  _data: {fileID: 11400000, guid: 4c9280da51c842340ad9576dbe64bec3, type: 2}
+  _muzzlePoint: {fileID: 6138003562251455392}
+  _ejectionPort: {fileID: 0}
+  _audioSource: {fileID: 0}
