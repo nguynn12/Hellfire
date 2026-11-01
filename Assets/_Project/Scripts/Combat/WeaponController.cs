@@ -1,3 +1,4 @@
+using Hellfire.AI;
 // Script: WeaponController.cs
 
 // Mục đích: Quản lý toàn bộ vũ khí súng tầm xa (Ranged Guns), bắn Hitscan, nạp đạn vô hạn không giới hạn số lần.
@@ -82,6 +83,11 @@ namespace Hellfire.Combat
 
 
         private PlayerMovement _playerMovement;
+        private WeaponBase _activeWeapon;
+
+        public WeaponBase ActiveWeapon => _activeWeapon;
+        public LayerMask RaycastMask => _cachedRaycastMask != 0 ? _cachedRaycastMask : ~LayerMask.GetMask("Viewmodel", "PlayerBody");
+        public bool IsAdsActive => _currentAdsFactor > 0.5f;
 
 
 
@@ -1167,9 +1173,48 @@ namespace Hellfire.Combat
 
             }
 
+            Transform ejectionSocket = FindEjectionSocket(_currentViewmodelInstance.transform);
 
+            // 5. Gắn và khởi tạo Component WeaponBase tương ứng (OOP Architecture)
+            if (_activeWeapon != null)
+            {
+                _activeWeapon.OnAmmoChanged -= HandleActiveWeaponAmmoChanged;
+                _activeWeapon.OnReloadStarted -= HandleActiveWeaponReloadStarted;
+                _activeWeapon.OnReloadCompleted -= HandleActiveWeaponReloadCompleted;
+                _activeWeapon = null;
+            }
 
-            // 5. Cập nhật WorldModel cho đồng đội góc nhìn thứ 3
+            _activeWeapon = _currentViewmodelInstance.GetComponent<WeaponBase>();
+            if (_activeWeapon == null)
+            {
+                if (data.WeaponId.IndexOf("shotgun", StringComparison.OrdinalIgnoreCase) >= 0 || data.PelletCount > 1)
+                {
+                    _activeWeapon = _currentViewmodelInstance.AddComponent<ShotgunWeapon>();
+                }
+                else if (data.IsAutomatic || data.WeaponId.IndexOf("rifle", StringComparison.OrdinalIgnoreCase) >= 0 || data.WeaponId.IndexOf("smg", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _activeWeapon = _currentViewmodelInstance.AddComponent<AutomaticWeapon>();
+                }
+                else
+                {
+                    _activeWeapon = _currentViewmodelInstance.AddComponent<PistolWeapon>();
+                }
+            }
+
+            if (_activeWeapon != null)
+            {
+                _activeWeapon.Initialize(data, this, _weaponMuzzlePoint, ejectionSocket);
+                RuntimeWeapon currentRw = GetRuntimeWeaponByIndex(index);
+                if (currentRw != null)
+                {
+                    _activeWeapon.SetAmmo(currentRw.CurrentAmmo, currentRw.ReserveAmmo);
+                }
+                _activeWeapon.OnAmmoChanged += HandleActiveWeaponAmmoChanged;
+                _activeWeapon.OnReloadStarted += HandleActiveWeaponReloadStarted;
+                _activeWeapon.OnReloadCompleted += HandleActiveWeaponReloadCompleted;
+            }
+
+            // 6. Cập nhật WorldModel cho đồng đội góc nhìn thứ 3
 
             UpdateWorldModelVisuals(data);
 
@@ -1828,6 +1873,12 @@ namespace Hellfire.Combat
 
         {
 
+            if (_activeWeapon != null)
+            {
+                _activeWeapon.StartReload();
+                return;
+            }
+
             if (_isReloading || _currentWeapon == null) return;
 
             int effectiveMag = CurrentMagSize;
@@ -1902,6 +1953,11 @@ namespace Hellfire.Combat
 
         {
 
+            if (_activeWeapon != null)
+            {
+                _activeWeapon.CancelReload();
+            }
+
             _isReloading = false;
 
             OnReloadStateChanged?.Invoke(false);
@@ -1958,6 +2014,13 @@ namespace Hellfire.Combat
 
 
 
+            // Kiểm tra phân loại bắn liên thanh vs bắn phát một (OOP Subclasses)
+            bool isAuto = _currentWeapon.IsAutomatic || (_activeWeapon is AutomaticWeapon);
+            if (!isAuto && Mouse.current != null)
+            {
+                triggerPressed = Mouse.current.leftButton.wasPressedThisFrame;
+            }
+
             bool canFireNow = Time.time >= _nextFireTime && !_isReloading;
 
             bool shouldFire = triggerPressed || (_hasBufferedFireInput && canFireNow);
@@ -1968,33 +2031,42 @@ namespace Hellfire.Combat
 
             _hasBufferedFireInput = false;
 
-
-
-            // Nếu hết đạn trong băng: tự động nạp đạn
-
-            if (_currentAmmo <= 0)
-
+            if (_activeWeapon != null)
             {
+                Vector3 cameraPos = _playerCamera.transform.position;
+                Vector3 cameraForward = _playerCamera.transform.forward;
 
-                if (_audioSource != null && _currentWeapon.EmptySound != null)
-
+                bool fired = _activeWeapon.TryFire(cameraPos, cameraForward);
+                if (fired)
                 {
-
-                    _audioSource.PlayOneShot(_currentWeapon.EmptySound);
-
+                    _nextFireTime = _activeWeapon.NextFireTime;
+                    int seed = UnityEngine.Random.Range(0, 100000);
+                    if (GameModeHelper.IsOffline || !IsSpawned)
+                    {
+                        ExecuteOfflineHitscan(cameraPos, cameraForward, seed, _currentWeaponIndex);
+                    }
+                    else
+                    {
+                        FireServerRpc(cameraPos, cameraForward, seed, _currentWeaponIndex);
+                    }
+                }
+            }
+            else
+            {
+                // Fallback nếu chưa khởi tạo WeaponBase
+                if (_currentAmmo <= 0)
+                {
+                    if (_audioSource != null && _currentWeapon.EmptySound != null)
+                    {
+                        _audioSource.PlayOneShot(_currentWeapon.EmptySound);
+                    }
+                    StartReload();
+                    _nextFireTime = Time.time + 0.25f;
+                    return;
                 }
 
-                StartReload();
-
-                _nextFireTime = Time.time + 0.25f;
-
-                return;
-
+                ExecuteRangedFire();
             }
-
-
-
-            ExecuteRangedFire();
 
         }
 
@@ -3137,7 +3209,74 @@ namespace Hellfire.Combat
 
         }
 
+    
+        // ================= OOP WEAPON ARCHITECTURE EVENT HANDLERS =================
+
+        private void HandleActiveWeaponAmmoChanged(int currentAmmo, int maxAmmo)
+        {
+            _currentAmmo = currentAmmo;
+            if (CurrentRuntimeWeapon != null)
+            {
+                CurrentRuntimeWeapon.CurrentAmmo = currentAmmo;
+            }
+            TriggerAmmoChanged();
+            NotifyWeaponUI();
+        }
+
+        private void HandleActiveWeaponReloadStarted()
+        {
+            _isReloading = true;
+            OnReloadStateChanged?.Invoke(true);
+        }
+
+        private void HandleActiveWeaponReloadCompleted()
+        {
+            _isReloading = false;
+            OnReloadStateChanged?.Invoke(false);
+            TriggerAmmoChanged();
+            NotifyWeaponUI();
+        }
+
+        public void ApplyRecoilKick(WeaponData data, Vector3 shootDirection)
+        {
+            float recoilFactor = Mathf.Clamp(1.0f - GlobalRecoilReduction, 0.30f, 1.0f);
+
+            // 1. Độ giật súng trên tay (ViewModel Kickback)
+            float kickForce = (data != null && data.KickbackForce > 0.001f ? data.KickbackForce : 0.04f) * recoilFactor;
+            float kickAngle = (data != null && data.KickbackAngle > 0.001f ? data.KickbackAngle : 2.5f) * recoilFactor;
+
+            _recoilOffset += new Vector3(0f, 0.005f * recoilFactor, -kickForce);
+            _recoilRotation += new Vector3(-kickAngle, UnityEngine.Random.Range(-0.8f, 0.8f) * recoilFactor, UnityEngine.Random.Range(-1f, 1f) * recoilFactor);
+
+            // 2. Độ giật Camera hất lên (Camera Kick)
+            if (_playerMovement != null && data != null)
+            {
+                float pitchKick = data.CameraRecoilPitch * recoilFactor;
+                float yawKick = UnityEngine.Random.Range(-data.CameraRecoilYaw, data.CameraRecoilYaw) * recoilFactor;
+                _playerMovement.AddCameraRecoil(pitchKick, yawKick);
+
+                // 3. Lực đẩy giật lùi nhân vật (Player Pushback)
+                if (data.EnableJuiceEffects && data.PlayerPushbackForce > 0.01f)
+                {
+                    float pushbackForce = data.PlayerPushbackForce * recoilFactor;
+                    _playerMovement.AddPushback(-shootDirection * pushbackForce);
+                }
+            }
+        }
+
+        public void OnWeaponHitTarget(RaycastHit hit, Vector3 shootDir, WeaponData data)
+        {
+            bool isEnemy = hit.collider.CompareTag("Enemy") ||
+                           hit.collider.GetComponentInParent<EnemyStateMachine>() != null ||
+                           hit.collider.GetComponentInParent<Health>() != null;
+
+            if (isEnemy)
+            {
+                var hitbox = hit.collider.GetComponent<HitboxIdentifier>();
+                bool isHead = hitbox != null && hitbox.Type == HitboxType.Head;
+                OnHitTargetConfirmed?.Invoke(isHead);
+            }
+        }
+
     }
-
 }
-

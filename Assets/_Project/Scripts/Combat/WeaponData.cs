@@ -159,13 +159,28 @@ namespace Hellfire.Combat
         [Range(0.1f, 1.0f)]
         [SerializeField] private float _minDamageMultiplier = 0.3f;
 
-        [Header("Audio Assets & Variations")]
+        [Header("=== ÂM THANH SÚNG (AUDIO SLOTS) ===")]
         [SerializeField] private AudioClip _fireSound;
         [Tooltip("Mảng các biến thể âm thanh bắn để phát ngẫu nhiên tránh đơn điệu")]
         [SerializeField] private AudioClip[] _fireSounds;
+        [Range(0f, 1f)] [SerializeField] private float _fireVolume = 0.9f;
+        [SerializeField] private Vector2 _firePitchVariation = new Vector2(0.95f, 1.05f);
         [SerializeField] private AudioClip _reloadSound;
         [SerializeField] private AudioClip _emptySound;
         [SerializeField] private AudioClip _meleeSwingSound;
+
+        [Header("=== VỎ ĐẠN & RƠI SÀN (SHELL CASING) ===")]
+        [SerializeField] private GameObject _shellCasingPrefab;
+        [SerializeField] private AudioClip[] _shellDropSounds;
+
+        [Header("=== HIỆU ỨNG TRÚNG TƯỜNG (SURFACE HIT) ===")]
+        [SerializeField] private GameObject _surfaceImpactVfx;
+        [SerializeField] private GameObject _bulletHoleDecal;
+        [SerializeField] private AudioClip[] _surfaceImpactSounds;
+
+        [Header("=== HIỆU ỨNG TRÚNG QUÁI (FLESH HIT) ===")]
+        [SerializeField] private GameObject _fleshImpactVfx;
+        [SerializeField] private AudioClip[] _fleshHitSounds;
 
         // Getters
         public string WeaponName => _weaponName;
@@ -239,9 +254,61 @@ namespace Hellfire.Combat
 
         public AudioClip FireSound => _fireSound;
         public AudioClip[] FireSounds => _fireSounds;
+        public float FireVolume => Mathf.Clamp01(_fireVolume);
+        public Vector2 FirePitchVariation => _firePitchVariation;
         public AudioClip ReloadSound => _reloadSound;
         public AudioClip EmptySound => _emptySound;
         public AudioClip MeleeSwingSound => _meleeSwingSound;
+
+        public GameObject ShellCasingPrefab => _shellCasingPrefab != null ? _shellCasingPrefab : (_shellPrefab != null ? _shellPrefab : _casingPrefab);
+        public AudioClip[] ShellDropSounds => _shellDropSounds;
+
+        public GameObject SurfaceImpactVfx => _surfaceImpactVfx != null ? _surfaceImpactVfx : _impactEffectPrefab;
+        public GameObject BulletHoleDecal => _bulletHoleDecal != null ? _bulletHoleDecal : _bulletDecalPrefab;
+        public AudioClip[] SurfaceImpactSounds => _surfaceImpactSounds;
+
+        public GameObject FleshImpactVfx => _fleshImpactVfx != null ? _fleshImpactVfx : _fleshImpactEffectPrefab;
+        public AudioClip[] FleshHitSounds => _fleshHitSounds;
+
+        public int MagazineSize => _magSize;
+
+        public float GetRandomPitch()
+        {
+            float minP = Mathf.Min(_firePitchVariation.x, _firePitchVariation.y);
+            float maxP = Mathf.Max(_firePitchVariation.x, _firePitchVariation.y);
+            if (minP <= 0.01f && maxP <= 0.01f) return 1.0f;
+            return UnityEngine.Random.Range(minP, maxP);
+        }
+
+        public AudioClip GetRandomSurfaceImpactSound()
+        {
+            if (_surfaceImpactSounds != null && _surfaceImpactSounds.Length > 0)
+            {
+                int idx = UnityEngine.Random.Range(0, _surfaceImpactSounds.Length);
+                return _surfaceImpactSounds[idx];
+            }
+            return null;
+        }
+
+        public AudioClip GetRandomFleshHitSound()
+        {
+            if (_fleshHitSounds != null && _fleshHitSounds.Length > 0)
+            {
+                int idx = UnityEngine.Random.Range(0, _fleshHitSounds.Length);
+                return _fleshHitSounds[idx];
+            }
+            return null;
+        }
+
+        public AudioClip GetRandomShellDropSound()
+        {
+            if (_shellDropSounds != null && _shellDropSounds.Length > 0)
+            {
+                int idx = UnityEngine.Random.Range(0, _shellDropSounds.Length);
+                return _shellDropSounds[idx];
+            }
+            return null;
+        }
 
         /// <summary>
         /// Lấy ngẫu nhiên âm thanh bắn từ danh sách hoặc trả về âm thanh mặc định.
