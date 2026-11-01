@@ -43,7 +43,7 @@ namespace Hellfire.Editor
             }
 
             // 2. Gán Prefab vào 4 ScriptableObject WeaponData
-            AssignPrefabToWeaponData("Pistol_Data.asset", vmPistol, worldPistol, new Vector3(0.24f, -0.20f, 0.45f), Vector3.zero);
+            AssignPrefabToWeaponData("Pistol_Data.asset", vmPistol, worldPistol, new Vector3(0.20f, -0.16f, 0.32f), Vector3.zero);
             AssignPrefabToWeaponData("Rifle_Data.asset", vmRifle, worldRifle, new Vector3(0f, -0.05f, 0.15f), Vector3.zero);
             AssignPrefabToWeaponData("Shotgun_Data.asset", vmShotgun, worldShotgun, new Vector3(0f, -0.05f, 0.15f), Vector3.zero);
             AssignPrefabToWeaponData("SMG_Data.asset", vmSmg, worldSmg, new Vector3(0f, -0.05f, 0.10f), Vector3.zero);
@@ -191,7 +191,7 @@ namespace Hellfire.Editor
                         if (mountedGun != null)
                         {
                             mountedGun.name = $"[Model]_{gunId}";
-                            mountedGun.transform.localPosition = gunId == "pistol" ? new Vector3(0.24f, -0.20f, 0.45f) : new Vector3(0.24f, -0.15f, 0.40f);
+                            mountedGun.transform.localPosition = gunId == "pistol" ? new Vector3(0.20f, -0.16f, 0.32f) : new Vector3(0.24f, -0.15f, 0.40f);
                             mountedGun.transform.localRotation = Quaternion.identity;
 
                             var weaponCtrl = player.GetComponent<WeaponController>();
