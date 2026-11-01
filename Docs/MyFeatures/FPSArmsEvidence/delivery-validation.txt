@@ -1,0 +1,8 @@
+Dependency files present: 259
+Metadata GUIDs match source: 148
+Runtime C# sources compiled: 103; compiler exit code 0
+Editor C# sources compiled: 9; compiler exit code 0
+Compiler/reference set: Unity 6000.5.6f1 live project, package manifests match committed base
+Protected core source retained from committed base; no core source changes
+Compile warnings: existing obsolete APIs and unused fields; no errors
+Not a standalone build; no second Unity Editor or Batchmode launched

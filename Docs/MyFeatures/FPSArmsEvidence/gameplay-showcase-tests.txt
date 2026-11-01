@@ -1,0 +1,32 @@
+Live Showcase checks; synthetic Input System keyboard/mouse, not human input.
+Owner=True Saiga=True Stamina=True Crouch=True Slide=True Combined=False
+W delta=(0.00, 0.00, 1.50) speed=4.499994
+S delta=(0.00, 0.00, -1.04) speed=3.15
+A delta=(-1.35, 0.00, 0.00) speed=4.499999
+D delta=(1.50, 0.00, 0.00) speed=4.5
+ShiftW delta=(0.00, 0.00, 2.33) speed=7.000001
+Sprint stamina=100->91.60786
+Rest stamina=100
+Ctrl height=1.8->1.009586 crouching=True
+Slide keys height=0.8290087 sliding=True stamina=76.36459
+Jump peakDeltaY=1.085632
+Mouse yaw=2.999965
+ADS=True FOV=65
+Before kills frames=103 meanMs=33.33 p95Ms=35.14 maxMs=36.39 speedMedian=4.50 sideCollisions=0
+Runner LMB HP=45->30 ammo=12->11
+Feedback hitmarker=True activeDamagePopups=1
+Runner dead=True colliderEnabled=0 navEnabled=False
+After Runner frames=103 meanMs=33.33 p95Ms=35.43 maxMs=38.76 speedMedian=4.50 sideCollisions=0
+Runner despawned=True
+Archer LMB HP=65->50 ammo=12->11
+Feedback hitmarker=True activeDamagePopups=1
+Archer dead=True colliderEnabled=0 navEnabled=False
+After Archer frames=102 meanMs=33.35 p95Ms=35.47 maxMs=39.31 speedMedian=4.50 sideCollisions=0
+Archer despawned=True
+Brute LMB HP=140->125 ammo=12->11
+Feedback hitmarker=True activeDamagePopups=1
+Brute dead=True colliderEnabled=0 navEnabled=False
+After Brute frames=103 meanMs=33.32 p95Ms=35.30 maxMs=37.98 speedMedian=4.50 sideCollisions=0
+Brute despawned=True
+After all kills frames=103 meanMs=33.33 p95Ms=35.45 maxMs=37.05 speedMedian=4.50 sideCollisions=0
+COMPLETE kills=3 playerDowned=False

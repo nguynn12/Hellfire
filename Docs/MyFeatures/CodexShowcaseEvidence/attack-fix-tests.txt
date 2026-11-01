@@ -1,0 +1,15 @@
+Auto-combat live Scene verification
+Host=True PlayerObject=True AutoCombat=True PlayerHP=100
+Observed actual AI projectile in flight at (-0.11, 1.42, -0.84)
+Showcase_Archer actual damage=12 Player HP=100->88
+Showcase_Runner actual damage=10 Player HP=88->78
+Showcase_Runner actual damage=10 Player HP=78->68
+Showcase_Runner actual damage=10 Player HP=68->58
+Showcase_Brute actual damage=25 Player HP=58->33
+Showcase_Runner enabled=True state=Attack chaseDelta=(3.55, 0.00, -9.24) nav=True
+Showcase_Brute enabled=True state=Attack chaseDelta=(-3.36, 0.00, -9.02) nav=True
+Showcase_Archer enabled=True state=Chase chaseDelta=(0.00, 0.00, -6.69) nav=True
+Distinct attackers damaging Player=3/3; PlayerDowned=False
+Real headshot Brute HP=140->110 stagger=True
+Real gun kill Brute HP=0 dead=True deathEvent=True NavMeshEnabled=False
+COMPLETE; QA mutations are Play Mode only.
