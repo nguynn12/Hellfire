@@ -31,6 +31,7 @@ namespace Hellfire.Dungeon
         [SerializeField] private RuntimeNavMeshBaker _navMeshBaker;
         [SerializeField] private DungeonEnemySpawner _enemySpawner;
 
+        public bool IsRoomLocked(Vector2Int coord) => _roomLockStates.TryGetValue(coord, out var state) && state == RoomLockState.Locked;
         public DungeonGenerator Generator => _generator;
         public DungeonEnemySpawner EnemySpawner => _enemySpawner;
 

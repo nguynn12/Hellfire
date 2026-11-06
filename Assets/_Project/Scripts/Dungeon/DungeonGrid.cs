@@ -16,6 +16,8 @@ namespace Hellfire.Dungeon
         public int DistanceFromSpawn = 0;
         public List<Vector2Int> ConnectedNeighbors = new List<Vector2Int>();
         public Vector3 WorldCenter;
+        public RoomThemeData Theme;
+        public readonly List<Bounds> ObstacleBounds = new List<Bounds>();
         public Vector2 Size = new Vector2(14f, 14f);
 
         public bool Contains(Vector3 position, float inset = 0f)

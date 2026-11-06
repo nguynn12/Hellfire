@@ -1,0 +1,192 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ec1db806fa440c18f50512dbe8cd2ce, type: 3}
+  m_Name: Prison
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Dungeon.RoomThemeData
+  _themeName: Nhà ngục
+  _floorColor: {r: 0.12, g: 0.13, b: 0.14, a: 1}
+  _wallColor: {r: 0.2, g: 0.22, b: 0.23, a: 1}
+  _obstacles:
+  - _id: iron_cage
+    _weight: 35
+    _shape: 0
+    _size: {x: 1.6, y: 2.2, z: 1.6}
+    _maxSize: {x: 1.6, y: 2.2, z: 1.6}
+    _color: {r: 0.16, g: 0.17, b: 0.18, a: 1}
+    _material: {fileID: 0}
+    _clusterCount: {x: 1, y: 1}
+    _clusterRadius: 0
+    _maxStack: 1
+    _rotationRange: {x: 0, y: 0, z: 0}
+    _lightColor: {r: 1, g: 0.18, b: 0.025, a: 1}
+    _lightRange: 0
+    _lightIntensity: 1
+    _prefab: {fileID: 0}
+    _parts:
+    - _shape: 0
+      _size: {x: 1.6, y: 0.15, z: 1.6}
+      _position: {x: 0, y: 0.075, z: 0}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 1.6, y: 0.15, z: 1.6}
+      _position: {x: 0, y: 2.125, z: 0}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.72, y: 1.1, z: -0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.72, y: 1.1, z: -0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.72, y: 1.1, z: 0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.72, y: 1.1, z: -0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.36, y: 1.1, z: -0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.72, y: 1.1, z: -0.36}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.36, y: 1.1, z: 0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.72, y: 1.1, z: -0.36}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0, y: 1.1, z: -0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.72, y: 1.1, z: 0}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0, y: 1.1, z: 0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.72, y: 1.1, z: 0}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.36, y: 1.1, z: -0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.72, y: 1.1, z: 0.36}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.36, y: 1.1, z: 0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.72, y: 1.1, z: 0.36}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.72, y: 1.1, z: -0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: -0.72, y: 1.1, z: 0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.72, y: 1.1, z: 0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+    - _shape: 0
+      _size: {x: 0.08, y: 2.2, z: 0.08}
+      _position: {x: 0.72, y: 1.1, z: 0.72}
+      _rotation: {x: 0, y: 0, z: 0}
+      _emissive: 0
+  - _id: torture_table
+    _weight: 25
+    _shape: 0
+    _size: {x: 2.2, y: 0.9, z: 1}
+    _maxSize: {x: 2.2, y: 0.9, z: 1}
+    _color: {r: 0.25, g: 0.15, b: 0.09, a: 1}
+    _material: {fileID: 0}
+    _clusterCount: {x: 1, y: 1}
+    _clusterRadius: 0
+    _maxStack: 1
+    _rotationRange: {x: 0, y: 0, z: 0}
+    _lightColor: {r: 1, g: 0.18, b: 0.025, a: 1}
+    _lightRange: 0
+    _lightIntensity: 1
+    _prefab: {fileID: 0}
+    _parts: []
+  - _id: chain_stake
+    _weight: 20
+    _shape: 1
+    _size: {x: 0.4, y: 2, z: 0.4}
+    _maxSize: {x: 0.4, y: 2, z: 0.4}
+    _color: {r: 0.18, g: 0.17, b: 0.16, a: 1}
+    _material: {fileID: 0}
+    _clusterCount: {x: 1, y: 1}
+    _clusterRadius: 0
+    _maxStack: 1
+    _rotationRange: {x: 0, y: 0, z: 0}
+    _lightColor: {r: 1, g: 0.18, b: 0.025, a: 1}
+    _lightRange: 0
+    _lightIntensity: 1
+    _prefab: {fileID: 0}
+    _parts: []
+  - _id: wood_crate
+    _weight: 20
+    _shape: 0
+    _size: {x: 1, y: 1, z: 1}
+    _maxSize: {x: 1, y: 1, z: 1}
+    _color: {r: 0.23, g: 0.16, b: 0.1, a: 1}
+    _material: {fileID: 0}
+    _clusterCount: {x: 1, y: 2}
+    _clusterRadius: 0.7
+    _maxStack: 2
+    _rotationRange: {x: 0, y: 0, z: 0}
+    _lightColor: {r: 1, g: 0.18, b: 0.025, a: 1}
+    _lightRange: 0
+    _lightIntensity: 1
+    _prefab: {fileID: 0}
+    _parts: []

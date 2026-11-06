@@ -598,6 +598,12 @@ MonoBehaviour:
   _doorFramePostDepth: 1.2
   _doorFrameLintelHeight: 0.4
   _gateMaterial: {fileID: 0}
+  _roomThemes:
+  - {fileID: 11400000, guid: f8eafd73b3984d4aaa29cf76a7aa30e2, type: 2}
+  - {fileID: 11400000, guid: fe867f352e7647c9b2e4c15cdf6565f0, type: 2}
+  - {fileID: 11400000, guid: b032dcebc11f4ee4915ef7eb1c43fc07, type: 2}
+  - {fileID: 11400000, guid: 02155a80cbb94f8f9589527d715bfd60, type: 2}
+  - {fileID: 11400000, guid: eafa858a9ef147d8a38b13686b54980a, type: 2}
   _dungeonRoot: {fileID: 0}
 --- !u!1 &100988745
 GameObject:

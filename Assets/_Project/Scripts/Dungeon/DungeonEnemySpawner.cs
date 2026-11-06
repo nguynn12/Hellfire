@@ -49,6 +49,31 @@ namespace Hellfire.Dungeon
 
         public string EffectiveSpawnParameters => $"enemies={_minEnemiesPerNormalRoom}..{_maxEnemiesPerNormalRoom}, sample={_maxNavMeshSampleDistance}m";
 
+        private float _containmentTimer;
+        private void Update()
+        {
+            if (!IsServer || _dungeonManager?.Generator?.ActiveGrid == null) return;
+            _containmentTimer += Time.deltaTime;
+            if (_containmentTimer < 1f) return;
+            _containmentTimer = 0f;
+            foreach (var entry in _roomAliveEnemies)
+            {
+                if (!_dungeonManager.IsRoomLocked(entry.Key)) continue;
+                var room = _dungeonManager.Generator.ActiveGrid.Rooms[entry.Key];
+                foreach (var enemy in entry.Value)
+                {
+                    if (enemy == null || enemy.transform.position.y < -10f || room.Contains(enemy.transform.position, -1f)) continue;
+                    var health = enemy.GetComponent<Health>();
+                    if (health != null && health.IsDead.Value) continue;
+                    Vector3 target = GetValidSpawnPosition(room.WorldCenter, room, "Containment", _maxNavMeshSampleDistance);
+                    var agent = enemy.GetComponent<NavMeshAgent>();
+                    if (agent != null && agent.enabled) agent.Warp(target);
+                    var netTransform = enemy.GetComponent<Unity.Netcode.Components.NetworkTransform>();
+                    if (netTransform != null) netTransform.Teleport(target, enemy.transform.rotation, enemy.transform.localScale);
+                }
+            }
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -299,12 +324,6 @@ namespace Hellfire.Dungeon
                 float ox = (float)((rng.NextDouble() * 2.0 - 1.0) * (room.Size.x * 0.5f - 2f)); // [-5, 5]
                 float oz = (float)((rng.NextDouble() * 2.0 - 1.0) * (room.Size.y * 0.5f - 2f)); // [-5, 5]
 
-                // Không trùng 4 cột ở góc (±4, 0, ±4): bán kính cột 1.5m
-                if (Mathf.Abs(Mathf.Abs(ox) - 4f) < 1.5f && Mathf.Abs(Mathf.Abs(oz) - 4f) < 1.5f)
-                {
-                    continue;
-                }
-
                 Vector3 candidate = room.WorldCenter + new Vector3(ox, 0.5f, oz);
 
                 // NÊN tránh bán kính 4m quanh người chơi nếu còn chỗ (Mục 17.5)
@@ -325,6 +344,10 @@ namespace Hellfire.Dungeon
 
                 if (NavMesh.SamplePosition(candidate, out var hit, 2.0f, NavMesh.AllAreas) && room.Contains(hit.position, 2f))
                 {
+                    bool blocked = false;
+                    foreach (var bounds in room.ObstacleBounds)
+                        if (RoomThemeBuilder.DistanceXZ(bounds, new Bounds(hit.position, Vector3.zero)) < 1.5f) { blocked = true; break; }
+                    if (blocked) continue;
                     chosenPos = hit.position;
                     found = true;
                     break;

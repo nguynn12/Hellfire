@@ -49,6 +49,9 @@ namespace Hellfire.Dungeon
         [Tooltip("Vật liệu sắt tối cho cổng phòng Combat và Boss")]
         [SerializeField] private Material _gateMaterial;
 
+        [Header("Room Themes (Mục 20.3)")]
+        [SerializeField] private RoomThemeData[] _roomThemes = Array.Empty<RoomThemeData>();
+
         [Header("Hierarchy Root")]
         [SerializeField] private Transform _dungeonRoot;
 
@@ -144,6 +147,11 @@ namespace Hellfire.Dungeon
                 Vector2 depth = room.RoomType == DungeonRoomType.Combat ? _combatDepthRange : room.RoomType == DungeonRoomType.Boss ? _bossDepthRange : _safeDepthRange;
                 room.Size = new Vector2(Mathf.Lerp(width.x, width.y, (float)sizeRng.NextDouble()),
                     Mathf.Lerp(depth.x, depth.y, (float)sizeRng.NextDouble()));
+                if (room.RoomType == DungeonRoomType.Combat && _roomThemes.Length > 0)
+                {
+                    var themeRng = new System.Random(DungeonRoomNode.Seed(dungeonSeed, room.GridPosition, 0x203A));
+                    room.Theme = _roomThemes[themeRng.Next(_roomThemes.Length)];
+                }
                 Debug.Log($"[DungeonRoom] {room.GridPosition} {room.RoomType} Size={room.Size.x:F2}x{room.Size.y:F2}m");
             }
 
@@ -285,7 +293,13 @@ namespace Hellfire.Dungeon
             // 3. Cột trong phòng Combat (Mục 17.3: 0–4 cột ở 4 ô góc ±4, 0, ±4 dựng trước khi bake NavMesh)
             if (room.RoomType == DungeonRoomType.Combat)
             {
-                BuildCombatRoomPillars(roomObj.transform, room.GridPosition, dungeonSeed);
+                RoomThemeBuilder.Build(room, roomObj.transform, dungeonSeed, _wallMaterial);
+                if (room.Theme != null)
+                {
+                    RoomThemeBuilder.Tint(floor.GetComponent<Renderer>(), room.Theme.FloorColor);
+                    foreach (var wallRenderer in roomObj.GetComponentsInChildren<Renderer>())
+                        if (wallRenderer.name.StartsWith("Wall_")) RoomThemeBuilder.Tint(wallRenderer, room.Theme.WallColor);
+                }
             }
         }
 
@@ -578,42 +592,6 @@ namespace Hellfire.Dungeon
                 {
                     renderer.sharedMaterial = _wallMaterial;
                 }
-            }
-        }
-
-        private void BuildCombatRoomPillars(Transform parent, Vector2Int gridPos, int dungeonSeed)
-        {
-            // RNG riêng cho cột theo mục 17.3, bảo đảm kết quả giống hệt trên mọi máy
-            int roomSeed = dungeonSeed ^ (gridPos.x * 73856093) ^ (gridPos.y * 19349663) ^ 0x5C01;
-            var rng = new System.Random(roomSeed);
-            int pillarCount = rng.Next(0, 5); // 0 đến 4 cột
-
-            if (pillarCount == 0) return;
-
-            var cornerOffsets = new List<Vector3>
-            {
-                new Vector3(-4f, 2f, -4f),
-                new Vector3(-4f, 2f, 4f),
-                new Vector3(4f, 2f, -4f),
-                new Vector3(4f, 2f, 4f)
-            };
-
-            for (int i = cornerOffsets.Count - 1; i > 0; i--)
-            {
-                int swapIdx = rng.Next(i + 1);
-                var temp = cornerOffsets[i];
-                cornerOffsets[i] = cornerOffsets[swapIdx];
-                cornerOffsets[swapIdx] = temp;
-            }
-
-            for (int i = 0; i < pillarCount; i++)
-            {
-                var pillar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                pillar.name = $"Pillar_{i + 1}";
-                pillar.transform.SetParent(parent);
-                pillar.transform.localPosition = cornerOffsets[i];
-                pillar.transform.localScale = new Vector3(2f, 4f, 2f);
-                ApplyWallMaterial(pillar);
             }
         }
 

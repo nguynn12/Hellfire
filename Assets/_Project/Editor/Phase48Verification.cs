@@ -57,6 +57,20 @@ namespace Hellfire.EditorTools
                 EditorApplication.update -= Tick;
             }
         }
+        [MenuItem("Hellfire/Phase 4.8/3 Inspect Combat geometry #&3")]
+        public static void InspectCombat()
+        {
+            var gen = DungeonManager.Instance?.Generator;
+            if (gen?.ActiveGrid == null) return;
+            foreach (var room in gen.ActiveGrid.Rooms.Values)
+                if (room.RoomType == DungeonRoomType.Combat)
+                {
+                    var view = SceneView.lastActiveSceneView;
+                    if (view != null) { view.LookAt(room.WorldCenter, Quaternion.Euler(75, 0, 0), 18f); view.Focus(); }
+                    Debug.Log($"[Phase48QA] Inspect room {room.GridPosition}, theme={room.Theme?.ThemeName}");
+                    break;
+                }
+        }
         private static void VerifyRectangles()
         {
             var gen = DungeonManager.Instance.Generator;
@@ -70,7 +84,15 @@ namespace Hellfire.EditorTools
                 shortest = Mathf.Min(shortest, length);
                 if (length < 10f) Debug.LogError($"[Phase48QA] Corridor too short: {length}");
             }
-            Debug.Log($"[Phase48QA] Rooms={grid.Rooms.Count}; shortest corridor={shortest:F2}m; grid={gen.GridCellSize}m");
+            foreach (var room in grid.Rooms.Values)
+            {
+                if (room.ObstacleBounds.Count > 6) Debug.LogError("[Phase48QA] Obstacle count > 6.");
+                foreach (var bounds in room.ObstacleBounds)
+                    if (!RoomThemeBuilder.Allowed(room, bounds)) Debug.LogError($"[Phase48QA] Invalid obstacle in {room.GridPosition}.");
+                if (room.RoomType != DungeonRoomType.Combat && room.ObstacleBounds.Count > 0)
+                    Debug.LogError("[Phase48QA] Obstacles outside Combat.");
+            }
+            Debug.Log($"[Phase48QA] Rooms={grid.Rooms.Count}; shortest corridor={shortest:F2}m; grid={gen.GridCellSize}m; obstacle bounds checked");
         }
     }
 }

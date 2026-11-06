@@ -1,0 +1,37 @@
+[DungeonParameters] seed=770316, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00), enemies=2..4, sample=3m
+[DungeonRoom] (0, 0) Spawn Size=13.66x13.38m
+[DungeonRoom] (1, 0) Combat Size=20.34x13.22m
+[DungeonRoom] (-1, 0) Combat Size=20.34x13.22m
+[DungeonRoom] (0, -1) Combat Size=16.90x13.24m
+[DungeonRoom] (1, 1) Combat Size=18.43x16.29m
+[DungeonRoom] (2, 0) Combat Size=16.53x13.98m
+[DungeonRoom] (-1, -1) Upgrade Size=12.81x13.43m
+[DungeonRoom] (1, 2) Boss Size=25.36x21.21m
+[DungeonRoom] (0, -2) Shop Size=12.76x12.04m
+[DungeonRoom] (-1, 1) Treasure Size=12.90x12.60m
+[RoomTheme] (1, 0) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/21.51m2, lights=0/2
+[RoomTheme] (-1, 0) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/21.51m2, lights=0/2
+[RoomTheme] (0, -1) theme=Mỏ đổ nát, clusters=3/3, objects=3/6, area=8.64/17.90m2, lights=0/2
+[RoomTheme] (1, 1) theme=Hầm rượu, clusters=3/4, objects=4/6, area=4.88/24.01m2, lights=0/2
+[RoomTheme] (2, 0) theme=Hầm rượu, clusters=3/3, objects=3/6, area=4.32/18.49m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=19.00m
+[DungeonCorridor] (0, 0)->(-1, 0) length=19.00m
+[DungeonCorridor] (0, 0)->(0, -1) length=22.69m
+[DungeonCorridor] (1, 0)->(1, 1) length=21.25m
+[DungeonCorridor] (1, 0)->(2, 0) length=17.56m
+[DungeonCorridor] (0, -1)->(-1, -1) length=21.14m
+[DungeonCorridor] (1, 1)->(1, 2) length=17.25m
+[DungeonCorridor] (0, -1)->(0, -2) length=23.36m
+[DungeonCorridor] (-1, 0)->(-1, 1) length=23.09m
+[DungeonManager] Client 0 đã sẵn sàng hầm ngục (1/1).
+[DungeonManager] Đủ toàn bộ 1 client! Mở cổng hầm ngục theo thứ tự (a) -> (b) -> (c).
+[DungeonManager] Đã spawn InteractiveShrine (ID: -1001) tại tâm phòng Upgrade (-1, -1) ((-36.00, 0.08, -36.00))
+[DungeonManager] Đã spawn ShopStation tại tâm phòng Shop (0, -2) ((0.00, 0.08, -72.00))
+[DungeonManager] Đã spawn LootChest 1/2 tại phòng Treasure (-1, 1) ((-38.50, 0.08, 36.00))
+[DungeonManager] Đã spawn LootChest 2/2 tại phòng Treasure (-1, 1) ((-33.50, 0.08, 36.00))
+[GameManager] Chuyển trạng thái game: Generating -> Playing
+[SceneAudit] Playing before first lock: EnemyStateMachine=0
+[Phase48QA] Real Host flow reached Playing: enemies=0; ready=1; seed=770316
+[Phase48QA] Rooms=10; shortest corridor=17.25m; grid=36m; obstacle bounds checked
+[Phase48QA] Inspect room (1, 0), theme=Hầm rượu
+Console quan sát: 50 logs, 6 warnings, 0 errors.
