@@ -282,6 +282,14 @@ namespace Hellfire.Dungeon
                 GameManager.Instance.SetState(GameState.Playing);
             }
 
+            // Mục 20.0: kiểm tra trước khi vòng lặp khóa phòng được khởi động.
+            var leftovers = UnityEngine.Object.FindObjectsByType<Hellfire.AI.EnemyStateMachine>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (leftovers.Length == 0)
+                Debug.Log("[SceneAudit] Playing before first lock: EnemyStateMachine=0");
+            foreach (var enemy in leftovers)
+                Debug.LogError($"[SceneAudit] EnemyStateMachine trước khi khóa phòng: {enemy.name}", enemy);
+
             // (e) Khởi tạo trạng thái phòng và cổng sắt (Mục 17.4)
             InitializeRoomGatesAndLockStates();
         }

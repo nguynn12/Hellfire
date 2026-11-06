@@ -509,34 +509,8 @@ namespace Hellfire.Editor
             soHud.FindProperty("_reviveProgressBar").objectReferenceValue = reviveBar;
             soHud.ApplyModifiedProperties();
 
-            // 2. Đặt 4 Quái vật Imp thử nghiệm trong Arena để người chơi test bắn
-            var existingImps = Object.FindObjectsByType<TestEnemyImp>(FindObjectsInactive.Exclude);
-            foreach (var existing in existingImps)
-            {
-                Object.DestroyImmediate(existing.gameObject);
-            }
-
-            if (impPrefab != null)
-            {
-                Vector3[] spawnPositions = new Vector3[]
-                {
-                    new Vector3(0f, 0f, 10f),
-                    new Vector3(-8f, 0f, 12f),
-                    new Vector3(8f, 0f, 12f),
-                    new Vector3(0f, 0f, 18f)
-                };
-
-                for (int i = 0; i < spawnPositions.Length; i++)
-                {
-                    var imp = PrefabUtility.InstantiatePrefab(impPrefab) as GameObject;
-                    imp.name = $"TestEnemyImp_{i + 1}";
-                    imp.transform.position = spawnPositions[i];
-                    imp.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-                }
-            }
-
             EditorSceneManager.SaveScene(scene, GameplayScenePath);
-            Debug.Log("[HellfirePhase2Setup] Đã cập nhật Scene Gameplay với HUD đầy đủ và 4 Imp thử nghiệm!");
+            Debug.Log("[HellfirePhase2Setup] Đã cập nhật Scene Gameplay với HUD đầy đủ (không đặt sẵn quái)!");
         }
 
         private static GameObject CreateHUDPanel(string name, Transform parent, Vector2 size, Vector2 pos, Vector2 anchorMin, Vector2 anchorMax)

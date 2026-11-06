@@ -47,6 +47,8 @@ namespace Hellfire.Dungeon
         private DungeonManager _dungeonManager;
         private readonly Dictionary<Vector2Int, HashSet<GameObject>> _roomAliveEnemies = new Dictionary<Vector2Int, HashSet<GameObject>>();
 
+        public string EffectiveSpawnParameters => $"enemies={_minEnemiesPerNormalRoom}..{_maxEnemiesPerNormalRoom}, sample={_maxNavMeshSampleDistance}m";
+
         private void Awake()
         {
             if (Instance != null && Instance != this)

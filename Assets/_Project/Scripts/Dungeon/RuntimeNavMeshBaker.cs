@@ -53,7 +53,15 @@ namespace Hellfire.Dungeon
 
             if (_navMeshSurface != null)
             {
-                _navMeshSurface.BuildNavMesh();
+                // Mục 17.0: bake only generated static geometry, never player/viewmodel meshes.
+                var root = GetComponent<DungeonGenerator>()?.GeometryRoot;
+                if (root == null) throw new InvalidOperationException("DungeonGeometryRoot missing before bake.");
+                _navMeshSurface.enabled = false;
+                var generatedSurface = root.GetComponent<NavMeshSurface>() ?? root.gameObject.AddComponent<NavMeshSurface>();
+                generatedSurface.agentTypeID = _navMeshSurface.agentTypeID;
+                generatedSurface.collectObjects = CollectObjects.Children;
+                generatedSurface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
+                generatedSurface.BuildNavMesh();
             }
 
             IsBaking = false;

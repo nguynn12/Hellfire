@@ -53,6 +53,7 @@ namespace Hellfire.Dungeon
         private DungeonGrid _activeGrid;
         private readonly Dictionary<Vector2Int, List<RoomGate>> _roomGates = new Dictionary<Vector2Int, List<RoomGate>>();
 
+        public Transform GeometryRoot => _dungeonRoot;
         public DungeonGrid ActiveGrid => _activeGrid;
         public IReadOnlyDictionary<Vector2Int, List<RoomGate>> RoomGates => _roomGates;
         public float GridCellSize => _gridCellSize;
@@ -66,6 +67,7 @@ namespace Hellfire.Dungeon
         /// </summary>
         public DungeonGrid GenerateDungeon(int dungeonSeed)
         {
+            Debug.Log($"[DungeonParameters] seed={dungeonSeed}, room={_roomSize}x{_roomSize}m, grid={_gridCellSize}m, rooms={_minRoomCount}..{_maxRoomCount}, {GetComponent<DungeonEnemySpawner>()?.EffectiveSpawnParameters}");
             ClearPreviousDungeon();
 
             // 1. Khởi tạo bộ sinh số ngẫu nhiên System.Random với seed đầu vào

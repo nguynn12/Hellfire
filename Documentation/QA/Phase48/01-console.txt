@@ -1,0 +1,11 @@
+[DungeonParameters] seed=357882, room=14x14m, grid=20m, rooms=8..14, enemies=2..4, sample=3m
+[DungeonManager] Client 0 đã sẵn sàng hầm ngục (1/1).
+[DungeonManager] Đủ toàn bộ 1 client! Mở cổng hầm ngục theo thứ tự (a) -> (b) -> (c).
+[DungeonManager] Đã spawn ShopStation tại tâm phòng Shop (0, 2) ((0.00, 0.08, 40.00))
+[DungeonManager] Đã spawn LootChest 1/2 tại phòng Treasure (1, 0) ((17.50, 0.08, 0.00))
+[DungeonManager] Đã spawn LootChest 2/2 tại phòng Treasure (1, 0) ((22.50, 0.08, 0.00))
+[DungeonManager] Đã spawn InteractiveShrine (ID: -998) tại tâm phòng Upgrade (-1, 2) ((-20.00, 0.08, 40.00))
+[GameManager] Chuyển trạng thái game: Generating -> Playing
+[SceneAudit] Playing before first lock: EnemyStateMachine=0
+[Phase48QA] Real Host flow reached Playing: enemies=0; ready=1; seed=357882
+Console quan sát: 24 logs, 7 warnings, 0 errors. Warnings gồm thiếu glyph TMP.
