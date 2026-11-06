@@ -53,8 +53,24 @@ namespace Hellfire.EditorTools
                 int enemies = UnityEngine.Object.FindObjectsByType<EnemyStateMachine>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
                 Debug.Log($"[Phase48QA] Real Host flow reached Playing: enemies={enemies}; ready={DungeonManager.Instance.ReadyCount.Value}; seed={DungeonManager.Instance.DungeonSeed.Value}");
                 if (enemies != 0) Debug.LogError("[Phase48QA] Unexpected enemies before first room lock.");
+                VerifyRectangles();
                 EditorApplication.update -= Tick;
             }
+        }
+        private static void VerifyRectangles()
+        {
+            var gen = DungeonManager.Instance.Generator;
+            var grid = gen.ActiveGrid;
+            float shortest = float.MaxValue;
+            foreach (var edge in grid.Corridors)
+            {
+                var a = grid.Rooms[edge.RoomA]; var b = grid.Rooms[edge.RoomB];
+                bool alongX = edge.RoomA.x != edge.RoomB.x;
+                float length = gen.GridCellSize - ((alongX ? a.Size.x : a.Size.y) + (alongX ? b.Size.x : b.Size.y)) * 0.5f;
+                shortest = Mathf.Min(shortest, length);
+                if (length < 10f) Debug.LogError($"[Phase48QA] Corridor too short: {length}");
+            }
+            Debug.Log($"[Phase48QA] Rooms={grid.Rooms.Count}; shortest corridor={shortest:F2}m; grid={gen.GridCellSize}m");
         }
     }
 }

@@ -577,8 +577,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 29261f4523daa1c43b82d9ff0b121b1a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Dungeon.DungeonGenerator
-  _gridCellSize: 20
-  _roomSize: 14
+  _gridCellSize: 36
+  _combatWidthRange: {x: 16, y: 22}
+  _combatDepthRange: {x: 12, y: 18}
+  _bossWidthRange: {x: 22, y: 26}
+  _bossDepthRange: {x: 18, y: 22}
+  _safeWidthRange: {x: 12, y: 14}
+  _safeDepthRange: {x: 12, y: 14}
   _wallHeight: 4.5
   _corridorWidth: 4
   _minRoomCount: 8

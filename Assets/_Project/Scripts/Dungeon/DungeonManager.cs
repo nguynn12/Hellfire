@@ -331,11 +331,7 @@ namespace Hellfire.Dungeon
                 return;
             }
 
-            Vector3 shrinePos = room.WorldCenter;
-            if (UnityEngine.AI.NavMesh.SamplePosition(shrinePos, out var hit, 3.0f, UnityEngine.AI.NavMesh.AllAreas))
-            {
-                shrinePos = hit.position;
-            }
+            Vector3 shrinePos = DungeonEnemySpawner.GetValidSpawnPosition(room.WorldCenter, room, "Upgrade");
 
             var shrineObj = Instantiate(_shrinePrefab, shrinePos, Quaternion.identity);
             int shrineId = room.GridPosition.x * 1000 + room.GridPosition.y;
@@ -364,19 +360,14 @@ namespace Hellfire.Dungeon
             }
 
             int count = Mathf.Max(1, _treasureChestCount);
-            float spacing = 2.5f;
+            float spacing = Mathf.Min(2.5f, room.Size.x * 0.5f - 2f);
 
             for (int i = 0; i < count; i++)
             {
                 // Đặt đối xứng quanh tâm phòng (Mục 17.6)
                 float xOffset = (i == 0) ? -spacing : spacing;
                 Vector3 proposedPos = room.WorldCenter + new Vector3(xOffset, 0f, 0f);
-                Vector3 chestPos = proposedPos;
-
-                if (UnityEngine.AI.NavMesh.SamplePosition(proposedPos, out var hit, 3.0f, UnityEngine.AI.NavMesh.AllAreas))
-                {
-                    chestPos = hit.position;
-                }
+                Vector3 chestPos = DungeonEnemySpawner.GetValidSpawnPosition(proposedPos, room, "Treasure");
 
                 Vector3 lookDir = (room.WorldCenter - chestPos);
                 lookDir.y = 0;
@@ -401,11 +392,7 @@ namespace Hellfire.Dungeon
 
         private void SpawnShopStation(DungeonRoomNode room)
         {
-            Vector3 stationPos = room.WorldCenter;
-            if (UnityEngine.AI.NavMesh.SamplePosition(stationPos, out var hit, 3.0f, UnityEngine.AI.NavMesh.AllAreas))
-            {
-                stationPos = hit.position;
-            }
+            Vector3 stationPos = DungeonEnemySpawner.GetValidSpawnPosition(room.WorldCenter, room, "Shop");
 
             GameObject stationObj = null;
             if (_shopStationPrefab != null)
@@ -568,7 +555,7 @@ namespace Hellfire.Dungeon
                         Vector3 offset = new Vector3((index % 2 == 0 ? 1f : -1f) * 2f, 0f, (index > 1 ? 2f : -2f));
                         Vector3 proposedPos = spawnCenter + offset;
                         Vector3 targetPos = DungeonEnemySpawner.GetValidSpawnPosition(
-                            proposedPos, spawnCenter, "Phòng Spawn (Vị trí Player)", 3.0f
+                            proposedPos, spawnRoom, "Phòng Spawn (Vị trí Player)", 3.0f
                         );
 
                         var movement = client.PlayerObject.GetComponent<Hellfire.Player.PlayerMovement>();
@@ -701,7 +688,7 @@ namespace Hellfire.Dungeon
         {
             if (NetworkManager.Singleton == null || _generator == null) return false;
 
-            float halfCore = (_generator.RoomSize - 3f) * 0.5f; // thụt vào 1.5m mỗi phía (Mục 17.4)
+            Vector2 halfCore = (room.Size - Vector2.one * 3f) * 0.5f; // thụt vào 1.5m mỗi phía (Mục 17.4)
             Vector3 roomCenter = room.WorldCenter;
 
             foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
@@ -712,7 +699,7 @@ namespace Hellfire.Dungeon
                 if (health == null || health.IsDead.Value || health.IsDowned.Value) continue;
 
                 Vector3 pPos = player.transform.position;
-                if (Mathf.Abs(pPos.x - roomCenter.x) <= halfCore && Mathf.Abs(pPos.z - roomCenter.z) <= halfCore)
+                if (Mathf.Abs(pPos.x - roomCenter.x) <= halfCore.x && Mathf.Abs(pPos.z - roomCenter.z) <= halfCore.y)
                 {
                     return true;
                 }
@@ -741,15 +728,15 @@ namespace Hellfire.Dungeon
         {
             if (NetworkManager.Singleton == null || _generator == null) return;
 
-            float halfRoom = _generator.RoomSize * 0.5f;
-            float halfCorridor = 4f * 0.5f; // Bề rộng cửa bằng _corridorWidth (4m)
+            Vector2 halfRoom = room.Size * 0.5f;
+            float halfCorridor = _generator.CorridorWidth * 0.5f; // Bề rộng cửa bằng _corridorWidth (4m)
 
             foreach (var dir in DungeonGrid.CardinalDirections)
             {
                 Vector2Int neighborCoord = room.GridPosition + dir;
                 if (!room.HasConnection(neighborCoord)) continue;
 
-                Vector3 wallCenter = room.WorldCenter + new Vector3(dir.x * halfRoom, 0f, dir.y * halfRoom);
+                Vector3 wallCenter = room.WorldCenter + new Vector3(dir.x * halfRoom.x, 0f, dir.y * halfRoom.y);
                 bool isZAxisWall = (dir.y != 0);
 
                 foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
@@ -787,7 +774,7 @@ namespace Hellfire.Dungeon
                     if (inThreshold)
                     {
                         Vector3 validatedPos = DungeonEnemySpawner.GetValidSpawnPosition(
-                            targetPos, room.WorldCenter, $"Ngưỡng cửa phòng {room.GridPosition}", 3f
+                            targetPos, room, $"Ngưỡng cửa phòng {room.GridPosition}", 3f
                         );
                         var movement = player.GetComponent<PlayerMovement>();
                         if (movement != null)

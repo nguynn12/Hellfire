@@ -16,6 +16,25 @@ namespace Hellfire.Dungeon
         public int DistanceFromSpawn = 0;
         public List<Vector2Int> ConnectedNeighbors = new List<Vector2Int>();
         public Vector3 WorldCenter;
+        public Vector2 Size = new Vector2(14f, 14f);
+
+        public bool Contains(Vector3 position, float inset = 0f)
+        {
+            return Mathf.Abs(position.x - WorldCenter.x) <= Size.x * 0.5f - inset
+                && Mathf.Abs(position.z - WorldCenter.z) <= Size.y * 0.5f - inset;
+        }
+
+        public Vector3 ClampInside(Vector3 position, float inset = 2f)
+        {
+            position.x = Mathf.Clamp(position.x, WorldCenter.x - Size.x * 0.5f + inset, WorldCenter.x + Size.x * 0.5f - inset);
+            position.z = Mathf.Clamp(position.z, WorldCenter.z - Size.y * 0.5f + inset, WorldCenter.z + Size.y * 0.5f - inset);
+            return position;
+        }
+
+        public static int Seed(int seed, Vector2Int grid, int salt)
+        {
+            return unchecked(seed ^ grid.x * 73856093 ^ grid.y * 19349663 ^ salt);
+        }
 
         public DungeonRoomNode(Vector2Int gridPos, Vector3 worldCenter, DungeonRoomType roomType = DungeonRoomType.Combat)
         {
