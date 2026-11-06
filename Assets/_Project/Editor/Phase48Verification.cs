@@ -71,6 +71,21 @@ namespace Hellfire.EditorTools
                     break;
                 }
         }
+        [MenuItem("Hellfire/Phase 4.8/4 Enter first Combat (Host) #&4")]
+        public static void EnterCombat()
+        {
+            var dm = DungeonManager.Instance;
+            if (!EditorApplication.isPlaying || dm == null || !dm.IsServer) return;
+            foreach (var room in dm.Generator.ActiveGrid.Rooms.Values)
+                if (room.RoomType == DungeonRoomType.Combat)
+                {
+                    var player = Unity.Netcode.NetworkManager.Singleton.LocalClient.PlayerObject;
+                    Vector3 target = DungeonEnemySpawner.GetValidSpawnPosition(room.WorldCenter, room, "QA entrant");
+                    player.GetComponent<Hellfire.Player.PlayerMovement>().TeleportOwnerClientRpc(target, Quaternion.identity);
+                    Debug.Log($"[Phase48QA] Host entered Combat {room.GridPosition}; observing normal server lock sequence.");
+                    return;
+                }
+        }
         private static void VerifyRectangles()
         {
             var gen = DungeonManager.Instance.Generator;

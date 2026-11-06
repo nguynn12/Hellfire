@@ -17,7 +17,8 @@ namespace Hellfire.Dungeon
     {
         Idle = 0,
         Locked = 1,
-        Cleared = 2
+        Cleared = 2,
+        Gathering = 3
     }
 
     [DisallowMultipleComponent]
@@ -38,6 +39,13 @@ namespace Hellfire.Dungeon
         private readonly Dictionary<Vector2Int, RoomLockState> _roomLockStates = new Dictionary<Vector2Int, RoomLockState>();
         private readonly HashSet<Vector2Int> _roomsFinishedSpawning = new HashSet<Vector2Int>();
         private Coroutine _roomLockRoutine;
+        private Vector2Int? _activeEncounter;
+        [Header("Party gathering (Mục 20.5)")]
+        [SerializeField] private float _partyTeleportDelay = 0.5f;
+        [SerializeField] private float _roomEnemySpawnDelay = 0.8f;
+        [SerializeField] private float _partyMinimumSpacing = 1.5f;
+        [SerializeField] private float _partyGatherMinRadius = 2f;
+        [SerializeField] private float _partyGatherMaxRadius = 4f;
 
         [Header("Room Rewards (Mục 17.7)")]
         [Tooltip("Thưởng Linh hồn cho mỗi người chơi còn sống khi phòng Combat Cleared (Mục 17.7)")]
@@ -613,6 +621,7 @@ namespace Hellfire.Dungeon
         {
             if (!IsServer) return;
 
+            _activeEncounter = null;
             _roomLockStates.Clear();
             _roomsFinishedSpawning.Clear();
             if (_generator != null && _generator.ActiveGrid != null)
@@ -663,10 +672,8 @@ namespace Hellfire.Dungeon
                     {
                         // 1. Server mỗi 0.2s kiểm tra các phòng đang Idle: nếu có ít nhất 1 người chơi còn sống
                         // và không Downed có vị trí nằm trong vùng "lõi" của phòng (roomSize - 3) thì khóa (Mục 17.4)
-                        if (IsAnyAlivePlayerInRoomCore(room))
-                        {
-                            LockRoom(room);
-                        }
+                        var entrant = _activeEncounter == null ? FindRoomEntrant(room) : null;
+                        if (entrant != null) LockRoom(room, entrant);
                     }
                     else if (lockState == RoomLockState.Locked)
                     {
@@ -685,122 +692,142 @@ namespace Hellfire.Dungeon
             }
         }
 
-        private bool IsAnyAlivePlayerInRoomCore(DungeonRoomNode room)
+        private bool IsCombatActive => GameManager.Instance != null &&
+            (GameManager.Instance.CurrentState.Value == GameState.Playing || GameManager.Instance.CurrentState.Value == GameState.BossFight);
+
+        private NetworkObject FindRoomEntrant(DungeonRoomNode room)
         {
-            if (NetworkManager.Singleton == null || _generator == null) return false;
-
-            Vector2 halfCore = (room.Size - Vector2.one * 3f) * 0.5f; // thụt vào 1.5m mỗi phía (Mục 17.4)
-            Vector3 roomCenter = room.WorldCenter;
-
+            if (NetworkManager.Singleton == null) return null;
+            NetworkObject entrant = null;
             foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
             {
-                if (client.PlayerObject == null) continue;
                 var player = client.PlayerObject;
-                var health = player.GetComponent<Health>();
-                if (health == null || health.IsDead.Value || health.IsDowned.Value) continue;
-
-                Vector3 pPos = player.transform.position;
-                if (Mathf.Abs(pPos.x - roomCenter.x) <= halfCore.x && Mathf.Abs(pPos.z - roomCenter.z) <= halfCore.y)
-                {
-                    return true;
-                }
+                var health = player != null ? player.GetComponent<Health>() : null;
+                if (health == null || health.IsDead.Value || health.IsDowned.Value || !room.Contains(player.transform.position, 1.5f)) continue;
+                if (entrant == null || player.OwnerClientId < entrant.OwnerClientId) entrant = player;
             }
+            return entrant;
+        }
 
+        private void LockRoom(DungeonRoomNode room, NetworkObject entrant)
+        {
+            if (!IsServer || _activeEncounter != null || _roomLockStates[room.GridPosition] != RoomLockState.Idle) return;
+            _activeEncounter = room.GridPosition;
+            _roomLockStates[room.GridPosition] = RoomLockState.Gathering;
+            StartCoroutine(GatherPartyAndLock(room, entrant));
+        }
+
+        private bool NeedsGathering(DungeonRoomNode room, Vector3 position)
+        {
+            if (!room.Contains(position)) return true;
+            // A player in a doorway must be moved clear of the closing gate too.
+            foreach (var dir in DungeonGrid.CardinalDirections)
+            {
+                if (!room.HasConnection(room.GridPosition + dir)) continue;
+                Vector3 local = position - room.WorldCenter;
+                if (dir.x != 0 && Mathf.Abs(local.x - dir.x * room.Size.x * .5f) <= 1.5f && Mathf.Abs(local.z) <= _generator.CorridorWidth * .5f) return true;
+                if (dir.y != 0 && Mathf.Abs(local.z - dir.y * room.Size.y * .5f) <= 1.5f && Mathf.Abs(local.x) <= _generator.CorridorWidth * .5f) return true;
+            }
             return false;
         }
 
-        private void LockRoom(DungeonRoomNode room)
+        private bool TryGatherPosition(DungeonRoomNode room, Vector3 entrant, List<Vector3> occupied, out Vector3 target)
         {
-            // (a) Đặt Locked
-            _roomLockStates[room.GridPosition] = RoomLockState.Locked;
-            Debug.Log($"[DungeonManager] Kích hoạt khóa phòng {room.GridPosition} ({room.RoomType})!");
-
-            // (b) Dịch chuyển vào trong phòng 2m mọi người chơi đang đứng trong vùng ngưỡng cửa (Mục 17.4)
-            TeleportThresholdPlayersIntoRoom(room);
-
-            // (c) Gọi SetRoomGatesClientRpc(roomGrid, true)
-            SetRoomGatesClientRpc(room.GridPosition, true);
-
-            // (d) Sau 0.8 giây (cổng đã hạ xong) spawn quái hoặc boss (Mục 17.4 & 17.5)
-            StartCoroutine(DelayedRoomSpawnRoutine(room));
+            // Deterministic rings; validate after sampling, never accept a point across a wall.
+            for (int ring = 0; ring < 5; ring++)
+                for (int step = 0; step < 48; step++)
+                {
+                    float radius = Mathf.Lerp(_partyGatherMinRadius, _partyGatherMaxRadius, ring / 4f);
+                    float angle = step * Mathf.PI * 2f / 48;
+                    Vector3 proposed = entrant + new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * radius;
+                    if (!UnityEngine.AI.NavMesh.SamplePosition(proposed, out var hit, 3f, UnityEngine.AI.NavMesh.AllAreas)) continue;
+                    if (!room.Contains(hit.position, 1.5f) || Mathf.Abs(hit.position.y - room.WorldCenter.y) > .5f) continue;
+                    Vector3 flat = hit.position - entrant; flat.y = 0;
+                    if (flat.magnitude < _partyGatherMinRadius || flat.magnitude > _partyGatherMaxRadius) continue;
+                    bool blocked = false;
+                    foreach (var point in occupied)
+                    {
+                        Vector3 delta = point - hit.position; delta.y = 0;
+                        if (delta.sqrMagnitude < _partyMinimumSpacing * _partyMinimumSpacing) { blocked = true; break; }
+                    }
+                    foreach (var obstacle in room.ObstacleBounds)
+                        if (RoomThemeBuilder.DistanceXZ(obstacle, new Bounds(hit.position, Vector3.zero)) < .5f) { blocked = true; break; }
+                    if (blocked) continue;
+                    target = hit.position;
+                    return true;
+                }
+            target = default;
+            return false;
         }
 
-        private void TeleportThresholdPlayersIntoRoom(DungeonRoomNode room)
+        private IEnumerator GatherPartyAndLock(DungeonRoomNode room, NetworkObject entrant)
         {
-            if (NetworkManager.Singleton == null || _generator == null) return;
-
-            Vector2 halfRoom = room.Size * 0.5f;
-            float halfCorridor = _generator.CorridorWidth * 0.5f; // Bề rộng cửa bằng _corridorWidth (4m)
-
-            foreach (var dir in DungeonGrid.CardinalDirections)
+            var occupied = new List<Vector3>();
+            var pending = new List<NetworkObject>();
+            var destinations = new List<Vector3>();
+            var clients = new List<NetworkClient>(NetworkManager.Singleton.ConnectedClientsList);
+            clients.Sort((a, b) => a.ClientId.CompareTo(b.ClientId));
+            foreach (var client in clients)
             {
-                Vector2Int neighborCoord = room.GridPosition + dir;
-                if (!room.HasConnection(neighborCoord)) continue;
-
-                Vector3 wallCenter = room.WorldCenter + new Vector3(dir.x * halfRoom.x, 0f, dir.y * halfRoom.y);
-                bool isZAxisWall = (dir.y != 0);
-
-                foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+                var player = client.PlayerObject;
+                var health = player != null ? player.GetComponent<Health>() : null;
+                if (health == null || health.IsDead.Value) continue; // Downed remains in the party.
+                if (NeedsGathering(room, player.transform.position)) pending.Add(player);
+                else occupied.Add(player.transform.position);
+            }
+            // Reserve the whole party before sending any RPC; retain valid spacing.
+            foreach (var player in pending)
+            {
+                if (!TryGatherPosition(room, entrant.transform.position, occupied, out var target))
                 {
-                    if (client.PlayerObject == null) continue;
-                    var player = client.PlayerObject;
-                    var health = player.GetComponent<Health>();
-                    if (health == null || health.IsDead.Value || health.IsDowned.Value) continue;
-
-                    Vector3 pPos = player.transform.position;
-                    bool inThreshold = false;
-                    Vector3 targetPos = pPos;
-
-                    if (isZAxisWall)
-                    {
-                        // Ngưỡng cửa trục Z: khoảng cách tới mặt tường <= 1.5m, bề rộng cửa theo trục X <= 2.0m
-                        if (Mathf.Abs(pPos.x - wallCenter.x) <= halfCorridor && Mathf.Abs(pPos.z - wallCenter.z) <= 1.5f)
-                        {
-                            inThreshold = true;
-                            // Dịch chuyển vào trong phòng 2m (hướng ngược lại với dir)
-                            targetPos = new Vector3(pPos.x, pPos.y, wallCenter.z - Mathf.Sign(dir.y) * 2f);
-                        }
-                    }
-                    else
-                    {
-                        // Ngưỡng cửa trục X: khoảng cách tới mặt tường <= 1.5m, bề rộng cửa theo trục Z <= 2.0m
-                        if (Mathf.Abs(pPos.z - wallCenter.z) <= halfCorridor && Mathf.Abs(pPos.x - wallCenter.x) <= 1.5f)
-                        {
-                            inThreshold = true;
-                            // Dịch chuyển vào trong phòng 2m (hướng ngược lại với dir)
-                            targetPos = new Vector3(wallCenter.x - Mathf.Sign(dir.x) * 2f, pPos.y, pPos.z);
-                        }
-                    }
-
-                    if (inThreshold)
-                    {
-                        Vector3 validatedPos = DungeonEnemySpawner.GetValidSpawnPosition(
-                            targetPos, room, $"Ngưỡng cửa phòng {room.GridPosition}", 3f
-                        );
-                        var movement = player.GetComponent<PlayerMovement>();
-                        if (movement != null)
-                        {
-                            var rpcParams = new ClientRpcParams
-                            {
-                                Send = new ClientRpcSendParams
-                                {
-                                    TargetClientIds = new[] { client.ClientId }
-                                }
-                            };
-                            movement.TeleportOwnerClientRpc(validatedPos, player.transform.rotation, rpcParams);
-                            Debug.Log($"[DungeonManager] Đã dịch chuyển người chơi {client.ClientId} vào trong phòng {room.GridPosition} 2m để tránh kẹt cổng (Mục 17.4).");
-                        }
-                    }
+                    Debug.LogWarning($"[PartyTeleport] No valid gathering slot in {room.GridPosition}; gates remain open.");
+                    _roomLockStates[room.GridPosition] = RoomLockState.Idle;
+                    _activeEncounter = null;
+                    yield break;
+                }
+                destinations.Add(target); occupied.Add(target);
+            }
+            for (int i = 0; i < pending.Count; i++)
+            {
+                var player = pending[i];
+                var movement = player.GetComponent<PlayerMovement>();
+                if (movement == null)
+                {
+                    Debug.LogError($"[PartyTeleport] Missing PlayerMovement on {player.name}");
+                    _roomLockStates[room.GridPosition] = RoomLockState.Idle; _activeEncounter = null;
+                    yield break;
+                }
+                movement.TeleportOwnerClientRpc(destinations[i], player.transform.rotation,
+                    new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { player.OwnerClientId } } });
+                Debug.Log($"[PartyTeleport] room={room.GridPosition} entrant={entrant.OwnerClientId} target={player.OwnerClientId} downed={player.GetComponent<Health>().IsDowned.Value} destination={destinations[i]}");
+            }
+            Debug.Log($"[PartyTeleport] room={room.GridPosition} entrant={entrant.OwnerClientId} gathered={pending.Count}; waiting {_partyTeleportDelay:F1}s before gates");
+            yield return new WaitForSeconds(_partyTeleportDelay);
+            if (!IsServer || !IsCombatActive) yield break;
+            // Owner transforms must have arrived. Never lock someone outside under packet delay.
+            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+            {
+                var player = client.PlayerObject;
+                var health = player != null ? player.GetComponent<Health>() : null;
+                if (health != null && !health.IsDead.Value && NeedsGathering(room, player.transform.position))
+                {
+                    Debug.LogWarning($"[PartyTeleport] Awaiting owner {client.ClientId}; retry gathering with gates open.");
+                    _roomLockStates[room.GridPosition] = RoomLockState.Idle; _activeEncounter = null;
+                    yield break;
                 }
             }
+            _roomLockStates[room.GridPosition] = RoomLockState.Locked;
+            SetRoomGatesClientRpc(room.GridPosition, true);
+            Debug.Log($"[PartyTeleport] room={room.GridPosition} Locked; spawning after {_roomEnemySpawnDelay:F1}s");
+            yield return DelayedRoomSpawnRoutine(room);
         }
 
         private IEnumerator DelayedRoomSpawnRoutine(DungeonRoomNode room)
         {
             // Chờ 0.8 giây cho cổng hạ xong (Mục 17.4)
-            yield return new WaitForSeconds(0.8f);
+            yield return new WaitForSeconds(_roomEnemySpawnDelay);
 
-            if (!IsServer) yield break;
+            if (!IsServer || !IsCombatActive) yield break;
 
             if (room.RoomType == DungeonRoomType.Combat)
             {
@@ -830,6 +857,7 @@ namespace Hellfire.Dungeon
         private void ClearRoom(DungeonRoomNode room)
         {
             _roomLockStates[room.GridPosition] = RoomLockState.Cleared;
+            if (_activeEncounter == room.GridPosition) _activeEncounter = null;
             SetRoomGatesClientRpc(room.GridPosition, false);
             Debug.Log($"[DungeonManager] [Cleared] Phòng {room.GridPosition} ({room.RoomType}) đã dọn sạch quái (Cleared)! Cổng nâng lên.");
 

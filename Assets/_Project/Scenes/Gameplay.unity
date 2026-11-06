@@ -513,6 +513,11 @@ MonoBehaviour:
   _generator: {fileID: 0}
   _navMeshBaker: {fileID: 0}
   _enemySpawner: {fileID: 0}
+  _partyTeleportDelay: 0.5
+  _roomEnemySpawnDelay: 0.8
+  _partyMinimumSpacing: 1.5
+  _partyGatherMinRadius: 2
+  _partyGatherMaxRadius: 4
   _combatRoomClearSoulsBonus: 20
   _shrinePrefab: {fileID: 3307499296855584155, guid: 85e113e7b6b8c416386ee9842f992597, type: 3}
   _lootChestPrefab: {fileID: 8559227056804521236, guid: d42d19d74d03140f0b38397a1eaa3d46, type: 3}

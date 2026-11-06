@@ -1,0 +1,50 @@
+[DungeonParameters] seed=649984, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00), enemies=2..4, sample=3m
+[DungeonRoom] (0, 0) Spawn Size=12.77x13.16m
+[DungeonRoom] (1, 0) Combat Size=16.36x16.17m
+[DungeonRoom] (-1, 0) Combat Size=16.36x16.17m
+[DungeonRoom] (1, 1) Combat Size=19.25x13.41m
+[DungeonRoom] (0, 1) Combat Size=21.42x12.41m
+[DungeonRoom] (2, 1) Combat Size=18.17x12.06m
+[DungeonRoom] (-1, 1) Treasure Size=13.17x13.64m
+[DungeonRoom] (2, 0) Combat Size=20.38x16.21m
+[DungeonRoom] (2, -1) Combat Size=18.17x12.06m
+[DungeonRoom] (0, 2) Shop Size=12.09x13.42m
+[DungeonRoom] (3, 0) Upgrade Size=12.46x12.47m
+[DungeonRoom] (3, -1) Boss Size=22.75x18.44m
+[DungeonRoom] (-1, -1) Combat Size=19.25x13.41m
+[RoomTheme] (1, 0) theme=Lò rèn, clusters=2/3, objects=2/6, area=4.16/21.17m2, lights=1/2
+[RoomTheme] (-1, 0) theme=Lò rèn, clusters=3/3, objects=3/6, area=2.72/21.17m2, lights=0/2
+[RoomTheme] (1, 1) theme=Mỏ đổ nát, clusters=2/3, objects=2/6, area=9.35/20.65m2, lights=0/2
+[RoomTheme] (0, 1) theme=Mỏ đổ nát, clusters=1/3, objects=1/6, area=4.08/21.27m2, lights=0/2
+[RoomTheme] (2, 1) theme=Hầm mộ, clusters=1/3, objects=1/6, area=2.25/17.54m2, lights=0/2
+[RoomTheme] (2, 0) theme=Nhà ngục, clusters=4/4, objects=4/6, area=7.96/26.43m2, lights=0/2
+[RoomTheme] (2, -1) theme=Hầm mộ, clusters=1/3, objects=1/6, area=2.25/17.54m2, lights=0/2
+[RoomTheme] (-1, -1) theme=Mỏ đổ nát, clusters=3/3, objects=3/6, area=14.22/20.65m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=21.43m
+[DungeonCorridor] (0, 0)->(-1, 0) length=21.43m
+[DungeonCorridor] (1, 0)->(1, 1) length=21.21m
+[DungeonCorridor] (0, 0)->(0, 1) length=23.21m
+[DungeonCorridor] (1, 1)->(2, 1) length=17.29m
+[DungeonCorridor] (0, 1)->(-1, 1) length=18.70m
+[DungeonCorridor] (1, 0)->(2, 0) length=17.63m
+[DungeonCorridor] (2, 0)->(2, -1) length=21.86m
+[DungeonCorridor] (0, 1)->(0, 2) length=23.08m
+[DungeonCorridor] (2, 0)->(3, 0) length=19.58m
+[DungeonCorridor] (2, -1)->(3, -1) length=15.54m
+[DungeonCorridor] (-1, 0)->(-1, -1) length=21.21m
+[DungeonManager] Client 0 đã sẵn sàng hầm ngục (1/1).
+[DungeonManager] Đủ toàn bộ 1 client! Mở cổng hầm ngục theo thứ tự (a) -> (b) -> (c).
+[DungeonManager] Đã spawn LootChest 1/2 tại phòng Treasure (-1, 1) ((-38.50, 0.08, 36.00))
+[DungeonManager] Đã spawn LootChest 2/2 tại phòng Treasure (-1, 1) ((-33.50, 0.08, 36.00))
+[DungeonManager] Đã spawn ShopStation tại tâm phòng Shop (0, 2) ((0.00, 0.08, 72.00))
+[DungeonManager] Đã spawn InteractiveShrine (ID: 3000) tại tâm phòng Upgrade (3, 0) ((108.00, 0.08, 0.00))
+[GameManager] Chuyển trạng thái game: Generating -> Playing
+[SceneAudit] Playing before first lock: EnemyStateMachine=0
+[Phase48QA] Real Host flow reached Playing: enemies=0; ready=1; seed=649984
+[Phase48QA] Rooms=13; shortest corridor=15.54m; grid=36m; obstacle bounds checked
+[Phase48QA] Host entered Combat (1, 0); observing normal server lock sequence.
+[PartyTeleport] room=(1, 0) entrant=0 gathered=0; waiting 0.5s before gates
+[PartyTeleport] room=(1, 0) Locked; spawning after 0.8s
+[DungeonEnemySpawner] Đã spawn 1 quái tại phòng Combat (1, 0) (Hệ số: x0.70).
+[DungeonManager] Đã đặt cờ phòng (1, 0) (Combat) đã spawn xong.
+Console quan sát: 64 logs, 6 warnings, 0 errors.
