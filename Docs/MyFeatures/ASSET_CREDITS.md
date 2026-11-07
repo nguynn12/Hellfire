@@ -32,3 +32,26 @@
 - **Giấy phép:** Free Asset License
 - **Vị trí trong dự án:** `Assets/_Project/Art/Bestiary/`
 
+
+## 4. REALISTIC SHOWCASE RUNNER AND BRUTE (2026-11-06)
+
+- Runner: FREE Shirtless Zombie, Studio New Punch.
+  Source: https://assetstore.unity.com/packages/3d/characters/humanoids/free-shirtless-zombie-276762
+  Imported from the user's Unity My Assets library into Assets/NewPunch/ShirtlessZombieFree/.
+- Brute: Zombie Mutant Free, buxoided.
+  Source: https://assetstore.unity.com/packages/3d/characters/humanoids/zombie-mutant-free-310842
+  Imported from the user's Unity My Assets library into Assets/Zombie_Mutant/.
+- Both models use Standard Unity Asset Store EULA. Original packages retained.
+- Animation source: existing Quaternius Universal Animation Library 1 and 2 in Assets/_Project/Art/PlayerAbilities/; local clips copied for enemy-specific loop settings.
+- Runner: Zombie Idle, Sprint Loop, Zombie Scratch, Hit Chest, Death01.
+- Brute: Zombie Idle, Zombie Walk Forward, Melee Hook, Hit Chest, Death01.
+
+
+## 5. EXCAVATION MAP PACKS (2026-11-06)
+
+Downloaded from the user’s Unity My Assets library. Original asset GUIDs and metadata preserved; sample scenes and demo scripts omitted. Local URP material copies live in Assets/_Project/Art/Excavation/. Usage remains subject to each package’s Unity Asset Store license.
+
+- RPG Dungeon Kit DEMO — Kimset: https://assetstore.unity.com/packages/3d/environments/dungeons/rpg-dungeon-kit-demo-348672
+- Modular Industrial Catwalk Kit Free — LineKotsi: https://assetstore.unity.com/packages/3d/props/industrial/modular-industrial-catwalk-kit-free-287064
+- Modular Medieval Lanterns — Alexandr Voevodov: https://assetstore.unity.com/packages/3d/environments/historic/modular-medieval-lanterns-85527
+- Medieval props — Lukas Bobor: https://assetstore.unity.com/packages/3d/props/medieval-props-41540

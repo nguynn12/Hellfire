@@ -10,6 +10,8 @@ namespace Hellfire.Combat
     public sealed class CodexZombieTestSceneNavigation : MonoBehaviour
     {
         private NavMeshData data;
+        public Transform[] IgnoreFromBuild = System.Array.Empty<Transform>();
+        public Bounds BuildBounds = new Bounds(Vector3.zero, new Vector3(160, 40, 160));
         private NavMeshDataInstance instance;
         private void Awake()
         {
@@ -19,11 +21,13 @@ namespace Hellfire.Combat
             if (manager != null && !manager.IsListening) manager.NetworkConfig.PlayerPrefab = null;
             var sources = new List<NavMeshBuildSource>();
             var markups = new List<NavMeshBuildMarkup>();
+            foreach (var root in IgnoreFromBuild)
+                if (root != null) markups.Add(new NavMeshBuildMarkup { root = root, ignoreFromBuild = true });
             foreach (var health in FindObjectsByType<Health>(FindObjectsSortMode.None))
                 markups.Add(new NavMeshBuildMarkup { root = health.transform, ignoreFromBuild = true });
             NavMeshBuilder.CollectSources(null, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, markups, sources);
             data = NavMeshBuilder.BuildNavMeshData(NavMesh.GetSettingsByID(0), sources,
-                new Bounds(Vector3.zero, new Vector3(160, 40, 160)), Vector3.zero, Quaternion.identity);
+                BuildBounds, Vector3.zero, Quaternion.identity);
             if (data != null) instance = NavMesh.AddNavMeshData(data);
             foreach (var agent in FindObjectsByType<NavMeshAgent>(FindObjectsSortMode.None))
                 if (agent.enabled && NavMesh.SamplePosition(agent.transform.position, out var hit, 3, agent.areaMask))

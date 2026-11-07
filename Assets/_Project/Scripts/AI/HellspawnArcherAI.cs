@@ -94,14 +94,14 @@ namespace Hellfire.AI
             }
 
             // Bắn hitscan theo cooldown
-            if (Time.time - _lastAttackTime >= _attackCooldown)
+            if (Time.time - _lastArcherAttackTime >= _attackCooldown)
             {
-                _lastAttackTime = Time.time;
+                _lastArcherAttackTime = Time.time;
                 ExecuteRangedHitscanAttack();
             }
         }
 
-        private float _lastAttackTime;
+        private float _lastArcherAttackTime;
 
         private void ExecuteRangedHitscanAttack()
         {
