@@ -72,19 +72,74 @@ namespace Hellfire.EditorTools
                 }
         }
         [MenuItem("Hellfire/Phase 4.8/4 Enter first Combat (Host) #&4")]
-        public static void EnterCombat()
+        public static void EnterCombat() => EnterRoom(DungeonRoomType.Combat);
+
+        [MenuItem("Hellfire/Phase 4.8/6 Enter Boss (Host) #&6")]
+        public static void EnterBoss() => EnterRoom(DungeonRoomType.Boss);
+
+        private static void EnterRoom(DungeonRoomType type)
         {
             var dm = DungeonManager.Instance;
             if (!EditorApplication.isPlaying || dm == null || !dm.IsServer) return;
             foreach (var room in dm.Generator.ActiveGrid.Rooms.Values)
-                if (room.RoomType == DungeonRoomType.Combat)
+                if (room.RoomType == type)
                 {
                     var player = Unity.Netcode.NetworkManager.Singleton.LocalClient.PlayerObject;
                     Vector3 target = DungeonEnemySpawner.GetValidSpawnPosition(room.WorldCenter, room, "QA entrant");
                     player.GetComponent<Hellfire.Player.PlayerMovement>().TeleportOwnerClientRpc(target, Quaternion.identity);
-                    Debug.Log($"[Phase48QA] Host entered Combat {room.GridPosition}; observing normal server lock sequence.");
+                    Debug.Log($"[Phase48QA] Host entered {type} {room.GridPosition}; observing normal server lock sequence.");
                     return;
                 }
+        }
+        [MenuItem("Hellfire/Phase 4.8/5 Check determinism and scaling #&5")]
+        public static void CheckDeterminismAndScaling()
+        {
+            var dm = DungeonManager.Instance;
+            if (!EditorApplication.isPlaying || dm == null) return;
+            var spawner = dm.EnemySpawner;
+            for (int floor = 1; floor <= 3; floor++)
+            {
+                spawner.GetBaseEnemyRange(floor, out int min, out int max);
+                if (min != 5 + 2 * (floor - 1) || max != 7 + 2 * (floor - 1))
+                    throw new InvalidOperationException("Floor enemy range mismatch.");
+                Debug.Log($"[Phase48QA] Floor formula {floor}: {min}..{max} (CurrentFloor was not changed)");
+            }
+            for (int players = 1; players <= 4; players++)
+                Debug.Log($"[Phase48QA] Floor1 players={players}: rolls5/6/7 => {spawner.ScaleEnemyCount(5, players)}/{spawner.ScaleEnemyCount(6, players)}/{spawner.ScaleEnemyCount(7, players)}; high-floor cap={spawner.ScaleEnemyCount(1000, players)}");
+            var preview = EditorSceneManager.NewPreviewScene();
+            try
+            {
+                var obj = new GameObject("Phase48DeterminismOnly");
+                SceneManager.MoveGameObjectToScene(obj, preview);
+                var gen = obj.AddComponent<DungeonGenerator>();
+                EditorJsonUtility.FromJsonOverwrite(EditorJsonUtility.ToJson(dm.Generator), gen);
+                var root = new GameObject("PreviewGeometryOnly");
+                root.transform.SetParent(obj.transform, false);
+                var so = new SerializedObject(gen);
+                so.FindProperty("_dungeonRoot").objectReferenceValue = root.transform;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                int[] seeds = {1, 42, 12345, 770316, 649984, 999999};
+                foreach (int seed in seeds)
+                {
+                    string first = Signature(gen.GenerateDungeon(seed));
+                    string second = Signature(gen.GenerateDungeon(seed));
+                    if (first != second) throw new InvalidOperationException($"Non-deterministic geometry for seed {seed}");
+                }
+                Debug.Log("[Phase48QA] Determinism PASS: 6 seeds x 2 independent generations; room type/size/theme/obstacle bounds identical.");
+            }
+            finally { EditorSceneManager.ClosePreviewScene(preview); }
+        }
+        private static string Signature(DungeonGrid grid)
+        {
+            var rooms = new System.Collections.Generic.List<DungeonRoomNode>(grid.Rooms.Values);
+            rooms.Sort((a, b) => a.GridPosition.x != b.GridPosition.x ? a.GridPosition.x.CompareTo(b.GridPosition.x) : a.GridPosition.y.CompareTo(b.GridPosition.y));
+            var text = new System.Text.StringBuilder();
+            foreach (var room in rooms)
+            {
+                text.Append(room.GridPosition).Append(room.RoomType).Append(room.Size.ToString("F6")).Append(room.Theme?.name);
+                foreach (var bounds in room.ObstacleBounds) text.Append(bounds.center.ToString("F6")).Append(bounds.size.ToString("F6"));
+            }
+            return text.ToString();
         }
         private static void VerifyRectangles()
         {
