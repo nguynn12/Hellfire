@@ -833,7 +833,7 @@ namespace Hellfire.Dungeon
             {
                 if (_enemySpawner != null)
                 {
-                    _enemySpawner.SpawnEnemiesForRoom(room);
+                    yield return _enemySpawner.SpawnEnemiesForRoom(room);
                 }
             }
             else if (room.RoomType == DungeonRoomType.Boss)
@@ -845,10 +845,11 @@ namespace Hellfire.Dungeon
 
                 if (_enemySpawner != null)
                 {
-                    _enemySpawner.SpawnBossForRoom(room);
+                    yield return _enemySpawner.SpawnBossForRoom(room);
                 }
             }
 
+            if (!IsServer || !IsCombatActive) yield break;
             // Đặt cờ đã spawn xong cho phòng này (chỉ Server)
             _roomsFinishedSpawning.Add(room.GridPosition);
             Debug.Log($"[DungeonManager] Đã đặt cờ phòng {room.GridPosition} ({room.RoomType}) đã spawn xong.");

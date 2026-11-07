@@ -78,6 +78,9 @@ namespace Hellfire.UI
         [Header("Souls (Mục 17.7)")]
         [SerializeField] private TextMeshProUGUI _soulsText;
 
+        [SerializeField] private TextMeshProUGUI _floorText;
+        private GameManager _floorGameManager;
+
         [Header("Dungeon Map (Mục 16.8)")]
         [SerializeField] private DungeonMapUI _dungeonMapUI;
 
@@ -183,6 +186,19 @@ namespace Hellfire.UI
             if (_soulsText == null && canvas != null)
             {
                 _soulsText = CreateSoulsText(canvas.transform);
+            }
+
+            if (_floorText == null && canvas != null)
+            {
+                var floorObj = new GameObject("FloorText", typeof(RectTransform), typeof(TextMeshProUGUI));
+                floorObj.transform.SetParent(canvas.transform, false);
+                _floorText = floorObj.GetComponent<TextMeshProUGUI>();
+                _floorText.fontSize = 22f; _floorText.color = new Color(.85f, .85f, .85f);
+                _floorText.raycastTarget = false;
+                var rect = floorObj.GetComponent<RectTransform>();
+                rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1, 1);
+                rect.anchoredPosition = new Vector2(-25, -60); rect.sizeDelta = new Vector2(150, 35);
+                _floorText.alignment = TextAlignmentOptions.TopRight;
             }
 
             // Teammate Panel (Mục 16.2)
@@ -376,6 +392,7 @@ namespace Hellfire.UI
 
         private void Update()
         {
+            BindFloorLabel();
             TryBindLocalPlayer();
             UpdatePlayerInfo();
             UpdateLowHealthPulse();
@@ -605,8 +622,27 @@ namespace Hellfire.UI
             }
         }
 
+        private void BindFloorLabel()
+        {
+            var manager = GameManager.Instance;
+            if (_floorGameManager == manager) return;
+            if (_floorGameManager != null) _floorGameManager.CurrentFloor.OnValueChanged -= UpdateFloorLabel;
+            _floorGameManager = manager;
+            if (_floorGameManager != null)
+            {
+                _floorGameManager.CurrentFloor.OnValueChanged += UpdateFloorLabel;
+                UpdateFloorLabel(0, _floorGameManager.CurrentFloor.Value);
+            }
+        }
+
+        private void UpdateFloorLabel(int previous, int current)
+        {
+            if (_floorText != null) _floorText.text = $"Tầng {current}";
+        }
+
         private void OnDestroy()
         {
+            if (_floorGameManager != null) _floorGameManager.CurrentFloor.OnValueChanged -= UpdateFloorLabel;
             if (_localPlayerHealth != null)
             {
                 _localPlayerHealth.OnHealthChanged -= HandleHealthChanged;

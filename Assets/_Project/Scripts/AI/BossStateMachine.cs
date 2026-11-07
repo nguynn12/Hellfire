@@ -300,15 +300,22 @@ namespace Hellfire.AI
 
         private void SummonImpMinions(int count)
         {
-            if (_impMinionPrefab == null || !IsServer) return;
+            if (_impMinionPrefab != null && IsServer) StartCoroutine(SummonImpMinionsRoutine(count));
+        }
+
+        private IEnumerator SummonImpMinionsRoutine(int count)
+        {
 
             for (int i = 0; i < count; i++)
             {
-                Vector3 spawnOffset = new Vector3((i == 0 ? 3f : -3f), 0.5f, 3f);
-                Vector3 proposedPos = transform.position + spawnOffset;
-                Vector3 spawnPos = Hellfire.Dungeon.DungeonEnemySpawner.GetValidSpawnPosition(
-                    proposedPos, _bossRoomCenter, "Triệu hồi Imp của Boss", 3.0f
-                );
+                Vector3 spawnPos;
+                var spawner = Hellfire.Dungeon.DungeonEnemySpawner.Instance;
+                if (spawner == null || !spawner.CanSpawnEncounterEnemies) yield break;
+                while (!spawner.TryGetBossSummonPosition(out spawnPos))
+                {
+                    if (!spawner.CanSpawnEncounterEnemies || GetComponent<Health>().IsDead.Value) yield break;
+                    yield return new WaitForSeconds(spawner.SpawnRetryDelay);
+                }
 
                 var imp = Instantiate(_impMinionPrefab, spawnPos, Quaternion.identity);
                 var minionEnemy = imp.GetComponent<EnemyStateMachine>();

@@ -493,8 +493,15 @@ MonoBehaviour:
   _rangedZombieWeight: 15
   _bruteWeight: 20
   _bossPrefab: {fileID: 5937095992736994228, guid: d3e9d3ba396165e4a9237c2794c12a48, type: 3}
-  _minEnemiesPerNormalRoom: 2
-  _maxEnemiesPerNormalRoom: 4
+  _baseMin: 5
+  _baseMax: 7
+  _enemiesPerFloorStep: 2
+  _maxEnemiesPerRoom: 14
+  _spawnWallInset: 2
+  _spawnObstacleClearance: 1.5
+  _spawnPlayerClearance: 5
+  _spawnPositionAttempts: 60
+  _spawnRetryDelay: 0.2
   _maxNavMeshSampleDistance: 3
   _scalingData: {fileID: 0}
 --- !u!114 &56814010
