@@ -247,6 +247,7 @@ namespace Hellfire.Combat
             if (GameModeHelper.IsOffline)
             {
                 OnDamageTaken?.Invoke(finalDamage, payload.Hitbox, payload.AttackerClientId);
+                ShowLocalEnemyDamage(finalDamage, payload.Hitbox);
                 OnHealthChanged?.Invoke(CurrentHealth.Value, MaxHealthNet.Value);
             }
             else
@@ -440,6 +441,20 @@ namespace Hellfire.Combat
         private void NotifyDamageClientRpc(float damage, HitboxType hitboxType, ulong attackerClientId)
         {
             OnDamageTaken?.Invoke(damage, hitboxType, attackerClientId);
+            var manager = NetworkManager.Singleton;
+            if (manager != null && manager.LocalClientId == attackerClientId)
+                ShowLocalEnemyDamage(damage, hitboxType);
+        }
+
+        private void ShowLocalEnemyDamage(float damage, HitboxType hitboxType)
+        {
+            if (_isPlayer || damage <= 0f) return;
+            var camera = PlayerMovement.LocalInstance?.PlayerCamera;
+            if (camera == null) return;
+            var pool = FloatingDamageManager.Instance;
+            if (pool == null)
+                pool = new GameObject("Floating Damage").AddComponent<FloatingDamageManager>();
+            pool.SpawnDamagePopup(transform.position + Vector3.up * 1.7f, damage, hitboxType == HitboxType.Head, camera);
         }
 
         [ClientRpc]

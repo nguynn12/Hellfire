@@ -28,6 +28,6 @@ MonoBehaviour:
   _reloadTime: 1.8
   _viewmodelPrefab: {fileID: 0}
   _worldModelPrefab: {fileID: 0}
-  _fireSound: {fileID: 0}
+  _fireSound: {fileID: 8300000, guid: 04f2ad2e0c988dc42b7874ae0489b488, type: 3}
   _reloadSound: {fileID: 0}
   _emptySound: {fileID: 0}

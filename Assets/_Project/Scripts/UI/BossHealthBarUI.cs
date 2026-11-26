@@ -360,7 +360,7 @@ namespace Hellfire.UI
                 tRect.offsetMin = Vector2.zero;
                 tRect.offsetMax = Vector2.zero;
                 _phase2BannerText = textObj.GetComponent<TextMeshProUGUI>();
-                _phase2BannerText.text = "⚡ PHA 2 ⚡"; // Chữ PHA 2 theo mục 16.6
+                _phase2BannerText.text = "PHA 2";
                 _phase2BannerText.fontSize = 54;
                 _phase2BannerText.fontStyle = FontStyles.Bold;
                 _phase2BannerText.alignment = TextAlignmentOptions.Center;

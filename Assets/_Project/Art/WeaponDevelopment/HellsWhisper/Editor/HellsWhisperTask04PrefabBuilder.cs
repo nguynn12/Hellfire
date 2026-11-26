@@ -67,7 +67,7 @@ namespace Hellfire.WeaponDevelopment.EditorOnly
             public string longestAxis;
         }
 
-        [InitializeOnLoadMethod]
+        [MenuItem("Hellfire/Weapon Development/Prepare Task04 Prefabs")]
         static void Schedule()
         {
             if (File.Exists(ReportPath) || SessionState.GetBool(SessionKey, false)) return;

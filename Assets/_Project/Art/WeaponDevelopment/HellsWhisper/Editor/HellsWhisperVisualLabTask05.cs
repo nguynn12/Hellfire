@@ -65,10 +65,9 @@ namespace Hellfire.WeaponDevelopment.EditorOnly
             EditorSceneManager.sceneOpened -= OnSceneOpened;
             EditorSceneManager.sceneOpened += OnSceneOpened;
             EditorApplication.delayCall += RestoreLoadedLabCameras;
-            if (!File.Exists(LabPath) && !SessionState.GetBool(SessionKey, false))
-                EditorApplication.delayCall += WaitAndBuild;
         }
 
+        [MenuItem("Hellfire/Weapon Development/Build Missing Visual Lab")]
         static void WaitAndBuild()
         {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating)
