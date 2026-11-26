@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "anchors": [],
+  "symbolAnchorsStatus": "NOT VERIFIED \u2014 no surface symbol coordinates inferred",
+  "cavityAnchorsStatus": "NOT VERIFIED \u2014 three camera/mesh candidates tested: one surface hit without recess evidence, two no-hit rays. No anchor created."
+}

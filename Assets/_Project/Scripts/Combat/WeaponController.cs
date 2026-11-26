@@ -69,6 +69,7 @@ namespace Hellfire.Combat
         private float _nextFireTime;
         private bool _isReloading;
         private float _reloadTimer;
+        private float _activeReloadDuration;
         private int _currentWeaponIndex = 0;
 
         private static Material _cachedFxMaterial;
@@ -91,6 +92,10 @@ namespace Hellfire.Combat
 
         public int CurrentAmmo => _currentAmmo;
         public bool IsReloading => _isReloading;
+        // Gameplay owns the sole reload clock. Cosmetic presenters only sample this progress.
+        public float ActiveReloadDuration => _activeReloadDuration;
+        public float ReloadProgress => _isReloading && _activeReloadDuration > 0f
+            ? Mathf.Clamp01(1f - _reloadTimer / _activeReloadDuration) : 0f;
         public int GlobalUpgradeLevel => GlobalUpgradeLevelNet.Value;
         public bool IsAimingDownSights { get; set; }
 
@@ -153,7 +158,13 @@ namespace Hellfire.Combat
 
         public override void OnNetworkDespawn()
         {
+            if (_isReloading) CancelReload();
             GlobalUpgradeLevelNet.OnValueChanged -= HandleGlobalUpgradeLevelChanged;
+        }
+
+        private void OnDisable()
+        {
+            if (_isReloading) CancelReload();
         }
 
         private void HandleGlobalUpgradeLevelChanged(int prevVal, int newVal)
@@ -204,6 +215,7 @@ namespace Hellfire.Combat
             if (index < 0 || index >= _availableWeapons.Count || _availableWeapons[index] == null) return;
             if (index == _currentWeaponIndex && _currentWeapon == _availableWeapons[index]) return;
 
+            if (_isReloading) CancelReload();
             _currentWeaponIndex = index;
             _currentWeapon = _availableWeapons[index];
             _currentAmmo = _currentWeapon.MagSize;
@@ -283,7 +295,8 @@ namespace Hellfire.Combat
         private void StartReload()
         {
             _isReloading = true;
-            _reloadTimer = _currentWeapon.ReloadTime;
+            _activeReloadDuration = _currentWeapon.ReloadTime;
+            _reloadTimer = _activeReloadDuration;
             OnReloadStateChanged?.Invoke(true);
 
             if (_audioSource != null && _currentWeapon.ReloadSound != null)
@@ -303,8 +316,9 @@ namespace Hellfire.Combat
             OnAmmoChanged?.Invoke(_currentAmmo, _currentWeapon != null ? _currentWeapon.MagSize : 0);
         }
 
-        private void CancelReload()
+        public void CancelReload()
         {
+            if (!_isReloading) return;
             _isReloading = false;
             OnReloadStateChanged?.Invoke(false);
         }
