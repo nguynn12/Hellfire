@@ -141,7 +141,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 0
+  GlobalObjectIdHash: 3803549488
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -296,6 +296,9 @@ MonoBehaviour:
   _shrineLight: {fileID: 3051141530383767563}
   _shrineRenderer: {fileID: 2293864501956647611}
   _usedColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
+  _glowController: {fileID: 0}
+  _autoColorByType: 1
+  _activeGlowColor: {r: 0.2, g: 0.8, b: 1, a: 1}
   _audioSource: {fileID: 7568226866933920923}
   _interactSound: {fileID: 0}
 --- !u!1 &4508283589535583063
@@ -611,7 +614,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 0.3, g: 0.85, b: 1, a: 1}
+  m_Color: {r: 1, g: 0.15, b: 0.15, a: 1}
   m_Intensity: 2
   m_Range: 5
   m_SpotAngle: 30

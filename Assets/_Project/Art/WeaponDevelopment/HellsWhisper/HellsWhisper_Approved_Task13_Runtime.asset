@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 252f69d1caaa4584a933b6170d3e3d2e, type: 3}
+  m_Name: HellsWhisper_Approved_Task13_Runtime
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.WeaponDevelopment.HellsWhisperReloadPresentation
+  approval: User approved Task13 Blood Presence in Task14
+  viewmodelPrefab: {fileID: 100000, guid: a0297d31fa8642019626d028625dca00, type: 3}
+  motionProfile: {fileID: 4900000, guid: 5768e182081b04176b9c7fd9ad58f73f, type: 3}
+  bloodMaterial: {fileID: 2100000, guid: 4736eb7f8190148f4a34cd42cb90ef27, type: 2}
+  viewmodelOffset: {x: -0.04, y: 0, z: 0}
+  uniformScale: 0.25
+  surfaceSites:
+  - {x: -0.05748569965362549, y: 0.6904814839363098, z: -0.7831062078475952}
+  - {x: -0.086658775806427, y: 0.9472559094429016, z: -0.6001948118209839}
+  - {x: 0.12354588508605957, y: 0.27152615785598755, z: -0.6344300508499146}
+  - {x: -0.14674288034439087, y: 1.0820739269256592, z: -0.5753949880599976}

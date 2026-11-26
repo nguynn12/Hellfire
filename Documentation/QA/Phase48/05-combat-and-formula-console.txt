@@ -1,0 +1,370 @@
+[DungeonParameters] seed=593441, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00), baseEnemies=5..7, floorStep=2, cap=14, floor=1, sample=3m
+[DungeonRoom] (0, 0) Spawn Size=13.78x13.62m
+[DungeonRoom] (1, 0) Combat Size=19.05x12.07m
+[DungeonRoom] (-1, 0) Treasure Size=13.11x13.20m
+[DungeonRoom] (0, 1) Combat Size=17.18x14.73m
+[DungeonRoom] (2, 0) Combat Size=20.29x16.49m
+[DungeonRoom] (0, -1) Upgrade Size=12.48x12.08m
+[DungeonRoom] (3, 0) Boss Size=24.98x19.65m
+[DungeonRoom] (2, 1) Shop Size=12.94x13.46m
+[DungeonRoom] (-1, 1) Combat Size=17.21x14.38m
+[DungeonRoom] (-2, 1) Combat Size=18.81x16.38m
+[RoomTheme] (1, 0) theme=Hầm rượu, clusters=3/3, objects=3/6, area=3.69/18.40m2, lights=0/2
+[RoomTheme] (0, 1) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.00/20.24m2, lights=0/2
+[RoomTheme] (2, 0) theme=Nhà ngục, clusters=3/4, objects=3/6, area=5.76/26.77m2, lights=0/2
+[RoomTheme] (-1, 1) theme=Nhà ngục, clusters=3/3, objects=3/6, area=3.72/19.81m2, lights=0/2
+[RoomTheme] (-2, 1) theme=Lò rèn, clusters=4/4, objects=4/6, area=4.48/24.65m2, lights=1/2
+[DungeonCorridor] (0, 0)->(1, 0) length=19.58m
+[DungeonCorridor] (0, 0)->(-1, 0) length=22.56m
+[DungeonCorridor] (0, 0)->(0, 1) length=21.83m
+[DungeonCorridor] (1, 0)->(2, 0) length=16.33m
+[DungeonCorridor] (0, 0)->(0, -1) length=23.15m
+[DungeonCorridor] (2, 0)->(3, 0) length=13.36m
+[DungeonCorridor] (2, 0)->(2, 1) length=21.03m
+[DungeonCorridor] (0, 1)->(-1, 1) length=18.80m
+[DungeonCorridor] (-1, 1)->(-2, 1) length=17.99m
+[DungeonManager] Client 0 đã sẵn sàng hầm ngục (1/1).
+[DungeonManager] Đủ toàn bộ 1 client! Mở cổng hầm ngục theo thứ tự (a) -> (b) -> (c).
+[DungeonManager] Đã spawn LootChest 1/2 tại phòng Treasure (-1, 0) ((-38.50, 0.08, 0.00))
+[DungeonManager] Đã spawn LootChest 2/2 tại phòng Treasure (-1, 0) ((-33.50, 0.08, 0.00))
+[DungeonManager] Đã spawn InteractiveShrine (ID: -1) tại tâm phòng Upgrade (0, -1) ((0.00, 0.08, -36.00))
+[DungeonManager] Đã spawn ShopStation tại tâm phòng Shop (2, 1) ((72.00, 0.08, 36.00))
+[GameManager] Chuyển trạng thái game: Generating -> Playing
+[SceneAudit] Playing before first lock: EnemyStateMachine=0
+[Phase48QA] Real Host flow reached Playing: enemies=0; ready=1; seed=593441
+[Phase48QA] Rooms=10; shortest corridor=13.36m; grid=36m; obstacle bounds checked
+[Phase48QA] Floor formula 1: 5..7 (CurrentFloor was not changed)
+[Phase48QA] Floor formula 2: 7..9 (CurrentFloor was not changed)
+[Phase48QA] Floor formula 3: 9..11 (CurrentFloor was not changed)
+[Phase48QA] Floor1 players=1: rolls5/6/7 => 4/4/5; high-floor cap=14
+[Phase48QA] Floor1 players=2: rolls5/6/7 => 5/6/7; high-floor cap=14
+[Phase48QA] Floor1 players=3: rolls5/6/7 => 7/8/10; high-floor cap=14
+[Phase48QA] Floor1 players=4: rolls5/6/7 => 9/11/13; high-floor cap=14
+[DungeonParameters] seed=1, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.55x13.86m
+[DungeonRoom] (0, 1) Combat Size=18.48x15.21m
+[DungeonRoom] (-1, 0) Shop Size=12.73x13.27m
+[DungeonRoom] (1, 1) Combat Size=18.07x14.40m
+[DungeonRoom] (1, 2) Boss Size=24.80x18.58m
+[DungeonRoom] (1, 0) Upgrade Size=12.64x12.10m
+[DungeonRoom] (0, -1) Treasure Size=12.92x12.25m
+[DungeonRoom] (0, 2) Combat Size=17.38x14.94m
+[DungeonRoom] (0, 3) Combat Size=16.28x14.68m
+[RoomTheme] (0, 1) theme=Mỏ đổ nát, clusters=2/4, objects=2/6, area=4.35/22.49m2, lights=0/2
+[RoomTheme] (1, 1) theme=Lò rèn, clusters=2/3, objects=2/6, area=4.16/20.82m2, lights=1/2
+[RoomTheme] (0, 2) theme=Hầm mộ, clusters=3/3, objects=3/6, area=5.08/20.78m2, lights=0/2
+[RoomTheme] (0, 3) theme=Lò rèn, clusters=2/3, objects=2/6, area=4.16/19.12m2, lights=1/2
+[DungeonCorridor] (0, 0)->(0, 1) length=21.47m
+[DungeonCorridor] (0, 0)->(-1, 0) length=22.86m
+[DungeonCorridor] (0, 1)->(1, 1) length=17.73m
+[DungeonCorridor] (1, 1)->(1, 2) length=19.51m
+[DungeonCorridor] (1, 1)->(1, 0) length=22.75m
+[DungeonCorridor] (0, 0)->(0, -1) length=22.95m
+[DungeonCorridor] (0, 1)->(0, 2) length=20.92m
+[DungeonCorridor] (0, 2)->(0, 3) length=21.19m
+[DungeonParameters] seed=1, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.55x13.86m
+[DungeonRoom] (0, 1) Combat Size=18.48x15.21m
+[DungeonRoom] (-1, 0) Shop Size=12.73x13.27m
+[DungeonRoom] (1, 1) Combat Size=18.07x14.40m
+[DungeonRoom] (1, 2) Boss Size=24.80x18.58m
+[DungeonRoom] (1, 0) Upgrade Size=12.64x12.10m
+[DungeonRoom] (0, -1) Treasure Size=12.92x12.25m
+[DungeonRoom] (0, 2) Combat Size=17.38x14.94m
+[DungeonRoom] (0, 3) Combat Size=16.28x14.68m
+[RoomTheme] (0, 1) theme=Mỏ đổ nát, clusters=2/4, objects=2/6, area=4.35/22.49m2, lights=0/2
+[RoomTheme] (1, 1) theme=Lò rèn, clusters=2/3, objects=2/6, area=4.16/20.82m2, lights=1/2
+[RoomTheme] (0, 2) theme=Hầm mộ, clusters=3/3, objects=3/6, area=5.08/20.78m2, lights=0/2
+[RoomTheme] (0, 3) theme=Lò rèn, clusters=2/3, objects=2/6, area=4.16/19.12m2, lights=1/2
+[DungeonCorridor] (0, 0)->(0, 1) length=21.47m
+[DungeonCorridor] (0, 0)->(-1, 0) length=22.86m
+[DungeonCorridor] (0, 1)->(1, 1) length=17.73m
+[DungeonCorridor] (1, 1)->(1, 2) length=19.51m
+[DungeonCorridor] (1, 1)->(1, 0) length=22.75m
+[DungeonCorridor] (0, 0)->(0, -1) length=22.95m
+[DungeonCorridor] (0, 1)->(0, 2) length=20.92m
+[DungeonCorridor] (0, 2)->(0, 3) length=21.19m
+[DungeonParameters] seed=42, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=12.21x13.57m
+[DungeonRoom] (1, 0) Combat Size=18.02x16.79m
+[DungeonRoom] (-1, 0) Combat Size=18.02x16.79m
+[DungeonRoom] (-1, -1) Combat Size=20.59x14.58m
+[DungeonRoom] (2, 0) Upgrade Size=12.98x13.46m
+[DungeonRoom] (0, 1) Combat Size=19.11x14.75m
+[DungeonRoom] (0, -1) Combat Size=19.11x14.75m
+[DungeonRoom] (-1, -2) Combat Size=20.10x14.38m
+[DungeonRoom] (-2, -2) Combat Size=18.54x12.45m
+[DungeonRoom] (-2, -1) Shop Size=12.55x12.88m
+[DungeonRoom] (-1, -3) Treasure Size=12.53x12.59m
+[DungeonRoom] (-3, -2) Boss Size=22.86x19.11m
+[RoomTheme] (1, 0) theme=Hầm mộ, clusters=3/4, objects=3/6, area=5.94/24.20m2, lights=0/2
+[RoomTheme] (-1, 0) theme=Hầm mộ, clusters=4/4, objects=4/6, area=8.04/24.20m2, lights=0/2
+[RoomTheme] (-1, -1) theme=Hầm rượu, clusters=4/4, objects=5/6, area=5.06/24.01m2, lights=0/2
+[RoomTheme] (0, 1) theme=Mỏ đổ nát, clusters=2/4, objects=2/6, area=5.84/22.55m2, lights=0/2
+[RoomTheme] (0, -1) theme=Mỏ đổ nát, clusters=3/4, objects=3/6, area=11.87/22.55m2, lights=0/2
+[RoomTheme] (-1, -2) theme=Hầm mộ, clusters=3/4, objects=3/6, area=6.93/23.13m2, lights=0/2
+[RoomTheme] (-2, -2) theme=Nhà ngục, clusters=1/3, objects=1/6, area=1.00/18.48m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=20.89m
+[DungeonCorridor] (0, 0)->(-1, 0) length=20.89m
+[DungeonCorridor] (-1, 0)->(-1, -1) length=20.31m
+[DungeonCorridor] (1, 0)->(2, 0) length=20.50m
+[DungeonCorridor] (0, 0)->(0, 1) length=21.84m
+[DungeonCorridor] (0, 0)->(0, -1) length=21.84m
+[DungeonCorridor] (-1, -1)->(-1, -2) length=21.52m
+[DungeonCorridor] (-1, -2)->(-2, -2) length=16.68m
+[DungeonCorridor] (-1, -1)->(-2, -1) length=19.43m
+[DungeonCorridor] (-1, -2)->(-1, -3) length=22.52m
+[DungeonCorridor] (-2, -2)->(-3, -2) length=15.30m
+[DungeonParameters] seed=42, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=12.21x13.57m
+[DungeonRoom] (1, 0) Combat Size=18.02x16.79m
+[DungeonRoom] (-1, 0) Combat Size=18.02x16.79m
+[DungeonRoom] (-1, -1) Combat Size=20.59x14.58m
+[DungeonRoom] (2, 0) Upgrade Size=12.98x13.46m
+[DungeonRoom] (0, 1) Combat Size=19.11x14.75m
+[DungeonRoom] (0, -1) Combat Size=19.11x14.75m
+[DungeonRoom] (-1, -2) Combat Size=20.10x14.38m
+[DungeonRoom] (-2, -2) Combat Size=18.54x12.45m
+[DungeonRoom] (-2, -1) Shop Size=12.55x12.88m
+[DungeonRoom] (-1, -3) Treasure Size=12.53x12.59m
+[DungeonRoom] (-3, -2) Boss Size=22.86x19.11m
+[RoomTheme] (1, 0) theme=Hầm mộ, clusters=3/4, objects=3/6, area=5.94/24.20m2, lights=0/2
+[RoomTheme] (-1, 0) theme=Hầm mộ, clusters=4/4, objects=4/6, area=8.04/24.20m2, lights=0/2
+[RoomTheme] (-1, -1) theme=Hầm rượu, clusters=4/4, objects=5/6, area=5.06/24.01m2, lights=0/2
+[RoomTheme] (0, 1) theme=Mỏ đổ nát, clusters=2/4, objects=2/6, area=5.84/22.55m2, lights=0/2
+[RoomTheme] (0, -1) theme=Mỏ đổ nát, clusters=3/4, objects=3/6, area=11.87/22.55m2, lights=0/2
+[RoomTheme] (-1, -2) theme=Hầm mộ, clusters=3/4, objects=3/6, area=6.93/23.13m2, lights=0/2
+[RoomTheme] (-2, -2) theme=Nhà ngục, clusters=1/3, objects=1/6, area=1.00/18.48m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=20.89m
+[DungeonCorridor] (0, 0)->(-1, 0) length=20.89m
+[DungeonCorridor] (-1, 0)->(-1, -1) length=20.31m
+[DungeonCorridor] (1, 0)->(2, 0) length=20.50m
+[DungeonCorridor] (0, 0)->(0, 1) length=21.84m
+[DungeonCorridor] (0, 0)->(0, -1) length=21.84m
+[DungeonCorridor] (-1, -1)->(-1, -2) length=21.52m
+[DungeonCorridor] (-1, -2)->(-2, -2) length=16.68m
+[DungeonCorridor] (-1, -1)->(-2, -1) length=19.43m
+[DungeonCorridor] (-1, -2)->(-1, -3) length=22.52m
+[DungeonCorridor] (-2, -2)->(-3, -2) length=15.30m
+[DungeonParameters] seed=12345, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.19x13.77m
+[DungeonRoom] (0, 1) Combat Size=16.93x14.47m
+[DungeonRoom] (-1, 1) Treasure Size=12.08x12.61m
+[DungeonRoom] (1, 1) Combat Size=16.23x13.82m
+[DungeonRoom] (0, -1) Combat Size=17.20x17.99m
+[DungeonRoom] (1, -1) Shop Size=12.08x12.61m
+[DungeonRoom] (1, 2) Boss Size=25.83x19.08m
+[DungeonRoom] (0, -2) Upgrade Size=13.16x12.35m
+[RoomTheme] (0, 1) theme=Nhà ngục, clusters=2/3, objects=2/6, area=4.76/19.59m2, lights=0/2
+[RoomTheme] (1, 1) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/17.95m2, lights=0/2
+[RoomTheme] (0, -1) theme=Mỏ đổ nát, clusters=3/4, objects=3/6, area=10.72/24.75m2, lights=0/2
+[DungeonCorridor] (0, 0)->(0, 1) length=21.88m
+[DungeonCorridor] (0, 1)->(-1, 1) length=21.50m
+[DungeonCorridor] (0, 1)->(1, 1) length=19.42m
+[DungeonCorridor] (0, 0)->(0, -1) length=20.12m
+[DungeonCorridor] (0, -1)->(1, -1) length=21.36m
+[DungeonCorridor] (1, 1)->(1, 2) length=19.55m
+[DungeonCorridor] (0, -1)->(0, -2) length=20.83m
+[DungeonParameters] seed=12345, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.19x13.77m
+[DungeonRoom] (0, 1) Combat Size=16.93x14.47m
+[DungeonRoom] (-1, 1) Treasure Size=12.08x12.61m
+[DungeonRoom] (1, 1) Combat Size=16.23x13.82m
+[DungeonRoom] (0, -1) Combat Size=17.20x17.99m
+[DungeonRoom] (1, -1) Shop Size=12.08x12.61m
+[DungeonRoom] (1, 2) Boss Size=25.83x19.08m
+[DungeonRoom] (0, -2) Upgrade Size=13.16x12.35m
+[RoomTheme] (0, 1) theme=Nhà ngục, clusters=2/3, objects=2/6, area=4.76/19.59m2, lights=0/2
+[RoomTheme] (1, 1) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/17.95m2, lights=0/2
+[RoomTheme] (0, -1) theme=Mỏ đổ nát, clusters=3/4, objects=3/6, area=10.72/24.75m2, lights=0/2
+[DungeonCorridor] (0, 0)->(0, 1) length=21.88m
+[DungeonCorridor] (0, 1)->(-1, 1) length=21.50m
+[DungeonCorridor] (0, 1)->(1, 1) length=19.42m
+[DungeonCorridor] (0, 0)->(0, -1) length=20.12m
+[DungeonCorridor] (0, -1)->(1, -1) length=21.36m
+[DungeonCorridor] (1, 1)->(1, 2) length=19.55m
+[DungeonCorridor] (0, -1)->(0, -2) length=20.83m
+[DungeonParameters] seed=770316, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.66x13.38m
+[DungeonRoom] (1, 0) Combat Size=20.34x13.22m
+[DungeonRoom] (-1, 0) Combat Size=20.34x13.22m
+[DungeonRoom] (0, -1) Combat Size=16.90x13.24m
+[DungeonRoom] (1, 1) Combat Size=18.43x16.29m
+[DungeonRoom] (2, 0) Combat Size=16.53x13.98m
+[DungeonRoom] (-1, -1) Upgrade Size=12.81x13.43m
+[DungeonRoom] (1, 2) Boss Size=25.36x21.21m
+[DungeonRoom] (0, -2) Shop Size=12.76x12.04m
+[DungeonRoom] (-1, 1) Treasure Size=12.90x12.60m
+[RoomTheme] (1, 0) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/21.51m2, lights=0/2
+[RoomTheme] (-1, 0) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/21.51m2, lights=0/2
+[RoomTheme] (0, -1) theme=Mỏ đổ nát, clusters=3/3, objects=3/6, area=8.64/17.90m2, lights=0/2
+[RoomTheme] (1, 1) theme=Hầm rượu, clusters=3/4, objects=4/6, area=4.88/24.01m2, lights=0/2
+[RoomTheme] (2, 0) theme=Hầm rượu, clusters=3/3, objects=3/6, area=4.32/18.49m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=19.00m
+[DungeonCorridor] (0, 0)->(-1, 0) length=19.00m
+[DungeonCorridor] (0, 0)->(0, -1) length=22.69m
+[DungeonCorridor] (1, 0)->(1, 1) length=21.25m
+[DungeonCorridor] (1, 0)->(2, 0) length=17.56m
+[DungeonCorridor] (0, -1)->(-1, -1) length=21.14m
+[DungeonCorridor] (1, 1)->(1, 2) length=17.25m
+[DungeonCorridor] (0, -1)->(0, -2) length=23.36m
+[DungeonCorridor] (-1, 0)->(-1, 1) length=23.09m
+[DungeonParameters] seed=770316, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.66x13.38m
+[DungeonRoom] (1, 0) Combat Size=20.34x13.22m
+[DungeonRoom] (-1, 0) Combat Size=20.34x13.22m
+[DungeonRoom] (0, -1) Combat Size=16.90x13.24m
+[DungeonRoom] (1, 1) Combat Size=18.43x16.29m
+[DungeonRoom] (2, 0) Combat Size=16.53x13.98m
+[DungeonRoom] (-1, -1) Upgrade Size=12.81x13.43m
+[DungeonRoom] (1, 2) Boss Size=25.36x21.21m
+[DungeonRoom] (0, -2) Shop Size=12.76x12.04m
+[DungeonRoom] (-1, 1) Treasure Size=12.90x12.60m
+[RoomTheme] (1, 0) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/21.51m2, lights=0/2
+[RoomTheme] (-1, 0) theme=Hầm rượu, clusters=2/3, objects=2/6, area=2.88/21.51m2, lights=0/2
+[RoomTheme] (0, -1) theme=Mỏ đổ nát, clusters=3/3, objects=3/6, area=8.64/17.90m2, lights=0/2
+[RoomTheme] (1, 1) theme=Hầm rượu, clusters=3/4, objects=4/6, area=4.88/24.01m2, lights=0/2
+[RoomTheme] (2, 0) theme=Hầm rượu, clusters=3/3, objects=3/6, area=4.32/18.49m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=19.00m
+[DungeonCorridor] (0, 0)->(-1, 0) length=19.00m
+[DungeonCorridor] (0, 0)->(0, -1) length=22.69m
+[DungeonCorridor] (1, 0)->(1, 1) length=21.25m
+[DungeonCorridor] (1, 0)->(2, 0) length=17.56m
+[DungeonCorridor] (0, -1)->(-1, -1) length=21.14m
+[DungeonCorridor] (1, 1)->(1, 2) length=17.25m
+[DungeonCorridor] (0, -1)->(0, -2) length=23.36m
+[DungeonCorridor] (-1, 0)->(-1, 1) length=23.09m
+[DungeonParameters] seed=649984, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=12.77x13.16m
+[DungeonRoom] (1, 0) Combat Size=16.36x16.17m
+[DungeonRoom] (-1, 0) Combat Size=16.36x16.17m
+[DungeonRoom] (1, 1) Combat Size=19.25x13.41m
+[DungeonRoom] (0, 1) Combat Size=21.42x12.41m
+[DungeonRoom] (2, 1) Combat Size=18.17x12.06m
+[DungeonRoom] (-1, 1) Treasure Size=13.17x13.64m
+[DungeonRoom] (2, 0) Combat Size=20.38x16.21m
+[DungeonRoom] (2, -1) Combat Size=18.17x12.06m
+[DungeonRoom] (0, 2) Shop Size=12.09x13.42m
+[DungeonRoom] (3, 0) Upgrade Size=12.46x12.47m
+[DungeonRoom] (3, -1) Boss Size=22.75x18.44m
+[DungeonRoom] (-1, -1) Combat Size=19.25x13.41m
+[RoomTheme] (1, 0) theme=Lò rèn, clusters=2/3, objects=2/6, area=4.16/21.17m2, lights=1/2
+[RoomTheme] (-1, 0) theme=Lò rèn, clusters=3/3, objects=3/6, area=2.72/21.17m2, lights=0/2
+[RoomTheme] (1, 1) theme=Mỏ đổ nát, clusters=2/3, objects=2/6, area=9.35/20.65m2, lights=0/2
+[RoomTheme] (0, 1) theme=Mỏ đổ nát, clusters=1/3, objects=1/6, area=4.08/21.27m2, lights=0/2
+[RoomTheme] (2, 1) theme=Hầm mộ, clusters=1/3, objects=1/6, area=2.25/17.54m2, lights=0/2
+[RoomTheme] (2, 0) theme=Nhà ngục, clusters=4/4, objects=4/6, area=7.96/26.43m2, lights=0/2
+[RoomTheme] (2, -1) theme=Hầm mộ, clusters=1/3, objects=1/6, area=2.25/17.54m2, lights=0/2
+[RoomTheme] (-1, -1) theme=Mỏ đổ nát, clusters=3/3, objects=3/6, area=14.22/20.65m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=21.43m
+[DungeonCorridor] (0, 0)->(-1, 0) length=21.43m
+[DungeonCorridor] (1, 0)->(1, 1) length=21.21m
+[DungeonCorridor] (0, 0)->(0, 1) length=23.21m
+[DungeonCorridor] (1, 1)->(2, 1) length=17.29m
+[DungeonCorridor] (0, 1)->(-1, 1) length=18.70m
+[DungeonCorridor] (1, 0)->(2, 0) length=17.63m
+[DungeonCorridor] (2, 0)->(2, -1) length=21.86m
+[DungeonCorridor] (0, 1)->(0, 2) length=23.08m
+[DungeonCorridor] (2, 0)->(3, 0) length=19.58m
+[DungeonCorridor] (2, -1)->(3, -1) length=15.54m
+[DungeonCorridor] (-1, 0)->(-1, -1) length=21.21m
+[DungeonParameters] seed=649984, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=12.77x13.16m
+[DungeonRoom] (1, 0) Combat Size=16.36x16.17m
+[DungeonRoom] (-1, 0) Combat Size=16.36x16.17m
+[DungeonRoom] (1, 1) Combat Size=19.25x13.41m
+[DungeonRoom] (0, 1) Combat Size=21.42x12.41m
+[DungeonRoom] (2, 1) Combat Size=18.17x12.06m
+[DungeonRoom] (-1, 1) Treasure Size=13.17x13.64m
+[DungeonRoom] (2, 0) Combat Size=20.38x16.21m
+[DungeonRoom] (2, -1) Combat Size=18.17x12.06m
+[DungeonRoom] (0, 2) Shop Size=12.09x13.42m
+[DungeonRoom] (3, 0) Upgrade Size=12.46x12.47m
+[DungeonRoom] (3, -1) Boss Size=22.75x18.44m
+[DungeonRoom] (-1, -1) Combat Size=19.25x13.41m
+[RoomTheme] (1, 0) theme=Lò rèn, clusters=2/3, objects=2/6, area=4.16/21.17m2, lights=1/2
+[RoomTheme] (-1, 0) theme=Lò rèn, clusters=3/3, objects=3/6, area=2.72/21.17m2, lights=0/2
+[RoomTheme] (1, 1) theme=Mỏ đổ nát, clusters=2/3, objects=2/6, area=9.35/20.65m2, lights=0/2
+[RoomTheme] (0, 1) theme=Mỏ đổ nát, clusters=1/3, objects=1/6, area=4.08/21.27m2, lights=0/2
+[RoomTheme] (2, 1) theme=Hầm mộ, clusters=1/3, objects=1/6, area=2.25/17.54m2, lights=0/2
+[RoomTheme] (2, 0) theme=Nhà ngục, clusters=4/4, objects=4/6, area=7.96/26.43m2, lights=0/2
+[RoomTheme] (2, -1) theme=Hầm mộ, clusters=1/3, objects=1/6, area=2.25/17.54m2, lights=0/2
+[RoomTheme] (-1, -1) theme=Mỏ đổ nát, clusters=3/3, objects=3/6, area=14.22/20.65m2, lights=0/2
+[DungeonCorridor] (0, 0)->(1, 0) length=21.43m
+[DungeonCorridor] (0, 0)->(-1, 0) length=21.43m
+[DungeonCorridor] (1, 0)->(1, 1) length=21.21m
+[DungeonCorridor] (0, 0)->(0, 1) length=23.21m
+[DungeonCorridor] (1, 1)->(2, 1) length=17.29m
+[DungeonCorridor] (0, 1)->(-1, 1) length=18.70m
+[DungeonCorridor] (1, 0)->(2, 0) length=17.63m
+[DungeonCorridor] (2, 0)->(2, -1) length=21.86m
+[DungeonCorridor] (0, 1)->(0, 2) length=23.08m
+[DungeonCorridor] (2, 0)->(3, 0) length=19.58m
+[DungeonCorridor] (2, -1)->(3, -1) length=15.54m
+[DungeonCorridor] (-1, 0)->(-1, -1) length=21.21m
+[DungeonParameters] seed=999999, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.98x12.65m
+[DungeonRoom] (0, -1) Combat Size=18.16x16.59m
+[DungeonRoom] (-1, 0) Shop Size=13.02x12.14m
+[DungeonRoom] (1, 0) Combat Size=18.78x14.90m
+[DungeonRoom] (0, 1) Combat Size=17.89x13.07m
+[DungeonRoom] (1, -1) Combat Size=17.92x12.03m
+[DungeonRoom] (0, -2) Combat Size=17.01x16.52m
+[DungeonRoom] (0, -3) Boss Size=24.26x19.73m
+[DungeonRoom] (-1, -2) Treasure Size=12.09x13.78m
+[DungeonRoom] (1, -2) Upgrade Size=12.18x12.95m
+[DungeonRoom] (2, -1) Combat Size=19.77x14.36m
+[RoomTheme] (0, -1) theme=Hầm mộ, clusters=3/4, objects=3/6, area=5.08/24.10m2, lights=0/2
+[RoomTheme] (1, 0) theme=Hầm rượu, clusters=3/3, objects=4/6, area=5.06/22.39m2, lights=0/2
+[RoomTheme] (0, 1) theme=Hầm mộ, clusters=2/3, objects=2/6, area=2.88/18.70m2, lights=0/2
+[RoomTheme] (1, -1) theme=Mỏ đổ nát, clusters=1/3, objects=1/6, area=3.34/17.25m2, lights=0/2
+[RoomTheme] (0, -2) theme=Nhà ngục, clusters=3/4, objects=3/6, area=4.92/22.48m2, lights=0/2
+[RoomTheme] (2, -1) theme=Lò rèn, clusters=4/4, objects=4/6, area=3.84/22.72m2, lights=0/2
+[DungeonCorridor] (0, 0)->(0, -1) length=21.38m
+[DungeonCorridor] (0, 0)->(-1, 0) length=22.50m
+[DungeonCorridor] (0, 0)->(1, 0) length=19.62m
+[DungeonCorridor] (0, 0)->(0, 1) length=23.14m
+[DungeonCorridor] (1, 0)->(1, -1) length=22.54m
+[DungeonCorridor] (0, -1)->(0, -2) length=19.45m
+[DungeonCorridor] (0, -2)->(0, -3) length=17.88m
+[DungeonCorridor] (0, -2)->(-1, -2) length=21.45m
+[DungeonCorridor] (1, -1)->(1, -2) length=23.51m
+[DungeonCorridor] (1, -1)->(2, -1) length=17.16m
+[DungeonParameters] seed=999999, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00),
+[DungeonRoom] (0, 0) Spawn Size=13.98x12.65m
+[DungeonRoom] (0, -1) Combat Size=18.16x16.59m
+[DungeonRoom] (-1, 0) Shop Size=13.02x12.14m
+[DungeonRoom] (1, 0) Combat Size=18.78x14.90m
+[DungeonRoom] (0, 1) Combat Size=17.89x13.07m
+[DungeonRoom] (1, -1) Combat Size=17.92x12.03m
+[DungeonRoom] (0, -2) Combat Size=17.01x16.52m
+[DungeonRoom] (0, -3) Boss Size=24.26x19.73m
+[DungeonRoom] (-1, -2) Treasure Size=12.09x13.78m
+[DungeonRoom] (1, -2) Upgrade Size=12.18x12.95m
+[DungeonRoom] (2, -1) Combat Size=19.77x14.36m
+[RoomTheme] (0, -1) theme=Hầm mộ, clusters=3/4, objects=3/6, area=5.08/24.10m2, lights=0/2
+[RoomTheme] (1, 0) theme=Hầm rượu, clusters=3/3, objects=4/6, area=5.06/22.39m2, lights=0/2
+[RoomTheme] (0, 1) theme=Hầm mộ, clusters=2/3, objects=2/6, area=2.88/18.70m2, lights=0/2
+[RoomTheme] (1, -1) theme=Mỏ đổ nát, clusters=1/3, objects=1/6, area=3.34/17.25m2, lights=0/2
+[RoomTheme] (0, -2) theme=Nhà ngục, clusters=3/4, objects=3/6, area=4.92/22.48m2, lights=0/2
+[RoomTheme] (2, -1) theme=Lò rèn, clusters=4/4, objects=4/6, area=3.84/22.72m2, lights=0/2
+[DungeonCorridor] (0, 0)->(0, -1) length=21.38m
+[DungeonCorridor] (0, 0)->(-1, 0) length=22.50m
+[DungeonCorridor] (0, 0)->(1, 0) length=19.62m
+[DungeonCorridor] (0, 0)->(0, 1) length=23.14m
+[DungeonCorridor] (1, 0)->(1, -1) length=22.54m
+[DungeonCorridor] (0, -1)->(0, -2) length=19.45m
+[DungeonCorridor] (0, -2)->(0, -3) length=17.88m
+[DungeonCorridor] (0, -2)->(-1, -2) length=21.45m
+[DungeonCorridor] (1, -1)->(1, -2) length=23.51m
+[DungeonCorridor] (1, -1)->(2, -1) length=17.16m
+[Phase48QA] Determinism PASS: 6 seeds x 2 independent generations; room type/size/theme/obstacle bounds identical.
+[Phase48QA] Host entered Combat (1, 0); observing normal server lock sequence.
+[PartyTeleport] room=(1, 0) entrant=0 gathered=0; waiting 0.5s before gates
+[PartyTeleport] room=(1, 0) Locked; spawning after 0.8s
+[DungeonEnemySpawner] floor=1 room=(1, 0) baseRange=5..7 rolled=6 players=1 multiplier=0.70 final=4 cap=14
+[DungeonEnemySpawner] Đã spawn 4 quái tại phòng Combat (1, 0) (Hệ số: x0.70).
+[DungeonManager] Đã đặt cờ phòng (1, 0) (Combat) đã spawn xong.
+[GameManager] Toàn bộ người chơi đã gục ngã! Kích hoạt GameOver.
+[GameManager] Chuyển trạng thái game: Playing -> GameOver
+Console quan sát: 375 logs, 6 warnings, 0 errors ở ảnh kiểm tra công thức; xem log Combat tiếp theo.

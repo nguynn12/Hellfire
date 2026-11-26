@@ -1,0 +1,316 @@
+{
+  "status": "TECHNICAL_VALIDATION_PASSED_ARTISTIC_CALIBRATION_PENDING",
+  "unityVersion": "6000.5.6f1",
+  "projectPath": "/Users/stormpaw/File/Hellfire/Assets",
+  "shader": "Universal Render Pipeline/Lit",
+  "generatedUtc": "2026-11-05T10:53:13.6869070Z",
+  "orientationCalibration": "Visual observation in Unity Right side view: muzzle points +Z, top points +Y. Imported origin is below the trigger area and away from the grip. Exact grip/muzzle/sight coordinates and final FPS size remain NOT VERIFIED. VisualPivot remains neutral.",
+  "socketCalibration": "MuzzleFX, GripAnchor, SightAnchor NOT VERIFIED; no sockets created.",
+  "compilationFinished": true,
+  "sourceImported": true,
+  "materialImported": true,
+  "materialInstancingEnabled": false,
+  "existingSceneStateUnchanged": true,
+  "activeSceneUnchanged": true,
+  "shaderErrors": [],
+  "sourceMeshes": [
+    {
+      "name": "model",
+      "assetPath": "Assets/_Project/Models/Weapons/HellsWhisper/Model/base_basic_pbr.fbx",
+      "assetGuid": "8df9836139d184d3697692f391ba4080",
+      "localFileId": -5668984478841134232,
+      "vertexCount": 702900,
+      "triangleCount": 999994,
+      "indexCount": 2999982,
+      "runtimeMemoryBytes": 91479840,
+      "submeshCount": 1,
+      "vertexBufferCount": 1,
+      "vertexStride0": 48,
+      "indexFormat": "UInt32",
+      "localBoundsCenter": {
+        "x": 1.1391821317374706e-05,
+        "y": -3.6461278796195984e-07,
+        "z": 0.007323774509131908
+      },
+      "localBoundsSize": {
+        "x": 0.004038561135530472,
+        "y": 0.018981613218784332,
+        "z": 0.014647549018263817
+      },
+      "normals": true,
+      "tangents": true,
+      "uv0": true,
+      "readable": false
+    }
+  ],
+  "prefabs": [
+    {
+      "path": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/PF_HellsWhisper_Viewmodel.prefab",
+      "assetGuid": "a0297d31fa8642019626d028625dca00",
+      "nestedModelSource": "Assets/_Project/Models/Weapons/HellsWhisper/Model/base_basic_pbr.fbx",
+      "materialPath": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/MAT_HellsWhisper_PBR_Test.mat",
+      "meshPath": "Assets/_Project/Models/Weapons/HellsWhisper/Model/base_basic_pbr.fbx",
+      "assetDatabaseFound": true,
+      "rootIdentity": true,
+      "visualPivotIdentity": true,
+      "materialMatches": true,
+      "meshMatches": true,
+      "missingScripts": 0,
+      "monoBehaviours": 0,
+      "rigidbodies": 0,
+      "colliders": 0,
+      "animatorCount": 0,
+      "componentTypes": [
+        "UnityEngine.Transform",
+        "UnityEngine.MeshFilter",
+        "UnityEngine.MeshRenderer"
+      ],
+      "hierarchy": [
+        {
+          "path": "PF_HellsWhisper_Viewmodel",
+          "localPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localEulerAngles": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          },
+          "worldPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "lossyScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        {
+          "path": "PF_HellsWhisper_Viewmodel/VisualPivot",
+          "localPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localEulerAngles": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          },
+          "worldPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "lossyScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        {
+          "path": "PF_HellsWhisper_Viewmodel/VisualPivot/ImportedFBX",
+          "localPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localEulerAngles": {
+            "x": 270.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localScale": {
+            "x": 100.0,
+            "y": 100.0,
+            "z": 100.0
+          },
+          "worldPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "lossyScale": {
+            "x": 100.0,
+            "y": 100.00003051757812,
+            "z": 100.00003051757812
+          }
+        }
+      ],
+      "fullHierarchyBoundsCenter": {
+        "x": 0.0011391821317374706,
+        "y": 0.7323775887489319,
+        "z": 3.6373978218762204e-05
+      },
+      "fullHierarchyBoundsSize": {
+        "x": 0.403856098651886,
+        "y": 1.4647554159164429,
+        "z": 1.898161768913269
+      }
+    },
+    {
+      "path": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/PF_HellsWhisper_WorldModel.prefab",
+      "assetGuid": "6c623566d22e48e0b503385de52027c6",
+      "nestedModelSource": "Assets/_Project/Models/Weapons/HellsWhisper/Model/base_basic_pbr.fbx",
+      "materialPath": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/MAT_HellsWhisper_PBR_Test.mat",
+      "meshPath": "Assets/_Project/Models/Weapons/HellsWhisper/Model/base_basic_pbr.fbx",
+      "assetDatabaseFound": true,
+      "rootIdentity": true,
+      "visualPivotIdentity": true,
+      "materialMatches": true,
+      "meshMatches": true,
+      "missingScripts": 0,
+      "monoBehaviours": 0,
+      "rigidbodies": 0,
+      "colliders": 0,
+      "animatorCount": 0,
+      "componentTypes": [
+        "UnityEngine.Transform",
+        "UnityEngine.MeshFilter",
+        "UnityEngine.MeshRenderer"
+      ],
+      "hierarchy": [
+        {
+          "path": "PF_HellsWhisper_WorldModel",
+          "localPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localEulerAngles": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          },
+          "worldPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "lossyScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        {
+          "path": "PF_HellsWhisper_WorldModel/VisualPivot",
+          "localPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localEulerAngles": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          },
+          "worldPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "lossyScale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        {
+          "path": "PF_HellsWhisper_WorldModel/VisualPivot/ImportedFBX",
+          "localPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localEulerAngles": {
+            "x": 270.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "localScale": {
+            "x": 100.0,
+            "y": 100.0,
+            "z": 100.0
+          },
+          "worldPosition": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "lossyScale": {
+            "x": 100.0,
+            "y": 100.00003051757812,
+            "z": 100.00003051757812
+          }
+        }
+      ],
+      "fullHierarchyBoundsCenter": {
+        "x": 0.0011391821317374706,
+        "y": 0.7323775887489319,
+        "z": 3.6373978218762204e-05
+      },
+      "fullHierarchyBoundsSize": {
+        "x": 0.403856098651886,
+        "y": 1.4647554159164429,
+        "z": 1.898161768913269
+      }
+    }
+  ],
+  "scenesBefore": [
+    {
+      "path": "Assets/_Project/Scenes/Gameplay.unity",
+      "name": "Gameplay",
+      "dirty": true,
+      "rootCount": 13,
+      "handle": "568105589213756012"
+    }
+  ],
+  "scenesAfter": [
+    {
+      "path": "Assets/_Project/Scenes/Gameplay.unity",
+      "name": "Gameplay",
+      "dirty": true,
+      "rootCount": 13,
+      "handle": "568105589213756012"
+    }
+  ],
+  "longestAxis": "Z",
+  "visualObservation": {
+    "method": "Unity Prefab Mode, shaded preview and Right side view with axis gizmo and Pivot display",
+    "viewmodelRendered": true,
+    "worldModelRendered": true,
+    "forwardObserved": "+Z",
+    "upObserved": "+Y",
+    "pivotObservation": "Below trigger area, offset from grip; not calibrated to a hand anchor",
+    "gameplayReturnedWithoutSaving": true,
+    "consoleFinalErrors": 0,
+    "consoleFinalWarnings": 0,
+    "consoleOtherMessages": "Unity AI NoSubscription messages logged as informational; no service settings changed",
+    "artisticApproval": "PENDING_USER_REVIEW"
+  }
+}

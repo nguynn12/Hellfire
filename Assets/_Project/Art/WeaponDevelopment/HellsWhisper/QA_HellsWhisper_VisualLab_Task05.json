@@ -1,0 +1,105 @@
+{
+  "status": "LAB_CREATED_SAFETY_AUDIT_FOUND_UNRELATED_MATERIAL_CHANGES",
+  "unityVersion": "6000.5.6f1",
+  "scene": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/SCN_HellsWhisper_VisualLab.unity",
+  "calibrationStatus": "PROVISIONAL test values only; no approved grip or socket coordinates",
+  "statsScope": "Editor aggregate snapshot after two offscreen camera renders; not isolated Game View performance or FPS/GPU timing",
+  "originalSceneStatePreserved": true,
+  "cameraCapturesWritten": true,
+  "scenesBefore": [
+    {
+      "path": "Assets/_Project/Scenes/Gameplay.unity",
+      "handle": "568105589213756012",
+      "dirty": true,
+      "rootCount": 13
+    }
+  ],
+  "scenesAfter": [
+    {
+      "path": "Assets/_Project/Scenes/Gameplay.unity",
+      "handle": "568105589213756012",
+      "dirty": true,
+      "rootCount": 13
+    }
+  ],
+  "viewmodel": {
+    "prefabSource": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/PF_HellsWhisper_Viewmodel.prefab",
+    "meshSource": "Assets/_Project/Models/Weapons/HellsWhisper/Model/base_basic_pbr.fbx",
+    "materialSource": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/MAT_HellsWhisper_PBR_Test.mat",
+    "vertices": 702900,
+    "triangles": 999994,
+    "nestedLinkIntact": true,
+    "materialCorrect": true,
+    "modelInFrontOfCamera": true,
+    "nearestBoundsDepth": 0.3101910948753357
+  },
+  "worldModel": {
+    "prefabSource": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/PF_HellsWhisper_WorldModel.prefab",
+    "meshSource": "Assets/_Project/Models/Weapons/HellsWhisper/Model/base_basic_pbr.fbx",
+    "materialSource": "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/MAT_HellsWhisper_PBR_Test.mat",
+    "vertices": 702900,
+    "triangles": 999994,
+    "nestedLinkIntact": true,
+    "materialCorrect": true,
+    "modelInFrontOfCamera": true,
+    "nearestBoundsDepth": 4.258270263671875
+  },
+  "initialCameraLocalPosition": {
+    "x": 0.25,
+    "y": -0.20000000298023224,
+    "z": 0.5
+  },
+  "initialUniformScale": 0.20000000298023224,
+  "fpsFov": 90.0,
+  "nearClip": 0.05000000074505806,
+  "farClip": 30.0,
+  "editorStats": [
+    "triangles=0",
+    "vertices=0",
+    "batches=NOT AVAILABLE",
+    "drawCalls=0",
+    "setPassCalls=0"
+  ],
+  "visualValidation": {
+    "fpsCaptureOpenedAndInspected": true,
+    "worldCaptureOpenedAndInspected": true,
+    "editorWindowRefreshTested": true,
+    "rotationYTestDegrees": 15,
+    "resetTested": true,
+    "finalPosition": [
+      0.25,
+      -0.2,
+      0.5
+    ],
+    "finalRotation": [
+      0,
+      0,
+      0
+    ],
+    "finalUniformScale": 0.2,
+    "onlyLabSavedAfterReset": true,
+    "gameViewBothModelsObserved": true,
+    "additiveGameViewLimitation": "Existing Gameplay screen-space overlay HUD remains visible in Game View. Clean isolated camera renders are available in the lab tool and PNG captures. Existing HUD was not modified.",
+    "finalConsoleErrors": 0,
+    "finalConsoleWarnings": 0,
+    "artisticApproval": "PENDING_USER_REVIEW"
+  },
+  "performanceValidity": {
+    "editorCounterSnapshotValidForDrawCost": false,
+    "reason": "Counters returned zeros after offscreen rendering; not a valid rendering workload measurement.",
+    "twoWeaponInstancesGeometryTriangles": 1999988,
+    "twoWeaponInstancesGeometryVertices": 1405800,
+    "geometryTotalsAreNotFrameRenderingCounters": true,
+    "gpuOrFpsMeasured": false
+  },
+  "sourceIntegrity": {
+    "baselineFilesChecked": 774,
+    "existingFilesChangedDuringTask": [
+      "Assets/_Project/Models/Weapons/ObsidianFang/New Material.mat",
+      "Assets/_Project/Models/Weapons/BoneCrusher/New Material.mat"
+    ],
+    "unchangedFiles": 772,
+    "cause": "UNKNOWN; no automatic revert attempted",
+    "hellsWhisperSourceAndGameplayUnchanged": true
+  }
+}

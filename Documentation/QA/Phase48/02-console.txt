@@ -1,0 +1,39 @@
+[DungeonParameters] seed=286024, grid=36m, Combat X=(16.00, 22.00) Z=(12.00, 18.00), Boss X=(22.00, 26.00) Z=(18.00, 22.00), Safe X=(12.00, 14.00) Z=(12.00, 14.00), enemies=2..4, sample=3m
+[DungeonRoom] (0, 0) Spawn Size=12.86x12.80m
+[DungeonRoom] (-1, 0) Combat Size=16.01x15.90m
+[DungeonRoom] (1, 0) Combat Size=16.01x15.90m
+[DungeonRoom] (2, 0) Combat Size=16.92x15.04m
+[DungeonRoom] (2, 1) Shop Size=12.27x12.81m
+[DungeonRoom] (3, 0) Upgrade Size=13.97x12.14m
+[DungeonRoom] (0, 1) Combat Size=19.59x13.80m
+[DungeonRoom] (1, 1) Combat Size=18.97x16.25m
+[DungeonRoom] (1, -1) Treasure Size=13.08x12.59m
+[DungeonRoom] (1, 2) Combat Size=19.48x12.42m
+[DungeonRoom] (2, -1) Combat Size=16.82x14.43m
+[DungeonRoom] (0, -1) Combat Size=19.59x13.80m
+[DungeonRoom] (0, -2) Combat Size=20.87x14.12m
+[DungeonRoom] (3, -1) Boss Size=22.95x18.31m
+[DungeonCorridor] (0, 0)->(-1, 0) length=21.57m
+[DungeonCorridor] (0, 0)->(1, 0) length=21.57m
+[DungeonCorridor] (1, 0)->(2, 0) length=19.54m
+[DungeonCorridor] (2, 0)->(2, 1) length=22.08m
+[DungeonCorridor] (2, 0)->(3, 0) length=20.56m
+[DungeonCorridor] (0, 0)->(0, 1) length=22.70m
+[DungeonCorridor] (1, 0)->(1, 1) length=19.92m
+[DungeonCorridor] (1, 0)->(1, -1) length=21.76m
+[DungeonCorridor] (1, 1)->(1, 2) length=21.66m
+[DungeonCorridor] (2, 0)->(2, -1) length=21.27m
+[DungeonCorridor] (0, 0)->(0, -1) length=22.70m
+[DungeonCorridor] (0, -1)->(0, -2) length=22.04m
+[DungeonCorridor] (2, -1)->(3, -1) length=16.12m
+[DungeonManager] Client 0 đã sẵn sàng hầm ngục (1/1).
+[DungeonManager] Đủ toàn bộ 1 client! Mở cổng hầm ngục theo thứ tự (a) -> (b) -> (c).
+[DungeonManager] Đã spawn ShopStation tại tâm phòng Shop (2, 1) ((72.00, 0.08, 36.00))
+[DungeonManager] Đã spawn InteractiveShrine (ID: 3000) tại tâm phòng Upgrade (3, 0) ((108.00, 0.08, 0.00))
+[DungeonManager] Đã spawn LootChest 1/2 tại phòng Treasure (1, -1) ((33.50, 0.08, -36.00))
+[DungeonManager] Đã spawn LootChest 2/2 tại phòng Treasure (1, -1) ((38.50, 0.08, -36.00))
+[GameManager] Chuyển trạng thái game: Generating -> Playing
+[SceneAudit] Playing before first lock: EnemyStateMachine=0
+[Phase48QA] Real Host flow reached Playing: enemies=0; ready=1; seed=286024
+[Phase48QA] Rooms=14; shortest corridor=16.12m; grid=36m
+Console quan sát: 52 logs, 6 warnings, 0 errors.

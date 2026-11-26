@@ -32,13 +32,13 @@ namespace Hellfire.UI
         [Header("Tips (Mục 16.4: tối thiểu 6 mẹo tiếng Việt)")]
         private static readonly string[] GameplayTips = new string[]
         {
-            "💡 Mẹo: Bắn vào đầu (Headshot) gây sát thương gấp đôi lên hầu hết mọi loại quái vật!",
-            "💡 Mẹo: Hãy luôn đi cùng đồng đội. Khi đồng đội gục, tiến lại gần và giữ phím E để cứu!",
-            "💡 Mẹo: Nhặt các bùa lợi (Power-Up) trong phòng để tăng tốc độ chạy, tăng máu hoặc nhận Khiên Bất Tử 8s!",
-            "💡 Mẹo: Nhấn phím Tab để bật Bản đồ hầm ngục và kiểm tra vị trí phòng Boss bất cứ lúc nào!",
-            "💡 Mẹo: Súng sẽ tự động nạp khi hết đạn, nhưng chủ động bấm R nạp trước sẽ giúp bạn an toàn hơn!",
-            "💡 Mẹo: Ở Pha 2, Chúa Tể Địa Ngục sẽ di chuyển nhanh hơn, bắn cầu lửa và liên tục triệu hồi tay sai!",
-            "💡 Mẹo: Bạn có thể tùy chỉnh góc nhìn FOV (70-110), âm lượng và bật Giảm Rung Màn Hình trong Cài đặt!"
+            "Mẹo: Bắn vào đầu (Headshot) gây sát thương gấp đôi lên hầu hết mọi loại quái vật!",
+            "Mẹo: Hãy luôn đi cùng đồng đội. Khi đồng đội gục, tiến lại gần và giữ phím E để cứu!",
+            "Mẹo: Nhặt các bùa lợi (Power-Up) trong phòng để tăng tốc độ chạy, tăng máu hoặc nhận Khiên Bất Tử 8s!",
+            "Mẹo: Nhấn phím Tab để bật Bản đồ hầm ngục và kiểm tra vị trí phòng Boss bất cứ lúc nào!",
+            "Mẹo: Súng sẽ tự động nạp khi hết đạn, nhưng chủ động bấm R nạp trước sẽ giúp bạn an toàn hơn!",
+            "Mẹo: Ở Pha 2, Chúa Tể Địa Ngục sẽ di chuyển nhanh hơn, bắn cầu lửa và liên tục triệu hồi tay sai!",
+            "Mẹo: Bạn có thể tùy chỉnh góc nhìn FOV (70-110), âm lượng và bật Giảm Rung Màn Hình trong Cài đặt!"
         };
 
         private int _currentTipIndex = 0;

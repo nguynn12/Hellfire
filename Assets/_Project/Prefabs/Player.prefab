@@ -755,6 +755,7 @@ GameObject:
   - component: {fileID: 6316514081456841377}
   - component: {fileID: 1912518411114849863}
   - component: {fileID: 4142404767945708372}
+  - component: {fileID: 140014000001}
   m_Layer: 7
   m_Name: WeaponViewmodel
   m_TagString: Untagged
@@ -974,3 +975,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.HitboxIdentifier
   _hitboxType: 0
   _damageableTarget: {fileID: 8148796173920827955}
+--- !u!114 &140014000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6457979424595455948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 75fade557d0c4d038e5ff41e2fe5f1ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.WeaponDevelopment.HellsWhisperReloadPresenter
+  _controller: {fileID: 9060686978780575275}
+  _camera: {fileID: 3801938197726472895}
+  _presentation: {fileID: 11400000, guid: 3cb4d20e16cf44a3a5b25801b6faee58, type: 2}
+  _fallbackRenderer: {fileID: 5734774103955328913}

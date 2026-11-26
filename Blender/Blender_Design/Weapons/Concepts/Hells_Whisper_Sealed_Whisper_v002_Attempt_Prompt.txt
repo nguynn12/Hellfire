@@ -1,0 +1,20 @@
+Status: generation failed; no v002 image returned.
+Tool: built-in image_gen.imagegen
+
+Use case: precise-object-edit, game-prop concept refinement.
+Input image is the EDIT TARGET: the approved v001 "HELL'S WHISPER — THE SEALED WHISPER" concept sheet. Produce ONE refined v002 sheet of the SAME fictional NONFUNCTIONAL pistol relic, preserving its recognizable artistic identity, palette, black-iron shell enclosing ancient bone, dark organic grip, restrained subordinate skull heel, and professional painterly hero quality. This is a targeted design-lock refinement, not a redesign or a new weapon. No functional mechanisms, real firearm engineering, internal diagrams, dimensions, glow, runes, chains, new spikes, extra ornament or accessories.
+
+Change these forms consistently across ALL views:
+1. Enlarge the underbody opening substantially in HEIGHT and modestly in length; lower its slender curved lower bridge, open its rear near the grip saddle, and relieve the inward lip. Make a generous clear rounded teardrop opening, not a skinny horizontal slit. Maintain a robust continuous border, no triangular web. Its lateral opening must remain plausibly visible from a rear-oblique FPS-biased direction, not just the side. Do not put a trigger or any moving part inside.
+2. Reduce the forward upper body's slab thickness approximately 15-20 percent VISUALLY, sculpt a clearer upper shoulder/chamfer and gently rounded lower transition, keep its front BLUNT with short end face. Preserve mass and recognizable pistol proportions; no pointed beak, no long thin barrel, no featureless rectangular slab.
+3. Make the grip heel's skull legible through three large forms: restrained brow arch, recessed orbital hollow, tapered cheek/jaw mass. Integrate them into the last portion of the grip contour, no hanging skull, no projecting teeth, no enlargement into a dominant pommel. Keep heel grip width controlled. Make its silhouette contours identical in side and hero.
+4. Use exactly the same placement and relative dimensions of bone crescent, iron retaining lips, grip rake, enlarged underbody opening, heel and front termination across all panels. Keep asymmetry limited to unequal iron retaining lips at the shoulder.
+
+Layout: refined landscape concept sheet on light warm-gray paper. Title "HELL'S WHISPER", subtitle "THE SEALED WHISPER / v002". Four panels:
+- dominant left HERO / ARTISTIC VIEW: a genuine front-side three-quarter view with enough rotation to visibly reveal front-end depth and body width; show the WHOLE prop, softly lit, clear midtones. Better dimensionality than v001's almost-side hero.
+- upper right SIDE / DESIGN STUDY: clean side-elevation-oriented full design view with restrained grayscale/material fills and crisp contour line, not a black silhouette; camera perpendicular to side as an intentional alignment aid, no perspective exaggeration. Show iron-bone division and heel primary forms. Only external design.
+- middle right TOP / DESIGN STUDY: deliberately top-down-oriented full external shape study of the SAME design, clear centerline, readable rear shoulder → waist → compact front, controlled bone/iron overlap, no dramatic perspective. Purpose is shape correspondence rather than engineering accuracy.
+- lower right IRON / BONE / GRIP: tight close-up of the same shoulder saddle where iron folds over bone and meets the grip, making contact and overlap clear.
+Add a very small plain note "Design studies — not measured orthographic drawings". Keep all panels generous and readable, balanced typography, no dense annotations. Reference views must correspond to hero; no alternative variants.
+
+Hierarchy: overall pistol silhouette first, restrained broad iron planes second, skeletal containment and negative space third, textures last. No heavy scratch detail masking uncertain shapes. Hero remains polished; design studies remain clear and useful for subsequent Blender interpretation. All geometry implied is purely decorative and nonfunctional.

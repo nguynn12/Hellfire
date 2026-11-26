@@ -53,6 +53,9 @@ namespace Hellfire.Networking
             NetworkVariableWritePermission.Server
         );
 
+        public NetworkVariable<int> CurrentFloor { get; } = new NetworkVariable<int>(
+            1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
         public event Action<GameState, GameState> OnGameStateChanged;
 
         private float _checkGameOverTimer = 0f;
@@ -165,6 +168,7 @@ namespace Hellfire.Networking
             // Chốt số người chơi một lần khi vào Generating (Mục 15.3)
             if (newState == GameState.Generating)
             {
+                if (IsServer) CurrentFloor.Value = 1; // New run only; no floor transition in section 20.8.
                 int count = NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClients.Count : 1;
                 LockedPlayerCount.Value = Mathf.Clamp(count, 1, 4);
                 Debug.Log($"[GameManager] Chốt số người chơi khi vào Generating: {LockedPlayerCount.Value} người.");

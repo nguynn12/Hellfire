@@ -1,0 +1,75 @@
+{
+    "schemaVersion": 1,
+    "referenceVideo": "",
+    "referenceNotes": "Migrated from Task 07 provisional prototype. No reference video supplied; no artistic approval implied.",
+    "approvalStatus": "PROVISIONAL_NO_REFERENCE",
+    "referenceStartSeconds": 0.0,
+    "referenceEndSeconds": 0.0,
+    "duration": 2.2,
+    "motionIntensity": 1.0,
+    "prepareEnd": 0.25,
+    "rechargeEnd": 0.6499999761581421,
+    "vfxEnabled": true,
+    "particleCount": 40,
+    "particleRadius": 0.6499999761581421,
+    "vfxFadeInFraction": 0.25,
+    "vfxReturnFadeFraction": 0.6571428775787354,
+    "keys": [
+        {
+            "time": 0.0,
+            "positionOffset": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotationDegrees": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "interpolation": 0
+        },
+        {
+            "time": 0.25,
+            "positionOffset": {
+                "x": -0.11999999731779099,
+                "y": -0.4000000059604645,
+                "z": -0.10000000149011612
+            },
+            "rotationDegrees": {
+                "x": 12.0,
+                "y": -8.0,
+                "z": -18.0
+            },
+            "interpolation": 0
+        },
+        {
+            "time": 0.6499999761581421,
+            "positionOffset": {
+                "x": -0.11999999731779099,
+                "y": -0.4000000059604645,
+                "z": -0.10000000149011612
+            },
+            "rotationDegrees": {
+                "x": 12.0,
+                "y": -8.0,
+                "z": -18.0
+            },
+            "interpolation": 0
+        },
+        {
+            "time": 1.0,
+            "positionOffset": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotationDegrees": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "interpolation": 0
+        }
+    ]
+}

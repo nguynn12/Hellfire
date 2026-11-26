@@ -1,0 +1,66 @@
+SCENE Assets/_Project/Scenes/Gameplay.unity name=Gameplay dirty=True roots=13
+  Directional Light
+  EventSystem
+  HUDCanvas
+  HUDCanvas/GameplayHUD
+  HUDCanvas/Crosshair
+  HUDCanvas/PlayerInfoText
+  HUDCanvas/PauseMenuPanel
+  HUDCanvas/PauseMenuPanel/PauseBox
+  HUDCanvas/PauseMenuPanel/PauseBox/PauseTitle
+  HUDCanvas/PauseMenuPanel/PauseBox/ResumeButton
+  HUDCanvas/PauseMenuPanel/PauseBox/ResumeButton/Text
+  HUDCanvas/PauseMenuPanel/PauseBox/LeaveGameButton
+  HUDCanvas/PauseMenuPanel/PauseBox/LeaveGameButton/Text
+  HUDCanvas/Hitmarker
+  HUDCanvas/HealthPanel
+  HUDCanvas/HealthPanel/HealthSlider
+  HUDCanvas/HealthPanel/HealthSlider/Background
+  HUDCanvas/HealthPanel/HealthSlider/Fill Area
+  HUDCanvas/HealthPanel/HealthSlider/Fill Area/Fill
+  HUDCanvas/HealthPanel/HealthText
+  HUDCanvas/AmmoPanel
+  HUDCanvas/AmmoPanel/WeaponNameText
+  HUDCanvas/AmmoPanel/WeaponNameText/TMP SubMeshUI [LiberationSans SDF Material + LiberationSans SDF Atlas]
+  HUDCanvas/AmmoPanel/AmmoText
+  HUDCanvas/AmmoPanel/AmmoText/TMP SubMeshUI [LiberationSans SDF Material + LiberationSans SDF Atlas]
+  HUDCanvas/AmmoPanel/ReloadPromptText
+  HUDCanvas/RevivePromptPanel
+  HUDCanvas/RevivePromptPanel/RevivePromptText
+  HUDCanvas/RevivePromptPanel/ReviveProgressBar
+  HUDCanvas/RevivePromptPanel/ReviveProgressBar/Background
+  HUDCanvas/RevivePromptPanel/ReviveProgressBar/Fill Area
+  HUDCanvas/RevivePromptPanel/ReviveProgressBar/Fill Area/Fill
+  HUDCanvas/DownedOverlayPanel
+  HUDCanvas/DownedOverlayPanel/DownedTimerText
+  TestEnemyImp_1
+  TestEnemyImp_1/Model
+  TestEnemyImp_1/Hitboxes
+  TestEnemyImp_1/Hitboxes/Hitbox_Head
+  TestEnemyImp_1/Hitboxes/Hitbox_Torso
+  TestEnemyImp_1/Hitboxes/Hitbox_Limbs
+  TestEnemyImp_2
+  TestEnemyImp_2/Model
+  TestEnemyImp_2/Hitboxes
+  TestEnemyImp_2/Hitboxes/Hitbox_Head
+  TestEnemyImp_2/Hitboxes/Hitbox_Torso
+  TestEnemyImp_2/Hitboxes/Hitbox_Limbs
+  TestEnemyImp_3
+  TestEnemyImp_3/Model
+  TestEnemyImp_3/Hitboxes
+  TestEnemyImp_3/Hitboxes/Hitbox_Head
+  TestEnemyImp_3/Hitboxes/Hitbox_Torso
+  TestEnemyImp_3/Hitboxes/Hitbox_Limbs
+  TestEnemyImp_4
+  TestEnemyImp_4/Model
+  TestEnemyImp_4/Hitboxes
+  TestEnemyImp_4/Hitboxes/Hitbox_Head
+  TestEnemyImp_4/Hitboxes/Hitbox_Torso
+  TestEnemyImp_4/Hitboxes/Hitbox_Limbs
+  DungeonManager
+  base_basic_pbr
+  base_basic_pbr (1)
+  base_basic_pbr (2)
+  base_basic_pbr (3)
+  base_basic_pbr (4)
+SCENE  name= dirty=False roots=0

@@ -399,8 +399,8 @@ namespace Hellfire.UI
                         bool isReady = identity.IsReady.Value;
 
                         string statusTag = isSlotHost
-                            ? "<color=#00FF00>[✓ Chủ phòng]</color>"
-                            : (isReady ? "<color=#00FF00>[✓ Sẵn sàng]</color>" : "<color=#FFA500>[Chưa sẵn sàng]</color>");
+                            ? "<color=#00FF00>[Chủ phòng]</color>"
+                            : (isReady ? "<color=#00FF00>[Sẵn sàng]</color>" : "<color=#FFA500>[Chưa sẵn sàng]</color>");
 
                         string youTag = isLocal ? " (Bạn)" : "";
 

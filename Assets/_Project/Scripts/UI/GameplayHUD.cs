@@ -78,6 +78,11 @@ namespace Hellfire.UI
         [Header("Souls (Mục 17.7)")]
         [SerializeField] private TextMeshProUGUI _soulsText;
 
+        [SerializeField] private TextMeshProUGUI _floorText;
+        private GameManager _floorGameManager;
+        private TextMeshProUGUI _staminaText;
+        private int _lastStaminaPercent = -1;
+
         [Header("Dungeon Map (Mục 16.8)")]
         [SerializeField] private DungeonMapUI _dungeonMapUI;
 
@@ -95,6 +100,20 @@ namespace Hellfire.UI
         private Coroutine _hitmarkerCoroutine;
         private Coroutine _buffToastCoroutine;
         private float _lastHeartbeatTime = 0f;
+
+        private void UpdateSprintStamina()
+        {
+            if (_staminaText == null) return;
+            var movement = PlayerMovement.LocalInstance;
+            int percent = movement == null ? 100 : Mathf.RoundToInt(movement.StaminaFraction * 100f);
+            bool visible = percent < 100 && !_isPaused &&
+                (_localPlayerHealth == null || (!_localPlayerHealth.IsDowned.Value && !_localPlayerHealth.IsDead.Value));
+            if (_staminaText.gameObject.activeSelf != visible)
+                _staminaText.gameObject.SetActive(visible);
+            if (!visible || percent == _lastStaminaPercent) return;
+            _lastStaminaPercent = percent;
+            _staminaText.SetText("Thể lực {0:0}%", percent);
+        }
 
         private void Awake()
         {
@@ -183,6 +202,35 @@ namespace Hellfire.UI
             if (_soulsText == null && canvas != null)
             {
                 _soulsText = CreateSoulsText(canvas.transform);
+            }
+
+            if (_floorText == null && canvas != null)
+            {
+                var floorObj = new GameObject("FloorText", typeof(RectTransform), typeof(TextMeshProUGUI));
+                floorObj.transform.SetParent(canvas.transform, false);
+                _floorText = floorObj.GetComponent<TextMeshProUGUI>();
+                _floorText.fontSize = 22f; _floorText.color = new Color(.85f, .85f, .85f);
+                _floorText.raycastTarget = false;
+                var rect = floorObj.GetComponent<RectTransform>();
+                rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1, 1);
+                rect.anchoredPosition = new Vector2(-25, -60); rect.sizeDelta = new Vector2(150, 35);
+                _floorText.alignment = TextAlignmentOptions.TopRight;
+            }
+
+            if (_staminaText == null && canvas != null)
+            {
+                var label = new GameObject("StaminaText", typeof(RectTransform), typeof(TextMeshProUGUI));
+                label.transform.SetParent(canvas.transform, false);
+                _staminaText = label.GetComponent<TextMeshProUGUI>();
+                _staminaText.fontSize = 19f;
+                _staminaText.color = new Color(.88f, .83f, .64f);
+                _staminaText.raycastTarget = false;
+                _staminaText.alignment = TextAlignmentOptions.Bottom;
+                var rect = _staminaText.rectTransform;
+                rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(.5f, 0f);
+                rect.anchoredPosition = new Vector2(0f, 24f);
+                rect.sizeDelta = new Vector2(180f, 29f);
+                label.SetActive(false);
             }
 
             // Teammate Panel (Mục 16.2)
@@ -376,7 +424,9 @@ namespace Hellfire.UI
 
         private void Update()
         {
+            BindFloorLabel();
             TryBindLocalPlayer();
+            UpdateSprintStamina();
             UpdatePlayerInfo();
             UpdateLowHealthPulse();
 
@@ -605,8 +655,27 @@ namespace Hellfire.UI
             }
         }
 
+        private void BindFloorLabel()
+        {
+            var manager = GameManager.Instance;
+            if (_floorGameManager == manager) return;
+            if (_floorGameManager != null) _floorGameManager.CurrentFloor.OnValueChanged -= UpdateFloorLabel;
+            _floorGameManager = manager;
+            if (_floorGameManager != null)
+            {
+                _floorGameManager.CurrentFloor.OnValueChanged += UpdateFloorLabel;
+                UpdateFloorLabel(0, _floorGameManager.CurrentFloor.Value);
+            }
+        }
+
+        private void UpdateFloorLabel(int previous, int current)
+        {
+            if (_floorText != null) _floorText.text = $"Tầng {current}";
+        }
+
         private void OnDestroy()
         {
+            if (_floorGameManager != null) _floorGameManager.CurrentFloor.OnValueChanged -= UpdateFloorLabel;
             if (_localPlayerHealth != null)
             {
                 _localPlayerHealth.OnHealthChanged -= HandleHealthChanged;

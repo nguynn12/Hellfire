@@ -1,0 +1,11 @@
+{
+  "status": "EXPERIMENTAL_NOT_APPROVED",
+  "uniformScaleMultiplier": 1.25,
+  "cameraLocalAnchorOffset": {
+    "x": -0.04,
+    "y": 0,
+    "z": 0
+  },
+  "fov": 90,
+  "persistToScene": false
+}

@@ -521,6 +521,12 @@ Danh sách nhanh để kiểm tra khi code hoặc review code — nếu vi phạ
 - [ ] Đạn dự trữ VẪN VÔ HẠN (mục 18, 19.3); không có đạn dự trữ hữu hạn trong `WeaponController`/`RuntimeWeapon`.
 - [ ] Cảm giác súng của Benz (WeaponSwayBobbing, WeaponRecoil, WeaponAimDownSights, WeaponMotionCoordinator) được gắn vào `Player.prefab` THẬT và chỉ chạy phía chủ sở hữu (thuần hình ảnh); hitscan vẫn do Server xác nhận (mục 19.2).
 - [ ] `RangedZombieAI` có prefab chính thức, đã đăng ký NetworkPrefabs và nằm trong bảng trọng số spawn của phòng Combat (mục 19.4).
+- [ ] Scene `Gameplay.unity` KHÔNG chứa quái, vật cản, rương, tế đàn nào đặt sẵn: mọi thứ đó do `DungeonManager` sinh lúc chạy. Trước khi phòng nào khóa, số quái đang tồn tại phải bằng 0 (mục 20.0).
+- [ ] Sau khi đổi bất kỳ `[SerializeField]` mặc định nào, PHẢI kiểm tra lại giá trị đã lưu trong scene (scene ghi đè mặc định trong code) (mục 20.1).
+- [ ] Phòng Combat là hình chữ nhật với kích thước riêng từng phòng; hành lang dài tối thiểu 10 m, không quái, không vật cản (mục 20.2, 20.4).
+- [ ] Phòng Combat có chủ đề (hầm rượu, hầm mộ, lò rèn, nhà ngục, mỏ đổ nát), ít vật cản theo đúng bộ của chủ đề, luôn chừa lối vào thông thoáng (mục 20.3).
+- [ ] Số quái gốc mỗi phòng tăng theo `CurrentFloor` (tầng 1: 5–7), nhân hệ số số người chơi; `CurrentFloor` do Server ghi; chưa có chuyển tầng (mục 20.6, 20.8).
+- [ ] Một người vào phòng Combat/Boss thì cả đội còn trong cuộc (kể cả Downed) được dịch chuyển vào theo, cổng khóa, quái spawn (mục 20.5).
 
 ---
 
@@ -821,3 +827,113 @@ Các điểm này **được công nhận là đúng** và thắng các mô tả
 3. Đạn dự trữ vẫn vô hạn: hết băng thì nạp lại được mãi.
 4. Phòng Combat thỉnh thoảng có Zombie tầm xa: nó giữ khoảng cách, bắn có báo trước, chết thì cả đội nhận 8 Linh hồn, tổng kết lượt chơi ghi nhận hạ gục.
 5. Cổng sắt vẫn giữ quái trong phòng, phòng vẫn chỉ mở khi diệt hết (kể cả Zombie tầm xa).
+
+---
+
+## 20. Hiệu chỉnh phòng đánh quái — Giai đoạn 4.8
+
+> **Bối cảnh**: chủ dự án làm rõ lại hướng thiết kế vì bản chạy đang lệch (phòng đánh quái cảm giác như cả bản đồ, nhiều vật cản, quái và vật cản lọt ra hành lang). Mục này **thắng** mục 17.1–17.5 khi mâu thuẫn, và thay thế mục 17.2 (hành lang, ô lưới 26 m), 17.3 (cột) và đoạn "người ngoài bị chặn" ở 17.4.
+
+### 20.0 Dọn tàn dư trong scene — BẮT BUỘC làm đầu tiên
+
+- `Gameplay.unity` đang chứa **4 đối tượng `TestEnemyImp_1..4`** (thực chất là prefab `EnemyImp` chạy `EnemyStateMachine` thật) tại `(0,0,10)`, `(-8,0,12)`, `(8,0,12)`, `(0,0,18)`, tàn dư của đấu trường test Giai đoạn 2. Chúng tồn tại ngay khi vào scene, không thuộc phòng nào, không bị cổng sắt giữ, nên xuất hiện cả ở hành lang.
+- **Xóa** 4 đối tượng này khỏi scene, và **xóa đoạn code Editor đặt chúng** (trong `HellfirePhase2Setup` hoặc script nào khác) để chạy lại setup không sinh lại.
+- Quy tắc cứng: scene `Gameplay.unity` KHÔNG được chứa sẵn bất kỳ prefab quái, vật cản, rương, tế đàn, cửa hàng nào. Tất cả do `DungeonManager`/`DungeonEnemySpawner` sinh lúc chạy. Quét luôn `Lobby.unity` và `MainMenu.unity`.
+- Tiêu chí: ngay sau khi vào `Playing` và trước khi bất kỳ phòng nào khóa, số `EnemyStateMachine` đang tồn tại bằng 0.
+
+### 20.1 Giá trị trong scene ghi đè mặc định trong code — BẮT BUỘC
+
+- Giá trị `[SerializeField]` đã lưu trong scene/prefab **thắng** giá trị mặc định viết trong code. Ví dụ `_gridCellSize: 20` đang lưu trong `Gameplay.unity` nên mặc định 26 ở mục 17.2 chưa từng có hiệu lực; `_minEnemiesPerNormalRoom: 2`, `_maxEnemiesPerNormalRoom: 4` cũng đang được lưu.
+- Mỗi lần đổi một mặc định, PHẢI cập nhật hoặc xóa giá trị đã lưu trong scene tương ứng, rồi **đọc lại file `.unity` để xác minh**.
+- Khi sinh bản đồ, in một dòng log các tham số hiệu lực (kích thước phòng, ô lưới, số quái mỗi phòng) để dễ kiểm tra.
+
+### 20.2 Phòng hình chữ nhật, vừa phải, hành lang đủ dài
+
+- Mỗi phòng có kích thước riêng (rộng X × sâu Z, mét), chọn **tất định** bằng `System.Random` dựng từ seed và tọa độ lưới của phòng (giống nhau trên mọi máy). Thêm trường `Size` (Vector2) vào `DungeonRoomNode`.
+- Khoảng kích thước (`[SerializeField]`, mặc định):
+
+| Loại phòng | Rộng (X) | Sâu (Z) |
+|---|---|---|
+| Combat | 16–22 | 12–18 |
+| Boss | 22–26 | 18–22 |
+| Spawn, Upgrade, Treasure, Shop | 12–14 | 12–14 |
+
+- Chiều cao tường giữ 4,5 m. Cửa ở **giữa mỗi cạnh** có kết nối, rộng `_corridorWidth` (4 m).
+- `_gridCellSize` mặc định **36** (đã sửa cả trong scene theo mục 20.1). Ràng buộc: `_gridCellSize >= kích thước lớn nhất của một phòng + 10`; vi phạm thì `Debug.LogError` và tự nâng lên.
+- Chiều dài hành lang = khoảng cách hai mặt tường đối diện dọc trục nối = `_gridCellSize − (nửa kích thước phòng A theo trục) − (nửa kích thước phòng B theo trục)`, **tối thiểu 10 m**.
+- Mọi chỗ đang dùng `_roomSize`/`RoomSize` PHẢI chuyển sang kích thước riêng của từng phòng: sàn, bốn tường và chỗ khoét cửa, khung cửa, cổng sắt, vùng "lõi" khóa phòng (cạnh − 3 m), vùng ngưỡng cửa, vùng spawn quái, vị trí tế đàn/rương/cửa hàng, ô vẽ trên bản đồ Tab (mục 16.8), và kiểm tra `GetValidSpawnPosition`.
+
+### 20.3 Chủ đề phòng và vật cản — ít, đa dạng, không cản đường
+
+- Mỗi phòng `Combat` có một **chủ đề (theme)** do Server chọn **tất định** bằng `System.Random` dựng từ seed và tọa độ lưới (giống nhau trên mọi máy). Chủ đề quyết định **bộ vật cản** của phòng và **tông màu** sàn/tường. Phòng an toàn, phòng Boss và hành lang KHÔNG có vật cản (phòng Boss thêm sau).
+- Chủ đề là dữ liệu: `ScriptableObject` `RoomThemeData` gồm tên, tông màu sàn, tông màu tường, và danh sách `ObstacleDef`. Mỗi `ObstacleDef` gồm: `id`, `weight`, hình khối (Box / Cylinder / Capsule), kích thước, màu/chất liệu, số lượng trong cụm (min–max) và bán kính cụm, tùy chọn ánh sáng phát ra (màu, tầm), và **prefab tùy chọn** (rỗng thì dựng bằng primitive). Thêm chủ đề mới chỉ cần thêm asset, không sửa code.
+- **Năm chủ đề mặc định** (kích thước tính bằng mét, rộng × cao × sâu; cụm = số vật thể giống nhau đặt sát nhau):
+
+| Chủ đề | Vật cản (trọng số) |
+|---|---|
+| **Hầm rượu** | Thùng rượu: trụ Ø0,9 × 1,1, cụm 1–3 (40); Giá rượu: hộp 2,4 × 1,8 × 0,6 (20); Thùng gỗ: hộp 1 × 1 × 1, cụm 1–2, được xếp chồng tối đa 2 tầng (25); Bàn gỗ: hộp 2 × 0,9 × 1 (15) |
+| **Hầm mộ** | Cột đá: hộp 1,8 × 4 × 1,8 (30); Quan tài đá: hộp 2,2 × 0,9 × 1 (30); Tượng đá: bệ 1,2 × 0,6 × 1,2 cộng thân capsule Ø0,8 × 2,2 (25); Đống xương: 2–3 khối thấp cao 0,5 (15) |
+| **Lò rèn** | Đe: bệ 0,8 × 0,9 × 0,8 cộng đầu 1,4 × 0,4 × 0,6 (25); Lò nung: hộp 2 × 1,6 × 2 có lõi phát sáng đỏ cam và đèn điểm nhỏ, lõi sáng không có collider (30); Xe goòng than: hộp 2 × 1 × 1,2 (30); Cột xích: trụ Ø0,4 × 2 (15) |
+| **Nhà ngục** | Lồng sắt: khung 1,6 × 2,2 × 1,6 (song bằng khối mảnh, collider hộp bao ngoài) (35); Bàn tra tấn: hộp 2,2 × 0,9 × 1 (25); Cọc xích: trụ Ø0,4 × 2 (20); Thùng gỗ: như trên (20) |
+| **Mỏ đổ nát** | Đá đổ vỡ: cụm 1–3 khối thấp xoay lệch, rộng 1,5–2,5, cao 0,6–1,4 (35); Cột gãy: hộp 1,6 × 1,8 × 1,6 xoay lệch (25); Dầm gỗ sập: hộp 3,5 × 0,5 × 0,5 nằm ngang (20); Xe goòng: như trên (20) |
+
+- **Số lượng**: số cụm = `clamp(round(diện tích phòng / 80), 2, 5)`, tối đa 6 vật thể mỗi phòng, tổng diện tích chiếm chỗ không quá 8% diện tích phòng. Mỗi cụm chọn `ObstacleDef` theo trọng số trong chủ đề của phòng.
+- **Đặt chỗ (tất định theo seed, giống nhau trên mọi máy)**: vùng hợp lệ là hình chữ nhật thụt vào 2,5 m so với tường; loại bỏ vị trí nếu (a) nằm trong **hành lang lối vào** của bất kỳ cửa nào (dải rộng 5 m kéo từ cửa vào trong 6 m), (b) cách tâm phòng dưới 3 m, (c) cách vật cản khác dưới 3 m. Thử tối đa 30 lần mỗi cụm, thất bại thì bỏ cụm đó.
+- Vật cản có collider, là con của `DungeonGeometryRoot`, dựng **trước** khi bake NavMesh. Prefab thay thế KHÔNG được có `NetworkObject` và phải có collider tĩnh. Vật cản phát sáng chỉ dùng đèn điểm nhỏ, tối đa 2 đèn mỗi phòng.
+- Tông màu chủ đề áp lên sàn và tường của phòng bằng bản sao chất liệu hoặc `MaterialPropertyBlock` (không sửa asset chất liệu dùng chung). Đây là mức **NÊN**; nếu tốn công thì bỏ, chủ đề vẫn có hiệu lực qua bộ vật cản.
+
+### 20.4 Hành lang
+
+- Hành lang **không bao giờ** có quái, vật cản, rương hay bất kỳ thứ gì spawn. Mọi vị trí spawn quái nằm trong hình chữ nhật sàn của đúng phòng đó.
+- **NÊN** có bảo vệ phụ: Server mỗi 1 giây kiểm tra quái của phòng `Locked`; quái nào nằm ngoài hình chữ nhật phòng (cộng lề 1 m) thì đưa về điểm hợp lệ trong phòng (`SamplePosition`).
+
+### 20.5 Khóa phòng kéo cả đội vào — thay thế đoạn liên quan ở 17.4
+
+Áp dụng cho phòng `Combat` và `Boss`. Trạng thái `Idle → Locked → Cleared` và điều kiện kích hoạt (người chơi còn sống, không `Downed` bước vào vùng lõi) giữ nguyên. Khi kích hoạt, Server làm theo thứ tự:
+
+1. Chọn `entrant` = người chơi kích hoạt (nếu nhiều người cùng lúc thì chọn `clientId` nhỏ nhất); đặt trạng thái trung gian để không kích hoạt hai lần.
+2. Với **mọi người chơi còn trong cuộc (không `Dead`), kể cả `Downed`**, đang ở ngoài phòng này (hành lang, phòng khác, ngưỡng cửa): dịch chuyển vào trong phòng qua `TeleportOwnerClientRpc` (mục 2.1.1). Vị trí đích: điểm hợp lệ (`SamplePosition`, 3 m) trong bán kính 2–4 m quanh `entrant`, nằm trong vùng lõi, các người cách nhau ít nhất 1,5 m. Người đã ở trong phòng giữ nguyên. Người `Dead` KHÔNG bị dịch chuyển.
+3. Đợi 0,5 giây cho việc dịch chuyển hoàn tất (do owner-authoritative), rồi hạ cổng (`SetRoomGatesClientRpc`), rồi sau 0,8 giây spawn quái (giữ nguyên 17.4/17.5). Phòng `Boss` đặt `GameState = BossFight` ở bước này.
+4. Sau khi khóa, **không còn ai bị bỏ ở ngoài**. Điều kiện mở phòng và thưởng giữ như 17.4. Phòng an toàn (Upgrade, Treasure, Shop) và phòng đã `Cleared` KHÔNG kéo ai.
+5. **NÊN** hiện thông báo ngắn "Cả đội được triệu vào phòng!" cho mọi người.
+
+### 20.6 Số quái theo tầng và vị trí spawn (thay phần số lượng của 17.5)
+
+- **Số quái gốc mỗi phòng Combat tăng theo tầng** (`CurrentFloor`, mục 20.8): tầng `f` có `rng.Next(min_f, max_f + 1)` con, với `min_f = 5 + 2 × (f − 1)` và `max_f = 7 + 2 × (f − 1)`. Tầng 1: 5–7; tầng 2: 7–9; tầng 3: 9–11... Các tham số `_baseMin = 5`, `_baseMax = 7`, `_enemiesPerFloorStep = 2` là `[SerializeField]`.
+- Số gốc này **nhân hệ số số người chơi ở mục 15.3** (0,7 / 1,0 / 1,4 / 1,8), làm tròn, tối thiểu 1, tối đa `_maxEnemiesPerRoom` (mặc định 14). Sửa cả giá trị đã lưu trong scene (mục 20.1), đang lưu 2–4.
+- Loại quái và chỉ số (máu, sát thương) **chưa đổi theo tầng** ở bản này; chỉ có số lượng.
+- Vị trí: trong vùng lõi phòng, cách tường tối thiểu 2 m, cách vật cản tối thiểu 1,5 m, cách mọi người chơi tối thiểu 5 m, qua `NavMesh.SamplePosition` (mục 15.2).
+
+### 20.7 Tiêu chí nghiệm thu (test 2–4 máy)
+
+1. Vào `Gameplay` khi chưa khóa phòng nào: không có quái nào trong scene (kể cả ở hành lang).
+2. Hành lang dài từ 10 m trở lên, nhìn rõ, không có quái hay vật cản.
+3. Các phòng Combat có kích thước hình chữ nhật khác nhau (xem log tham số) và chủ đề khác nhau; mỗi phòng 2–5 cụm vật cản đúng bộ vật cản của chủ đề (ví dụ hầm rượu có thùng, giá rượu; hầm mộ có quan tài, tượng); lối vào luôn thông thoáng; đi lại và bắn thoải mái.
+4. Một người bước vào phòng Combat: cả đội (kể cả người `Downed`) được dịch chuyển vào quanh người đó, cổng đóng, quái spawn; không ai còn ở ngoài. Người `Dead` không bị kéo.
+5. Diệt hết quái thì cổng mở; phòng an toàn không khóa và không kéo ai.
+6. Kích thước phòng, chủ đề và vị trí vật cản **giống hệt nhau** trên mọi máy cùng seed.
+7. Tầng 1: mỗi phòng Combat có 5–7 quái gốc (nhân hệ số số người chơi). Đổi `CurrentFloor` thành 2 thì số quái gốc là 7–9.
+
+### 20.8 Khái niệm "tầng" (Floor) — chỉ phần nền, chưa chuyển tầng
+
+- `GameManager` giữ `NetworkVariable<int> CurrentFloor`, **chỉ Server ghi**, bằng **1** khi bắt đầu mỗi lượt chơi mới. Mọi mã phụ thuộc độ khó theo tầng (số quái ở mục 20.6) PHẢI đọc giá trị này, KHÔNG được ghi cứng "tầng 1".
+- HUD **NÊN** hiện nhãn nhỏ "Tầng N" ở góc màn hình.
+- **Chưa có cơ chế chuyển tầng.** Phòng xuống lòng đất sẽ thiết kế sau (mục 21.1), nên hiện tại ván chơi vẫn là một tầng. AI/lập trình viên KHÔNG ĐƯỢC tự làm phòng xuống tầng, tự đổi `CurrentFloor`, hay tự quyết hành vi sau khi hạ boss.
+
+---
+
+## 21. Ghi nhận để làm sau (CHƯA LÀM, không được tự triển khai)
+
+> Chủ dự án nhắc lại từ trí nhớ về game Hellhole trên Roblox. Các mục dưới đây chỉ để không bị quên; chưa có thiết kế nên AI KHÔNG ĐƯỢC tự bịa và code.
+
+### 21.1 Phòng xuống lòng đất (để qua tầng kế tiếp)
+
+- Một loại phòng riêng dẫn xuống tầng sau. Thiết kế chi tiết để sau. Các câu hỏi còn mở khi thiết kế: phòng này nằm ở đâu trong sơ đồ; mở khi nào (sau khi hạ boss hay mỗi tầng đều có); cả đội phải cùng xuống hay chỉ cần một người; hạ boss thì thắng hẳn (`Victory`) hay dẫn xuống tầng kế; seed của tầng sau; tầng cuối là tầng nào; chỉ số, bùa lợi và Linh hồn có giữ khi xuống tầng không (đặc tả gốc ghi "qua màn với chỉ số mạnh hơn").
+- Tiền đề đã có: `CurrentFloor` (mục 20.8).
+
+### 21.2 Giao diện và luồng menu (tham khảo Hellhole)
+
+- Màn hình chính: tên game, **Play**, **Options**, **Settings**, **Quit** (chủ dự án liệt kê Options và Settings là hai mục; chưa rõ khác nhau thế nào, cần làm rõ lúc thiết kế).
+- Bấm Play có **hai chế độ: Đơn và Nhiều người**. Chế độ Đơn là chơi một mình (một người chơi, hệ số số người = 1 theo mục 15.3).
+- Bấm Nhiều người vào **phòng đợi**: giao diện trực quan, **giảm bớt chữ**.
+- Hiện tại `MainMenuUI` và `LobbyUI` đã có theo mục 16.10; chưa thiết kế lại. Làm sau khi gameplay ổn.

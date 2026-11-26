@@ -34,6 +34,12 @@ namespace Hellfire.Player
         [Tooltip("Tốc độ chạy nhanh khi giữ Shift (m/s)")]
         [SerializeField] private float _sprintSpeed = 7.0f;
 
+        [Header("Sprint Stamina")]
+        [SerializeField, Min(1f)] private float _maxStamina = 100f;
+        [SerializeField, Min(1f)] private float _sprintDrainPerSecond = 15f;
+        [SerializeField, Min(1f)] private float _staminaRecoveryPerSecond = 22f;
+        [SerializeField, Min(0f)] private float _staminaRecoveryDelay = 0.65f;
+
         [Tooltip("Hệ số tốc độ khi đi lùi (70% walkSpeed)")]
         [SerializeField] private float _backwardMultiplier = 0.7f;
 
@@ -67,6 +73,7 @@ namespace Hellfire.Player
         public float WalkSpeed => _walkSpeed;
         public float SprintSpeed => _sprintSpeed;
         public Camera PlayerCamera => _playerCamera;
+        public float StaminaFraction => _stamina / Mathf.Max(1f, _maxStamina);
         public bool IsOnlineMode
         {
             get => _isOnlineMode;
@@ -84,6 +91,9 @@ namespace Hellfire.Player
         private PlayerBuffManager _buffManager;
         private Vector3 _originalCamLocalPos;
         private Coroutine _shakeCoroutine;
+        private float _stamina;
+        private float _staminaRecoveryAt;
+        private bool _staminaExhausted;
 
         private void Reset()
         {
@@ -100,6 +110,7 @@ namespace Hellfire.Player
 
         private void Awake()
         {
+            _stamina = _maxStamina;
             AutoResolveReferences();
             if (GameModeHelper.IsOffline || IsOwner)
             {
@@ -393,8 +404,9 @@ namespace Hellfire.Player
             moveInput = moveInput.normalized;
 
             // 2. Xác định tốc độ (đi bộ, chạy nhanh, đi lùi)
-            bool isSprinting = Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+            bool wantsSprint = Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
             bool isMovingBackward = moveInput.y < -0.1f;
+            bool isSprinting = UpdateSprintStamina(wantsSprint && !isMovingBackward && moveInput.sqrMagnitude > 0.01f);
 
             float currentSpeed;
             if (isMovingBackward)
@@ -402,7 +414,7 @@ namespace Hellfire.Player
                 // Đi lùi: 70% walkSpeed (Mục 1.3)
                 currentSpeed = _walkSpeed * _backwardMultiplier;
             }
-            else if (isSprinting && moveInput.sqrMagnitude > 0.01f)
+            else if (isSprinting)
             {
                 currentSpeed = _sprintSpeed;
             }
@@ -447,6 +459,25 @@ namespace Hellfire.Player
             // 6. Di chuyển CharacterController
             Vector3 velocity = moveDirection * currentSpeed + Vector3.up * _verticalVelocity;
             _characterController.Move(velocity * Time.deltaTime);
+        }
+
+        private bool UpdateSprintStamina(bool wantsSprint)
+        {
+            if (wantsSprint && !_staminaExhausted && _stamina > 0f)
+            {
+                _stamina = Mathf.Max(0f, _stamina - _sprintDrainPerSecond * Time.deltaTime);
+                _staminaRecoveryAt = Time.time + _staminaRecoveryDelay;
+                _staminaExhausted = _stamina <= 0f;
+                return true;
+            }
+
+            if (Time.time >= _staminaRecoveryAt)
+                _stamina = Mathf.Min(_maxStamina, _stamina + _staminaRecoveryPerSecond * Time.deltaTime);
+
+            // Require a new sprint press after exhaustion rather than pulsing in and out of sprint.
+            if (!wantsSprint && _stamina >= _maxStamina * 0.2f)
+                _staminaExhausted = false;
+            return false;
         }
 
         private void ApplyGravityOnly()

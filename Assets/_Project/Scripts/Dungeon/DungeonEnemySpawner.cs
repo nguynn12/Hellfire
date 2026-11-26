@@ -2,6 +2,7 @@
 // Mục đích: Quản lý việc sinh quái vật và Boss theo phòng khi phòng bị khóa (Mục 17.4 & 17.5 đặc tả kỹ thuật).
 // Môi trường thực thi: CHỈ TRÊN SERVER (Server-Authoritative spawn).
 
+using System.Collections;
 using System.Collections.Generic;
 using Hellfire.Combat;
 using Hellfire.Networking;
@@ -33,8 +34,15 @@ namespace Hellfire.Dungeon
         [SerializeField] private GameObject _bossPrefab;
 
         [Header("Spawn Balancing (Mục 6.2 & 17.5)")]
-        [SerializeField] private int _minEnemiesPerNormalRoom = 2;
-        [SerializeField] private int _maxEnemiesPerNormalRoom = 4;
+        [SerializeField] private int _baseMin = 5;
+        [SerializeField] private int _baseMax = 7;
+        [SerializeField] private int _enemiesPerFloorStep = 2;
+        [SerializeField] private int _maxEnemiesPerRoom = 14;
+        [SerializeField] private float _spawnWallInset = 2f;
+        [SerializeField] private float _spawnObstacleClearance = 1.5f;
+        [SerializeField] private float _spawnPlayerClearance = 5f;
+        [SerializeField] private int _spawnPositionAttempts = 60;
+        [SerializeField] private float _spawnRetryDelay = 0.2f;
 
         [Header("Spawn Validation (Mục 15.2 & 17.5)")]
         [Tooltip("Khoảng cách tìm kiếm tối đa trên NavMesh khi spawn đối tượng (m)")]
@@ -46,6 +54,49 @@ namespace Hellfire.Dungeon
 
         private DungeonManager _dungeonManager;
         private readonly Dictionary<Vector2Int, HashSet<GameObject>> _roomAliveEnemies = new Dictionary<Vector2Int, HashSet<GameObject>>();
+
+        public bool CanSpawnEncounterEnemies => IsServer && GameManager.Instance != null &&
+            (GameManager.Instance.CurrentState.Value == GameState.Playing || GameManager.Instance.CurrentState.Value == GameState.BossFight);
+        public float SpawnRetryDelay => _spawnRetryDelay;
+        public string EffectiveSpawnParameters => $"baseEnemies={_baseMin}..{_baseMax}, floorStep={_enemiesPerFloorStep}, cap={_maxEnemiesPerRoom}, floor={GameManager.Instance?.CurrentFloor.Value ?? 1}, sample={_maxNavMeshSampleDistance}m";
+
+        public void GetBaseEnemyRange(int floor, out int min, out int max)
+        {
+            int step = Mathf.Max(0, floor - 1) * _enemiesPerFloorStep;
+            min = _baseMin + step;
+            max = _baseMax + step;
+        }
+
+        public int ScaleEnemyCount(int rolled, int playerCount)
+        {
+            float multiplier = _scalingData != null ? _scalingData.GetEnemyCountMultiplier(playerCount) : GetDefaultEnemyCountMultiplier(playerCount);
+            return Mathf.Clamp(Mathf.RoundToInt(rolled * multiplier), 1, _maxEnemiesPerRoom);
+        }
+
+        private float _containmentTimer;
+        private void Update()
+        {
+            if (!IsServer || _dungeonManager?.Generator?.ActiveGrid == null) return;
+            _containmentTimer += Time.deltaTime;
+            if (_containmentTimer < 1f) return;
+            _containmentTimer = 0f;
+            foreach (var entry in _roomAliveEnemies)
+            {
+                if (!_dungeonManager.IsRoomLocked(entry.Key)) continue;
+                var room = _dungeonManager.Generator.ActiveGrid.Rooms[entry.Key];
+                foreach (var enemy in entry.Value)
+                {
+                    if (enemy == null || enemy.transform.position.y < -10f || room.Contains(enemy.transform.position, -1f)) continue;
+                    var health = enemy.GetComponent<Health>();
+                    if (health != null && health.IsDead.Value) continue;
+                    Vector3 target = GetValidSpawnPosition(room.WorldCenter, room, "Containment", _maxNavMeshSampleDistance);
+                    var agent = enemy.GetComponent<NavMeshAgent>();
+                    if (agent != null && agent.enabled) agent.Warp(target);
+                    var netTransform = enemy.GetComponent<Unity.Netcode.Components.NetworkTransform>();
+                    if (netTransform != null) netTransform.Teleport(target, enemy.transform.rotation, enemy.transform.localScale);
+                }
+            }
+        }
 
         private void Awake()
         {
@@ -77,15 +128,17 @@ namespace Hellfire.Dungeon
         /// <summary>
         /// Sinh quái vật cho phòng Combat khi phòng chuyển sang Locked (Mục 17.4 & 17.5).
         /// </summary>
-        public void SpawnEnemiesForRoom(DungeonRoomNode room)
+        public IEnumerator SpawnEnemiesForRoom(DungeonRoomNode room)
         {
-            if (!IsServer || room == null) return;
+            if (!CanSpawnEncounterEnemies || room == null || room.RoomType != DungeonRoomType.Combat) yield break;
 
             int seed = _dungeonManager != null ? _dungeonManager.DungeonSeed.Value : 12345;
             int roomRngSeed = seed ^ (room.GridPosition.x * 73856093) ^ (room.GridPosition.y * 19349663) ^ 0x175;
             var rng = new System.Random(roomRngSeed);
 
-            int rolledCount = rng.Next(_minEnemiesPerNormalRoom, _maxEnemiesPerNormalRoom + 1);
+            int floor = GameManager.Instance.CurrentFloor.Value;
+            GetBaseEnemyRange(floor, out int minCount, out int maxCount);
+            int rolledCount = rng.Next(minCount, maxCount + 1);
 
             // Cân bằng số lượng quái theo số người chơi chốt khi vào Generating (Mục 15.3 & 17.5)
             int playerCount = (GameManager.Instance != null)
@@ -94,14 +147,13 @@ namespace Hellfire.Dungeon
             float enemyMultiplier = _scalingData != null
                 ? _scalingData.GetEnemyCountMultiplier(playerCount)
                 : GetDefaultEnemyCountMultiplier(playerCount);
-            int enemyCount = Mathf.Max(1, Mathf.RoundToInt(rolledCount * enemyMultiplier));
+            int enemyCount = ScaleEnemyCount(rolledCount, playerCount);
+            Debug.Log($"[DungeonEnemySpawner] floor={floor} room={room.GridPosition} baseRange={minCount}..{maxCount} rolled={rolledCount} players={playerCount} multiplier={enemyMultiplier:F2} final={enemyCount} cap={_maxEnemiesPerRoom}");
 
             if (!_roomAliveEnemies.ContainsKey(room.GridPosition))
             {
                 _roomAliveEnemies[room.GridPosition] = new HashSet<GameObject>();
             }
-
-            var alivePlayerPositions = GetAlivePlayerPositions();
 
             for (int i = 0; i < enemyCount; i++)
             {
@@ -131,8 +183,20 @@ namespace Hellfire.Dungeon
                 if (prefabToSpawn == null) prefabToSpawn = _impPrefab;
                 if (prefabToSpawn == null) continue;
 
-                // Vị trí spawn: cách tường tối thiểu 2m, không trùng cột, tránh bán kính 4m quanh người chơi nếu còn chỗ (Mục 17.5)
-                Vector3 spawnPos = FindValidCombatSpawnPosition(room, rng, alivePlayerPositions);
+                // Mục 20.6: validate wall >=2m, obstacle >=1.5m and every player >=5m after sampling.
+                Vector3 spawnPos;
+                bool warned = false;
+                while (!TryFindCombatSpawnPosition(room, rng, GetAllPlayerPositions(), out spawnPos))
+                {
+                    if (!IsServer || GameManager.Instance == null ||
+                        (GameManager.Instance.CurrentState.Value != GameState.Playing && GameManager.Instance.CurrentState.Value != GameState.BossFight)) yield break;
+                    if (!warned)
+                    {
+                        Debug.LogWarning($"[SpawnValidation] Deferring enemy {i + 1}/{enemyCount} in {room.GridPosition}: no point meets wall/obstacle/player clearances.");
+                        warned = true;
+                    }
+                    yield return new WaitForSeconds(_spawnRetryDelay);
+                }
 
                 var enemyObj = Instantiate(prefabToSpawn, spawnPos, Quaternion.Euler(0f, rng.Next(360), 0f));
                 var netObj = enemyObj.GetComponent<NetworkObject>();
@@ -149,17 +213,22 @@ namespace Hellfire.Dungeon
         /// <summary>
         /// Sinh Boss tại phòng Boss khi phòng Boss chuyển sang Locked (Mục 17.4, 17.5, 15.2, 15.3).
         /// </summary>
-        public void SpawnBossForRoom(DungeonRoomNode bossRoom)
+        public IEnumerator SpawnBossForRoom(DungeonRoomNode bossRoom)
         {
-            if (!IsServer || bossRoom == null || _bossPrefab == null) return;
+            if (!IsServer || bossRoom == null || _bossPrefab == null) yield break;
 
             if (!_roomAliveEnemies.ContainsKey(bossRoom.GridPosition))
             {
                 _roomAliveEnemies[bossRoom.GridPosition] = new HashSet<GameObject>();
             }
 
-            Vector3 bossProposed = bossRoom.WorldCenter + Vector3.up * 0.5f;
-            Vector3 bossSpawnPos = GetValidSpawnPosition(bossProposed, bossRoom.WorldCenter, "Phòng Boss", _maxNavMeshSampleDistance);
+            Vector3 bossSpawnPos;
+            var rng = new System.Random(DungeonRoomNode.Seed(_dungeonManager.DungeonSeed.Value, bossRoom.GridPosition, 0xB055));
+            while (!TryFindCombatSpawnPosition(bossRoom, rng, GetAllPlayerPositions(), out bossSpawnPos))
+            {
+                if (!IsServer || GameManager.Instance == null || GameManager.Instance.CurrentState.Value != GameState.BossFight) yield break;
+                yield return new WaitForSeconds(_spawnRetryDelay);
+            }
             var bossObj = Instantiate(_bossPrefab, bossSpawnPos, Quaternion.identity);
 
             // Tính máu tối đa của Boss theo hệ số độ khó (Mục 15.3: 800 * hệ số)
@@ -286,74 +355,60 @@ namespace Hellfire.Dungeon
             enemies.Clear();
         }
 
-        private Vector3 FindValidCombatSpawnPosition(DungeonRoomNode room, System.Random rng, List<Vector3> alivePlayers)
+        public bool TryGetBossSummonPosition(out Vector3 position)
         {
-            // Phòng 14m x 14m: cách tường tối thiểu 2m -> phạm vi offset x, z trong [-5, 5]
-            Vector3 chosenPos = room.WorldCenter;
-            bool found = false;
-
-            for (int attempt = 0; attempt < 12; attempt++)
-            {
-                float ox = (float)(rng.NextDouble() * 10.0 - 5.0); // [-5, 5]
-                float oz = (float)(rng.NextDouble() * 10.0 - 5.0); // [-5, 5]
-
-                // Không trùng 4 cột ở góc (±4, 0, ±4): bán kính cột 1.5m
-                if (Mathf.Abs(Mathf.Abs(ox) - 4f) < 1.5f && Mathf.Abs(Mathf.Abs(oz) - 4f) < 1.5f)
-                {
-                    continue;
-                }
-
-                Vector3 candidate = room.WorldCenter + new Vector3(ox, 0.5f, oz);
-
-                // NÊN tránh bán kính 4m quanh người chơi nếu còn chỗ (Mục 17.5)
-                bool nearPlayer = false;
-                if (attempt < 8)
-                {
-                    foreach (var pPos in alivePlayers)
-                    {
-                        if ((candidate - pPos).sqrMagnitude < 16f) // 4m squared = 16
-                        {
-                            nearPlayer = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (nearPlayer) continue;
-
-                if (NavMesh.SamplePosition(candidate, out var hit, 2.0f, NavMesh.AllAreas))
-                {
-                    chosenPos = hit.position;
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                chosenPos = GetValidSpawnPosition(room.WorldCenter + Vector3.up * 0.5f, room.WorldCenter, $"Phòng {room.GridPosition}", _maxNavMeshSampleDistance);
-            }
-
-            return chosenPos;
+            position = default;
+            if (!CanSpawnEncounterEnemies || _dungeonManager?.Generator?.ActiveGrid?.BossRoom == null) return false;
+            var room = _dungeonManager.Generator.ActiveGrid.BossRoom;
+            if (!_dungeonManager.IsRoomLocked(room.GridPosition)) return false;
+            var rng = new System.Random(DungeonRoomNode.Seed(_dungeonManager.DungeonSeed.Value, room.GridPosition,
+                0xB056 + GetAliveEnemyCountInRoom(room.GridPosition)));
+            return TryFindCombatSpawnPosition(room, rng, GetAllPlayerPositions(), out position);
         }
 
-        private List<Vector3> GetAlivePlayerPositions()
+        private bool TryFindCombatSpawnPosition(DungeonRoomNode room, System.Random rng, List<Vector3> players, out Vector3 result)
+        {
+            // Existing walls are 1m thick, centered on the nominal room boundary.
+            Vector2 half = room.Size * .5f - Vector2.one * Mathf.Max(1.5f, _spawnWallInset + .5f);
+            for (int attempt = 0; attempt < _spawnPositionAttempts; attempt++)
+            {
+                Vector3 proposed = room.WorldCenter + new Vector3((float)(rng.NextDouble() * 2 - 1) * half.x, 0, (float)(rng.NextDouble() * 2 - 1) * half.y);
+                if (TryCombatSample(room, proposed, players, out result)) return true;
+            }
+            // A deterministic lattice finds free corners without weakening any clearance in a fallback.
+            for (float x = -half.x; x <= half.x; x += 1f)
+                for (float z = -half.y; z <= half.y; z += 1f)
+                    if (TryCombatSample(room, room.WorldCenter + new Vector3(x, 0, z), players, out result)) return true;
+            result = default;
+            return false;
+        }
+
+        private bool TryCombatSample(DungeonRoomNode room, Vector3 proposed, List<Vector3> players, out Vector3 result)
+        {
+            result = default;
+            if (!NavMesh.SamplePosition(proposed, out var hit, _maxNavMeshSampleDistance, NavMesh.AllAreas)
+                || !room.Contains(hit.position, Mathf.Max(1.5f, _spawnWallInset + .5f))
+                || Mathf.Abs(hit.position.y - room.WorldCenter.y) > .5f) return false;
+            foreach (var bounds in room.ObstacleBounds)
+                if (RoomThemeBuilder.DistanceXZ(bounds, new Bounds(hit.position, Vector3.zero)) < _spawnObstacleClearance) return false;
+            foreach (var position in players)
+            {
+                Vector3 flat = position - hit.position; flat.y = 0;
+                if (flat.sqrMagnitude < _spawnPlayerClearance * _spawnPlayerClearance) return false;
+            }
+            if (_roomAliveEnemies.TryGetValue(room.GridPosition, out var enemies))
+                foreach (var enemy in enemies)
+                    if (enemy != null && Vector3.Distance(enemy.transform.position, hit.position) < 1f) return false;
+            result = hit.position;
+            return true;
+        }
+
+        private List<Vector3> GetAllPlayerPositions()
         {
             var positions = new List<Vector3>();
             if (NetworkManager.Singleton != null)
-            {
                 foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
-                {
-                    if (client.PlayerObject != null)
-                    {
-                        var health = client.PlayerObject.GetComponent<Health>();
-                        if (health != null && !health.IsDead.Value && !health.IsDowned.Value)
-                        {
-                            positions.Add(client.PlayerObject.transform.position);
-                        }
-                    }
-                }
-            }
+                    if (client.PlayerObject != null) positions.Add(client.PlayerObject.transform.position);
             return positions;
         }
 
@@ -362,6 +417,12 @@ namespace Hellfire.Dungeon
         /// </summary>
         public static Vector3 GetValidSpawnPosition(Vector3 proposedPos, Vector3 roomCenter, string roomName, float maxDistance = 3.0f)
         {
+            // Resolve legacy boss callers to their actual rectangle as well.
+            var grid = DungeonManager.Instance?.Generator?.ActiveGrid;
+            if (grid != null)
+                foreach (var room in grid.Rooms.Values)
+                    if ((room.WorldCenter - roomCenter).sqrMagnitude < 1f)
+                        return GetValidSpawnPosition(proposedPos, room, roomName, maxDistance);
             // 1. Thử sample vị trí đề xuất trên NavMesh
             if (NavMesh.SamplePosition(proposedPos, out var hit, maxDistance, NavMesh.AllAreas))
             {
@@ -377,6 +438,17 @@ namespace Hellfire.Dungeon
             // 3. Tâm phòng cũng thất bại: cảnh báo và fallback về tâm phòng (không được bỏ qua)
             Debug.LogWarning($"[SpawnValidation] Không thể tìm vị trí NavMesh hợp lệ tại '{roomName}' (đề xuất: {proposedPos}, tâm: {roomCenter}). Dùng tâm phòng làm fallback.");
             return roomCenter;
+        }
+
+        public static Vector3 GetValidSpawnPosition(Vector3 proposedPos, DungeonRoomNode room, string roomName, float maxDistance = 3f)
+        {
+            proposedPos = room.ClampInside(proposedPos);
+            if (NavMesh.SamplePosition(proposedPos, out var hit, maxDistance, NavMesh.AllAreas) && room.Contains(hit.position, 2f))
+                return hit.position;
+            if (NavMesh.SamplePosition(room.WorldCenter, out hit, maxDistance, NavMesh.AllAreas) && room.Contains(hit.position, 2f))
+                return hit.position;
+            Debug.LogWarning($"[SpawnValidation] No NavMesh point within room {roomName} {room.GridPosition}; using center.");
+            return room.WorldCenter;
         }
 
         private float GetDefaultEnemyCountMultiplier(int playerCount)

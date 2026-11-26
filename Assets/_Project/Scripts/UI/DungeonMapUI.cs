@@ -26,7 +26,6 @@ namespace Hellfire.UI
 
         [Header("Settings (Mục 16.8)")]
         [SerializeField] private bool _revealBossRoom = true; // Mặc định bật để người chơi không bị lạc
-        [SerializeField] private float _roomCellSize = 44f;
         [SerializeField] private float _gridSpacing = 56f;
 
         private readonly HashSet<Vector2Int> _visitedRooms = new HashSet<Vector2Int>();
@@ -139,7 +138,7 @@ namespace Hellfire.UI
                         {
                             var room = kvp.Value;
                             // Nếu người chơi ở gần tâm phòng (bán kính 9m)
-                            if (Vector3.Distance(new Vector3(playerPos.x, 0f, playerPos.z), new Vector3(room.WorldCenter.x, 0f, room.WorldCenter.z)) <= 9.0f)
+                            if (room.Contains(playerPos))
                             {
                                 _visitedRooms.Add(room.GridPosition);
                             }
@@ -221,7 +220,7 @@ namespace Hellfire.UI
                 roomObj.transform.SetParent(_mapContentContainer, false);
                 var rRect = roomObj.GetComponent<RectTransform>();
                 rRect.anchoredPosition = pos;
-                rRect.sizeDelta = new Vector2(_roomCellSize, _roomCellSize);
+                rRect.sizeDelta = room.Size * (_gridSpacing / DungeonManager.Instance.Generator.GridCellSize);
 
                 // Biểu tượng bên trong phòng (Ví dụ Boss skull hoặc Spawn S)
                 var iconObj = new GameObject("Icon", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -465,7 +464,7 @@ namespace Hellfire.UI
 
         private Vector2 WorldToMapAnchoredPosition(Vector3 worldPos)
         {
-            float gridCellSize = 20f;
+            float gridCellSize = DungeonManager.Instance != null ? DungeonManager.Instance.Generator.GridCellSize : 36f;
             return new Vector2((worldPos.x / gridCellSize) * _gridSpacing, (worldPos.z / gridCellSize) * _gridSpacing);
         }
 

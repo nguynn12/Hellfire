@@ -25,9 +25,9 @@ MonoBehaviour:
   _spread: 0.012
   _isAutomatic: 0
   _magSize: 12
-  _reloadTime: 1.2
+  _reloadTime: 2.2
   _viewmodelPrefab: {fileID: 0}
   _worldModelPrefab: {fileID: 0}
-  _fireSound: {fileID: 0}
+  _fireSound: {fileID: 8300000, guid: 2582c34857fdf1945a6dba673b0c145c, type: 3}
   _reloadSound: {fileID: 0}
   _emptySound: {fileID: 0}

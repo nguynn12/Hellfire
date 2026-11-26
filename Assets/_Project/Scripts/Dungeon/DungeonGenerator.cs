@@ -12,11 +12,13 @@ namespace Hellfire.Dungeon
     public class DungeonGenerator : MonoBehaviour
     {
         [Header("Grid & Room Settings")]
-        [Tooltip("Khoảng cách giữa các tâm ô phòng trên lưới (mục 17.2: mặc định 26m)")]
-        [SerializeField] private float _gridCellSize = 26f;
-
-        [Tooltip("Kích thước phòng (rộng x dài)")]
-        [SerializeField] private float _roomSize = 14f;
+        [SerializeField] private float _gridCellSize = 36f;
+        [SerializeField] private Vector2 _combatWidthRange = new Vector2(16f, 22f);
+        [SerializeField] private Vector2 _combatDepthRange = new Vector2(12f, 18f);
+        [SerializeField] private Vector2 _bossWidthRange = new Vector2(22f, 26f);
+        [SerializeField] private Vector2 _bossDepthRange = new Vector2(18f, 22f);
+        [SerializeField] private Vector2 _safeWidthRange = new Vector2(12f, 14f);
+        [SerializeField] private Vector2 _safeDepthRange = new Vector2(12f, 14f);
 
         [Tooltip("Chiều cao tường phòng")]
         [SerializeField] private float _wallHeight = 4.5f;
@@ -47,16 +49,20 @@ namespace Hellfire.Dungeon
         [Tooltip("Vật liệu sắt tối cho cổng phòng Combat và Boss")]
         [SerializeField] private Material _gateMaterial;
 
+        [Header("Room Themes (Mục 20.3)")]
+        [SerializeField] private RoomThemeData[] _roomThemes = Array.Empty<RoomThemeData>();
+
         [Header("Hierarchy Root")]
         [SerializeField] private Transform _dungeonRoot;
 
         private DungeonGrid _activeGrid;
         private readonly Dictionary<Vector2Int, List<RoomGate>> _roomGates = new Dictionary<Vector2Int, List<RoomGate>>();
 
+        public Transform GeometryRoot => _dungeonRoot;
         public DungeonGrid ActiveGrid => _activeGrid;
         public IReadOnlyDictionary<Vector2Int, List<RoomGate>> RoomGates => _roomGates;
         public float GridCellSize => _gridCellSize;
-        public float RoomSize => _roomSize;
+        public float CorridorWidth => _corridorWidth;
 
         public event Action<DungeonGrid> OnDungeonGenerated;
 
@@ -66,6 +72,14 @@ namespace Hellfire.Dungeon
         /// </summary>
         public DungeonGrid GenerateDungeon(int dungeonSeed)
         {
+            float largest = Mathf.Max(_combatWidthRange.y, _combatDepthRange.y, _bossWidthRange.y,
+                _bossDepthRange.y, _safeWidthRange.y, _safeDepthRange.y);
+            if (_gridCellSize < largest + 10f)
+            {
+                Debug.LogError($"[DungeonParameters] grid={_gridCellSize} < max room {largest}+10; raising grid.");
+                _gridCellSize = largest + 10f;
+            }
+            Debug.Log($"[DungeonParameters] seed={dungeonSeed}, grid={_gridCellSize}m, Combat X={_combatWidthRange} Z={_combatDepthRange}, Boss X={_bossWidthRange} Z={_bossDepthRange}, Safe X={_safeWidthRange} Z={_safeDepthRange}, {GetComponent<DungeonEnemySpawner>()?.EffectiveSpawnParameters}");
             ClearPreviousDungeon();
 
             // 1. Khởi tạo bộ sinh số ngẫu nhiên System.Random với seed đầu vào
@@ -126,6 +140,20 @@ namespace Hellfire.Dungeon
 
             // Phân bổ loại phòng tất định theo Mục 17.1 (Spawn, Combat, Upgrade, Treasure, Shop, Boss)
             _activeGrid.AllocateRoomTypes(dungeonSeed);
+            foreach (var room in _activeGrid.Rooms.Values)
+            {
+                var sizeRng = new System.Random(DungeonRoomNode.Seed(dungeonSeed, room.GridPosition, 0x202));
+                Vector2 width = room.RoomType == DungeonRoomType.Combat ? _combatWidthRange : room.RoomType == DungeonRoomType.Boss ? _bossWidthRange : _safeWidthRange;
+                Vector2 depth = room.RoomType == DungeonRoomType.Combat ? _combatDepthRange : room.RoomType == DungeonRoomType.Boss ? _bossDepthRange : _safeDepthRange;
+                room.Size = new Vector2(Mathf.Lerp(width.x, width.y, (float)sizeRng.NextDouble()),
+                    Mathf.Lerp(depth.x, depth.y, (float)sizeRng.NextDouble()));
+                if (room.RoomType == DungeonRoomType.Combat && _roomThemes.Length > 0)
+                {
+                    var themeRng = new System.Random(DungeonRoomNode.Seed(dungeonSeed, room.GridPosition, 0x203A));
+                    room.Theme = _roomThemes[themeRng.Next(_roomThemes.Length)];
+                }
+                Debug.Log($"[DungeonRoom] {room.GridPosition} {room.RoomType} Size={room.Size.x:F2}x{room.Size.y:F2}m");
+            }
 
             // 6. Dựng hình học thế giới thực (Instantiate hình học phòng và hành lang)
             BuildDungeonGeometry(_activeGrid, dungeonSeed);
@@ -224,7 +252,7 @@ namespace Hellfire.Dungeon
             floor.name = "Floor";
             floor.transform.SetParent(roomObj.transform);
             floor.transform.localPosition = new Vector3(0f, -0.5f, 0f);
-            floor.transform.localScale = new Vector3(_roomSize, 1f, _roomSize);
+            floor.transform.localScale = new Vector3(room.Size.x, 1f, room.Size.y);
 
             var renderer = floor.GetComponent<MeshRenderer>();
             if (renderer != null)
@@ -239,33 +267,39 @@ namespace Hellfire.Dungeon
 
             // 2. Bốn bức tường xung quanh phòng (Bắc, Nam, Đông, Tây)
             // Nếu có kết nối hành lang theo hướng đó thì tạo cửa mở (doorway) kèm khung cửa (Mục 17.2)
-            float halfRoom = _roomSize * 0.5f;
+            Vector2 halfRoom = room.Size * 0.5f;
             float wallThickness = 1f;
 
             // Hướng Bắc (+Z)
             BuildRoomWall(roomObj.transform, room, new Vector2Int(0, 1),
-                new Vector3(0f, _wallHeight * 0.5f, halfRoom),
-                new Vector3(_roomSize, _wallHeight, wallThickness));
+                new Vector3(0f, _wallHeight * 0.5f, halfRoom.y),
+                new Vector3(room.Size.x, _wallHeight, wallThickness));
 
             // Hướng Nam (-Z)
             BuildRoomWall(roomObj.transform, room, new Vector2Int(0, -1),
-                new Vector3(0f, _wallHeight * 0.5f, -halfRoom),
-                new Vector3(_roomSize, _wallHeight, wallThickness));
+                new Vector3(0f, _wallHeight * 0.5f, -halfRoom.y),
+                new Vector3(room.Size.x, _wallHeight, wallThickness));
 
             // Hướng Đông (+X)
             BuildRoomWall(roomObj.transform, room, new Vector2Int(1, 0),
-                new Vector3(halfRoom, _wallHeight * 0.5f, 0f),
-                new Vector3(wallThickness, _wallHeight, _roomSize));
+                new Vector3(halfRoom.x, _wallHeight * 0.5f, 0f),
+                new Vector3(wallThickness, _wallHeight, room.Size.y));
 
             // Hướng Tây (-X)
             BuildRoomWall(roomObj.transform, room, new Vector2Int(-1, 0),
-                new Vector3(-halfRoom, _wallHeight * 0.5f, 0f),
-                new Vector3(wallThickness, _wallHeight, _roomSize));
+                new Vector3(-halfRoom.x, _wallHeight * 0.5f, 0f),
+                new Vector3(wallThickness, _wallHeight, room.Size.y));
 
             // 3. Cột trong phòng Combat (Mục 17.3: 0–4 cột ở 4 ô góc ±4, 0, ±4 dựng trước khi bake NavMesh)
             if (room.RoomType == DungeonRoomType.Combat)
             {
-                BuildCombatRoomPillars(roomObj.transform, room.GridPosition, dungeonSeed);
+                RoomThemeBuilder.Build(room, roomObj.transform, dungeonSeed, _wallMaterial);
+                if (room.Theme != null)
+                {
+                    RoomThemeBuilder.Tint(floor.GetComponent<Renderer>(), room.Theme.FloorColor);
+                    foreach (var wallRenderer in roomObj.GetComponentsInChildren<Renderer>())
+                        if (wallRenderer.name.StartsWith("Wall_")) RoomThemeBuilder.Tint(wallRenderer, room.Theme.WallColor);
+                }
             }
         }
 
@@ -292,7 +326,7 @@ namespace Hellfire.Dungeon
 
                 if (isZAxisWall)
                 {
-                    float sideWidth = (_roomSize - _corridorWidth) * 0.5f;
+                    float sideWidth = (room.Size.x - _corridorWidth) * 0.5f;
                     float offset = (_corridorWidth + sideWidth) * 0.5f;
 
                     // Đoạn trái
@@ -313,7 +347,7 @@ namespace Hellfire.Dungeon
                 }
                 else
                 {
-                    float sideLength = (_roomSize - _corridorWidth) * 0.5f;
+                    float sideLength = (room.Size.y - _corridorWidth) * 0.5f;
                     float offset = (_corridorWidth + sideLength) * 0.5f;
 
                     // Đoạn trên (+Z)
@@ -347,7 +381,7 @@ namespace Hellfire.Dungeon
         private void BuildDoorFrame(Transform parent, Vector2Int dir, Vector3 wallPos)
         {
             var frameObj = new GameObject($"DoorFrame_{dir}");
-            frameObj.transform.SetParent(parent);
+            frameObj.transform.SetParent(parent, false);
 
             bool isZAxisWall = (dir.y != 0);
 
@@ -444,7 +478,7 @@ namespace Hellfire.Dungeon
             if (isZAxisWall)
             {
                 // Song sắt đứng dọc theo trục X (cách nhau khoảng 0.4m)
-                for (float x = -1.6f; x <= 1.61f; x += 0.4f)
+                for (float x = -_corridorWidth * 0.5f + 0.2f; x <= _corridorWidth * 0.5f - 0.19f; x += 0.4f)
                 {
                     var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
                     bar.name = $"Bar_{x:F1}";
@@ -492,7 +526,7 @@ namespace Hellfire.Dungeon
             else
             {
                 // Song sắt đứng dọc theo trục Z (cách nhau khoảng 0.4m)
-                for (float z = -1.6f; z <= 1.61f; z += 0.4f)
+                for (float z = -_corridorWidth * 0.5f + 0.2f; z <= _corridorWidth * 0.5f - 0.19f; z += 0.4f)
                 {
                     var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
                     bar.name = $"Bar_{z:F1}";
@@ -561,53 +595,22 @@ namespace Hellfire.Dungeon
             }
         }
 
-        private void BuildCombatRoomPillars(Transform parent, Vector2Int gridPos, int dungeonSeed)
-        {
-            // RNG riêng cho cột theo mục 17.3, bảo đảm kết quả giống hệt trên mọi máy
-            int roomSeed = dungeonSeed ^ (gridPos.x * 73856093) ^ (gridPos.y * 19349663) ^ 0x5C01;
-            var rng = new System.Random(roomSeed);
-            int pillarCount = rng.Next(0, 5); // 0 đến 4 cột
-
-            if (pillarCount == 0) return;
-
-            var cornerOffsets = new List<Vector3>
-            {
-                new Vector3(-4f, 2f, -4f),
-                new Vector3(-4f, 2f, 4f),
-                new Vector3(4f, 2f, -4f),
-                new Vector3(4f, 2f, 4f)
-            };
-
-            for (int i = cornerOffsets.Count - 1; i > 0; i--)
-            {
-                int swapIdx = rng.Next(i + 1);
-                var temp = cornerOffsets[i];
-                cornerOffsets[i] = cornerOffsets[swapIdx];
-                cornerOffsets[swapIdx] = temp;
-            }
-
-            for (int i = 0; i < pillarCount; i++)
-            {
-                var pillar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                pillar.name = $"Pillar_{i + 1}";
-                pillar.transform.SetParent(parent);
-                pillar.transform.localPosition = cornerOffsets[i];
-                pillar.transform.localScale = new Vector3(2f, 4f, 2f);
-                ApplyWallMaterial(pillar);
-            }
-        }
-
         private void BuildCorridorGeometry(DungeonCorridorEdge corridor)
         {
             var corridorObj = new GameObject($"Corridor_{corridor.RoomA}_to_{corridor.RoomB}");
             corridorObj.transform.SetParent(_dungeonRoot);
 
-            Vector3 midPoint = (corridor.WorldStart + corridor.WorldEnd) * 0.5f;
             Vector3 diff = corridor.WorldEnd - corridor.WorldStart;
-            float length = diff.magnitude - _roomSize + 1f; // chiều dài đoạn nối ngoài phòng
-            if (length <= 0f) length = 2f;
-
             bool isHorizontal = Mathf.Abs(diff.x) > Mathf.Abs(diff.z);
+            var a = _activeGrid.Rooms[corridor.RoomA];
+            var b = _activeGrid.Rooms[corridor.RoomB];
+            float halfA = (isHorizontal ? a.Size.x : a.Size.y) * 0.5f;
+            float halfB = (isHorizontal ? b.Size.x : b.Size.y) * 0.5f;
+            Vector3 start = a.WorldCenter + diff.normalized * halfA;
+            Vector3 end = b.WorldCenter - diff.normalized * halfB;
+            Vector3 midPoint = (start + end) * 0.5f;
+            float length = Vector3.Distance(start, end);
+            Debug.Log($"[DungeonCorridor] {corridor.RoomA}->{corridor.RoomB} length={length:F2}m");
 
             // Sàn hành lang
             var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -656,11 +659,11 @@ namespace Hellfire.Dungeon
             }
 
             // 2 đèn điểm ở 1/3 và 2/3 chiều dài, nháy nhẹ theo mục 9.1 và 17.2
-            Vector3 light1Pos = Vector3.Lerp(corridor.WorldStart, corridor.WorldEnd, 1f / 3f);
+            Vector3 light1Pos = Vector3.Lerp(start, end, 1f / 3f);
             light1Pos.y = _wallHeight - 1.2f;
             CreateCorridorLight(corridorObj.transform, light1Pos, "CorridorLight_1");
 
-            Vector3 light2Pos = Vector3.Lerp(corridor.WorldStart, corridor.WorldEnd, 2f / 3f);
+            Vector3 light2Pos = Vector3.Lerp(start, end, 2f / 3f);
             light2Pos.y = _wallHeight - 1.2f;
             CreateCorridorLight(corridorObj.transform, light2Pos, "CorridorLight_2");
         }
