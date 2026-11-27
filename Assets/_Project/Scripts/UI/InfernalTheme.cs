@@ -15,6 +15,22 @@ namespace Hellfire.UI
         private static TMP_FontAsset _body;
         private static TMP_FontAsset Body => _body != null ? _body : _body = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
 
+        private static TMP_FontAsset _displayFont;
+        public static void Display(TMP_Text label)
+        {
+            if (label == null) return;
+            if (_displayFont == null)
+            {
+                var source = Resources.Load<Font>("Infernal/Fonts/Cinzel");
+                if (source == null) return;
+                _displayFont = TMP_FontAsset.CreateFontAsset(source, 64, 8,
+                    UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA, 1024, 1024);
+                if (Body != null) _displayFont.fallbackFontAssetTable = new System.Collections.Generic.List<TMP_FontAsset> { Body };
+            }
+            label.font = _displayFont;
+            label.fontStyle = FontStyles.Bold;
+        }
+
         public static Sprite Art(string file) => Resources.Load<Sprite>("Infernal/" + file);
 
         public static Transform Find(Transform root, string name)
@@ -46,7 +62,10 @@ namespace Hellfire.UI
             image.overrideSprite = null;
             image.color = tint;
             image.type = sliced && sprite.border.sqrMagnitude > 0f ? Image.Type.Sliced : Image.Type.Simple;
-            image.pixelsPerUnitMultiplier = artwork == "Panel" || artwork == "Button" ? 1.55f : 1f;
+            bool framed = artwork == "Panel" || artwork == "Button";
+            image.pixelsPerUnitMultiplier = framed ? 1.55f : 1f;
+            if (framed && image.GetComponent<RoundedSpriteCorners>() == null)
+                image.gameObject.AddComponent<RoundedSpriteCorners>();
         }
 
         public static void Backdrop(Transform parent, string artwork)

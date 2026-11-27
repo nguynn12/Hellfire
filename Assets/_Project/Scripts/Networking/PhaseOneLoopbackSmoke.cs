@@ -13,6 +13,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
+using UnityEngine.AI;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -145,6 +146,17 @@ namespace Hellfire.Networking
                 .OrderBy(room => room.GridPosition.x).ThenBy(room => room.GridPosition.y)
                 .Select(room => $"{room.GridPosition}:{room.RoomType}:{room.Theme?.name}:{room.Size}:{room.ObstacleBounds.Count}"));
             Debug.Log($"{Tag} PLAYING seed={dungeon.DungeonSeed.Value} rooms={grid.Rooms.Count} signature={signature}");
+            if (Environment.GetEnvironmentVariable("HELLFIRE_QA_VISUALS") == "1")
+            {
+                if (!CheckDungeonArt(dungeon.Generator, grid)) { Fail("Dungeon art or open gates/NavMesh"); yield break; }
+                if (_host)
+                {
+                    yield return CheckViewmodels(grid.SpawnRoom);
+                    if (_finished) yield break;
+                    yield return CaptureBiomes(dungeon.Generator, grid);
+                    if (_finished) yield break;
+                }
+            }
             if (_host && !string.IsNullOrEmpty(_captureDirectory))
             {
                 yield return new WaitForSecondsRealtime(.65f);
@@ -242,6 +254,112 @@ namespace Hellfire.Networking
             if (_host) yield return new WaitForSecondsRealtime(1.5f);
             _finished = true;
             Application.Quit(0);
+        }
+
+        private static bool CheckDungeonArt(DungeonGenerator generator, DungeonGrid grid)
+        {
+            var root = generator.GeometryRoot;
+            var art = root.GetComponentsInChildren<MeshRenderer>()
+                .Where(renderer => renderer.name.Contains("_WallTiles") || renderer.name.StartsWith("Lava") || renderer.name.StartsWith("Ice"))
+                .GroupBy(renderer => renderer.name, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => $"{group.Key}={group.Count()}").ToArray();
+            foreach (string biome in new[] { "Lava", "Ice" })
+            foreach (string kind in new[] { "_WallTiles", "DoorWay", "Gate", "Pillar" })
+                if (!art.Any(item => item.StartsWith(biome + kind, StringComparison.Ordinal))) return false;
+
+            foreach (var gates in generator.RoomGates.Values)
+            foreach (var gate in gates)
+                if (gate.IsClosed || gate.GetComponent<BoxCollider>().enabled) return false;
+
+            var path = new NavMeshPath();
+            foreach (var corridor in grid.Corridors)
+            {
+                Vector3 a = grid.Rooms[corridor.RoomA].WorldCenter;
+                Vector3 b = grid.Rooms[corridor.RoomB].WorldCenter;
+                if (!NavMesh.SamplePosition(a, out var start, 2.5f, NavMesh.AllAreas) ||
+                    !NavMesh.SamplePosition(b, out var end, 2.5f, NavMesh.AllAreas) ||
+                    !NavMesh.CalculatePath(start.position, end.position, NavMesh.AllAreas, path) ||
+                    path.status != NavMeshPathStatus.PathComplete) return false;
+            }
+            Debug.Log($"{Tag} VISUAL_NAVMESH edges={grid.Corridors.Count}, " + string.Join(";", art));
+            return true;
+        }
+
+        private IEnumerator CheckViewmodels(DungeonRoomNode spawn)
+        {
+            var local = NetworkManager.Singleton.LocalClient.PlayerObject;
+            var movement = local.GetComponent<PlayerMovement>();
+            var weapon = local.GetComponent<WeaponController>();
+            var camera = movement.PlayerCamera;
+            var keys = InputSystem.AddDevice<Keyboard>();
+            var mouse = InputSystem.AddDevice<Mouse>();
+            var socket = camera.transform.Find("WeaponViewmodel");
+            if (socket == null) { Fail("FPS viewmodel mount"); yield break; }
+
+            Vector2Int exit = spawn.ConnectedNeighbors[0] - spawn.GridPosition;
+            InputSystem.QueueDeltaStateEvent(mouse.delta, AimDelta(camera, new Vector3(exit.x, -.035f, exit.y),
+                .1f * Mathf.Max(.1f, PlayerPrefs.GetFloat("MouseSensitivity", 2f))));
+            yield return new WaitForSecondsRealtime(.30f);
+            string[] models = { "HellsWhisper_Approved_Task13_Runtime", "EquippedViewmodel_smg",
+                "EquippedViewmodel_shotgun", "EquippedViewmodel_rifle" };
+            string[] captions = { "HellsWhisper", "IronShredder", "Bonecrusher", "ObsidianFang" };
+            for (int i = 0; i < models.Length; i++)
+            {
+                yield return Press(keys, (Key)((int)Key.Digit1 + i));
+                var model = socket.Find(models[i]);
+                yield return WaitFor(() => (model = socket.Find(models[i])) != null && model.gameObject.activeInHierarchy,
+                    "visible viewmodel " + captions[i]);
+                if (_finished) yield break;
+                if (weapon.CurrentWeaponData.ViewmodelPrefab == null || model.GetComponentsInChildren<MeshRenderer>().Length == 0 ||
+                    model.GetComponentsInChildren<Collider>().Any(collider => collider.enabled))
+                { Fail("viewmodel references or collider " + captions[i]); yield break; }
+                yield return Capture(captions[i] + "-Hip");
+                InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Right));
+                yield return WaitFor(() => weapon.IsAimingDownSights && camera.fieldOfView < 72f, "ADS " + captions[i]);
+                if (_finished) yield break;
+                yield return new WaitForSecondsRealtime(.22f);
+                yield return Capture(captions[i] + "-ADS");
+                InputSystem.QueueStateEvent(mouse, new MouseState());
+                yield return WaitFor(() => !weapon.IsAimingDownSights, "release ADS " + captions[i]);
+                if (_finished) yield break;
+                Debug.Log($"{Tag} VIEWMODEL_ADS {captions[i]}");
+            }
+            yield return Press(keys, Key.Digit1);
+            InputSystem.RemoveDevice(keys);
+            InputSystem.RemoveDevice(mouse);
+        }
+
+        private IEnumerator CaptureBiomes(DungeonGenerator generator, DungeonGrid grid)
+        {
+            if (string.IsNullOrEmpty(_captureDirectory)) yield break;
+            yield return WaitFor(() => GameObject.Find("LoadingPanel") == null, "dungeon preview without loading overlay");
+            if (_finished) yield break;
+            yield return new WaitForSecondsRealtime(.40f);
+            var camera = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerMovement>().PlayerCamera.transform;
+            Vector3 originalPosition = camera.localPosition;
+            Quaternion originalRotation = camera.localRotation;
+            try
+            {
+                foreach (string biome in new[] { "Lava", "Ice" })
+                {
+                    var room = grid.Rooms.Values.First(candidate => candidate.RoomType == DungeonRoomType.Combat &&
+                        candidate.ObstacleBounds.Count > 0 && generator.GeometryRoot
+                            .Find($"Room_{candidate.GridPosition.x}_{candidate.GridPosition.y}_{candidate.RoomType}")
+                            .Find(biome + "Pillar(Clone)") != null);
+                    Vector2Int exit = room.ConnectedNeighbors[0] - room.GridPosition;
+                    Vector3 forward = new Vector3(exit.x, 0f, exit.y);
+                    Vector3 right = Vector3.Cross(Vector3.up, forward);
+                    camera.SetPositionAndRotation(room.WorldCenter - forward * 4f - right * 2.25f + Vector3.up * 1.65f,
+                        Quaternion.LookRotation(forward + right * .24f + Vector3.down * .06f));
+                    yield return null;
+                    yield return Capture(biome + "-CombatRoom");
+                }
+            }
+            finally
+            {
+                camera.SetLocalPositionAndRotation(originalPosition, originalRotation);
+            }
         }
 
         private IEnumerator CaptureLoading()
@@ -418,6 +536,11 @@ namespace Hellfire.Networking
             if (_finished) yield break;
             if (!NetworkManager.Singleton.ConnectedClientsList.All(client => combat.Contains(client.PlayerObject.transform.position)))
             { Fail("Party not inside the locked combat room"); yield break; }
+            if (Environment.GetEnvironmentVariable("HELLFIRE_QA_VISUALS") == "1" &&
+                (!dungeon.Generator.RoomGates.TryGetValue(combat.GridPosition, out var gates) ||
+                 gates.Any(gate => !gate.IsClosed || !gate.GetComponent<BoxCollider>().enabled ||
+                     !gate.GetComponent<NavMeshObstacle>().enabled)))
+            { Fail("closed gate collider and nav obstacle"); yield break; }
             Debug.Log(Tag + " COMBAT_ROOM_LOCKED");
 
             int hits = 0;

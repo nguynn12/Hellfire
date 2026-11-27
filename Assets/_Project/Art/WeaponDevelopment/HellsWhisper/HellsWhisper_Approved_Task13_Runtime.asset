@@ -16,8 +16,8 @@ MonoBehaviour:
   viewmodelPrefab: {fileID: 100000, guid: a0297d31fa8642019626d028625dca00, type: 3}
   motionProfile: {fileID: 4900000, guid: 5768e182081b04176b9c7fd9ad58f73f, type: 3}
   bloodMaterial: {fileID: 2100000, guid: 4736eb7f8190148f4a34cd42cb90ef27, type: 2}
-  viewmodelOffset: {x: -0.04, y: 0, z: 0}
-  uniformScale: 0.25
+  viewmodelOffset: {x: 0, y: -0.065, z: 0.025}
+  uniformScale: 0.145
   surfaceSites:
   - {x: -0.05748569965362549, y: 0.6904814839363098, z: -0.7831062078475952}
   - {x: -0.086658775806427, y: 0.9472559094429016, z: -0.6001948118209839}

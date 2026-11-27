@@ -52,6 +52,11 @@ namespace Hellfire.Dungeon
         [Header("Room Themes (Mục 20.3)")]
         [SerializeField] private RoomThemeData[] _roomThemes = Array.Empty<RoomThemeData>();
 
+        [Header("Biome art")]
+        [SerializeField] private DungeonArtSet _lavaArt;
+        [SerializeField] private DungeonArtSet _iceArt;
+        private readonly Dictionary<Vector2Int, DungeonArtSet> _roomArt = new();
+
         [Header("Hierarchy Root")]
         [SerializeField] private Transform _dungeonRoot;
 
@@ -228,6 +233,10 @@ namespace Hellfire.Dungeon
                 _dungeonRoot = newRoot.transform;
             }
 
+            _roomArt.Clear();
+            foreach (var room in grid.Rooms.Values)
+                _roomArt.Add(room.GridPosition, BiomeArt(room, dungeonSeed));
+
             // Dựng các phòng
             foreach (var kvp in grid.Rooms)
             {
@@ -239,6 +248,13 @@ namespace Hellfire.Dungeon
             {
                 BuildCorridorGeometry(corridor);
             }
+        }
+
+        private DungeonArtSet BiomeArt(DungeonRoomNode room, int seed)
+        {
+            // A seed selects the entry biome. Other rooms alternate every two steps from spawn.
+            int entry = (DungeonRoomNode.Seed(seed, Vector2Int.zero, 0x4C41) & 1);
+            return ((room.DistanceFromSpawn / 2 + entry) & 1) == 0 ? _lavaArt : _iceArt;
         }
 
         private void BuildRoomGeometry(DungeonRoomNode room, int dungeonSeed)
@@ -267,6 +283,13 @@ namespace Hellfire.Dungeon
 
             // 2. Bốn bức tường xung quanh phòng (Bắc, Nam, Đông, Tây)
             // Nếu có kết nối hành lang theo hướng đó thì tạo cửa mở (doorway) kèm khung cửa (Mục 17.2)
+            var art = _roomArt[room.GridPosition];
+            if (art != null)
+            {
+                renderer.sharedMaterial = art.Floor;
+                BuildCeiling(roomObj.transform, Vector3.up * _wallHeight, room.Size, art);
+                CreateCorridorLight(roomObj.transform, room.WorldCenter + Vector3.up * (_wallHeight - .65f), "RoomLight", art, 16f);
+            }
             Vector2 halfRoom = room.Size * 0.5f;
             float wallThickness = 1f;
 
@@ -293,8 +316,11 @@ namespace Hellfire.Dungeon
             // 3. Cột trong phòng Combat (Mục 17.3: 0–4 cột ở 4 ô góc ±4, 0, ±4 dựng trước khi bake NavMesh)
             if (room.RoomType == DungeonRoomType.Combat)
             {
-                RoomThemeBuilder.Build(room, roomObj.transform, dungeonSeed, _wallMaterial);
-                if (room.Theme != null)
+                if (art != null)
+                    BuildCombatPillars(room, roomObj.transform, art);
+                else
+                    RoomThemeBuilder.Build(room, roomObj.transform, dungeonSeed, _wallMaterial);
+                if (room.Theme != null && art == null)
                 {
                     RoomThemeBuilder.Tint(floor.GetComponent<Renderer>(), room.Theme.FloorColor);
                     foreach (var wallRenderer in roomObj.GetComponentsInChildren<Renderer>())
@@ -303,83 +329,90 @@ namespace Hellfire.Dungeon
             }
         }
 
-        private void BuildRoomWall(Transform parent, DungeonRoomNode room, Vector2Int dir, Vector3 wallPos, Vector3 wallScale)
+        private void BuildCombatPillars(DungeonRoomNode room, Transform parent, DungeonArtSet art)
         {
-            Vector2Int neighborCoord = room.GridPosition + dir;
-            bool hasDoorway = room.HasConnection(neighborCoord);
-
-            if (!hasDoorway)
+            for (int x = -1; x <= 1; x += 2)
+            for (int z = -1; z <= 1; z += 2)
             {
-                // Tường kín hoàn toàn
-                var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                wall.name = $"Wall_{dir}";
-                wall.transform.SetParent(parent);
-                wall.transform.localPosition = wallPos;
-                wall.transform.localScale = wallScale;
-
-                ApplyWallMaterial(wall);
-            }
-            else
-            {
-                // Tường có cửa mở: chia làm 2 đoạn hai bên để chừa lối đi ở giữa bằng _corridorWidth
-                bool isZAxisWall = (dir.y != 0); // Tường Bắc hoặc Nam -> đoạn tường trải theo trục X
-
-                if (isZAxisWall)
-                {
-                    float sideWidth = (room.Size.x - _corridorWidth) * 0.5f;
-                    float offset = (_corridorWidth + sideWidth) * 0.5f;
-
-                    // Đoạn trái
-                    var leftWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    leftWall.name = $"Wall_{dir}_Left";
-                    leftWall.transform.SetParent(parent);
-                    leftWall.transform.localPosition = new Vector3(-offset, wallPos.y, wallPos.z);
-                    leftWall.transform.localScale = new Vector3(sideWidth, _wallHeight, wallScale.z);
-                    ApplyWallMaterial(leftWall);
-
-                    // Đoạn phải
-                    var rightWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    rightWall.name = $"Wall_{dir}_Right";
-                    rightWall.transform.SetParent(parent);
-                    rightWall.transform.localPosition = new Vector3(offset, wallPos.y, wallPos.z);
-                    rightWall.transform.localScale = new Vector3(sideWidth, _wallHeight, wallScale.z);
-                    ApplyWallMaterial(rightWall);
-                }
-                else
-                {
-                    float sideLength = (room.Size.y - _corridorWidth) * 0.5f;
-                    float offset = (_corridorWidth + sideLength) * 0.5f;
-
-                    // Đoạn trên (+Z)
-                    var topWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    topWall.name = $"Wall_{dir}_Top";
-                    topWall.transform.SetParent(parent);
-                    topWall.transform.localPosition = new Vector3(wallPos.x, wallPos.y, offset);
-                    topWall.transform.localScale = new Vector3(wallScale.x, _wallHeight, sideLength);
-                    ApplyWallMaterial(topWall);
-
-                    // Đoạn dưới (-Z)
-                    var btmWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    btmWall.name = $"Wall_{dir}_Bottom";
-                    btmWall.transform.SetParent(parent);
-                    btmWall.transform.localPosition = new Vector3(wallPos.x, wallPos.y, -offset);
-                    btmWall.transform.localScale = new Vector3(wallScale.x, _wallHeight, sideLength);
-                    ApplyWallMaterial(btmWall);
-                }
-
-                // Dựng khung cửa (2 trụ + 1 dầm) ở mỗi cửa phòng (Mục 17.2)
-                BuildDoorFrame(parent, dir, wallPos);
-
-                // Dựng cổng sắt cho phòng Combat và Boss (Mục 17.4)
-                if (room.RoomType == DungeonRoomType.Combat || room.RoomType == DungeonRoomType.Boss)
-                {
-                    BuildRoomGate(parent, room, dir, wallPos);
-                }
+                var bottom = new Vector3(x * room.Size.x * .27f, 0f, z * room.Size.y * .27f);
+                var bounds = new Bounds(room.WorldCenter + bottom + Vector3.up * art.PillarSize.y * .5f, art.PillarSize);
+                if (!RoomThemeBuilder.Allowed(room, bounds)) continue;
+                var pillar = art.Place(art.Pillar, parent, bottom, Quaternion.identity);
+                var collider = pillar.AddComponent<BoxCollider>();
+                collider.center = Vector3.up * art.PillarSize.y * .5f;
+                collider.size = art.PillarSize;
+                room.ObstacleBounds.Add(bounds);
             }
         }
 
-        private void BuildDoorFrame(Transform parent, Vector2Int dir, Vector3 wallPos)
+        private void BuildCeiling(Transform parent, Vector3 centre, Vector2 size, DungeonArtSet art)
         {
+            var ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ceiling.name = "Ceiling";
+            ceiling.transform.SetParent(parent, false);
+            ceiling.transform.localPosition = centre + Vector3.up * .12f;
+            ceiling.transform.localScale = new Vector3(size.x, .24f, size.y);
+            DestroyImmediate(ceiling.GetComponent<Collider>());
+            ceiling.GetComponent<Renderer>().sharedMaterial = art.Ceiling;
+        }
+
+        private void BuildRoomWall(Transform parent, DungeonRoomNode room, Vector2Int dir, Vector3 wallPos, Vector3 wallScale)
+        {
+            var art = _roomArt[room.GridPosition];
+            var axis = dir.y != 0 ? Vector3.right : Vector3.forward;
+            bool alongX = dir.y != 0;
+            if (!room.HasConnection(room.GridPosition + dir))
+            {
+                BuildWallSegment(parent, "Wall_" + dir, wallPos, wallScale, alongX, art, dir);
+                return;
+            }
+
+            float length = alongX ? wallScale.x : wallScale.z;
+            float side = (length - _corridorWidth) * .5f;
+            Vector3 sideSize = alongX ? new Vector3(side, wallScale.y, wallScale.z) : new Vector3(wallScale.x, wallScale.y, side);
+            Vector3 offset = axis * ((_corridorWidth + side) * .5f);
+            BuildWallSegment(parent, $"Wall_{dir}_Left", wallPos - offset, sideSize, alongX, art, dir);
+            BuildWallSegment(parent, $"Wall_{dir}_Right", wallPos + offset, sideSize, alongX, art, dir);
+            BuildDoorFrame(parent, dir, wallPos, art);
+            if (room.RoomType == DungeonRoomType.Combat || room.RoomType == DungeonRoomType.Boss)
+                BuildRoomGate(parent, room, dir, wallPos, art);
+        }
+
+        private void BuildWallSegment(Transform parent, string label, Vector3 centre, Vector3 size, bool alongX,
+            DungeonArtSet art, Vector2Int outside)
+        {
+            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wall.name = label;
+            wall.transform.SetParent(parent, false);
+            wall.transform.localPosition = centre;
+            wall.transform.localScale = size;
+            ApplyWallMaterial(wall);
+            if (art == null) return;
+
+            var facing = Quaternion.LookRotation(new Vector3(outside.x, 0f, outside.y), Vector3.up);
+            art.TileWall(wall.transform, alongX ? size.x : size.z, size.y, alongX ? size.z : size.x, facing);
+        }
+
+        private void BuildDoorFrame(Transform parent, Vector2Int dir, Vector3 wallPos, DungeonArtSet art)
+        {
+            if (art != null)
+            {
+                wallPos.y = 0f;
+                var facing = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.y), Vector3.up);
+                var door = art.Place(art.Door, parent, wallPos, facing, (_corridorWidth + 1.15f) / art.DoorSize.x);
+                // Preserve a 3.2 m clear lane and keep the sides aligned to the original 4 m opening.
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    var rim = new GameObject("DoorSideCollider").transform;
+                    rim.SetParent(door.transform, false);
+                    rim.localScale = Vector3.one / door.transform.localScale.x;
+                    rim.localPosition = new Vector3(side * 1.8f, 1.25f, 0f) / door.transform.localScale.x;
+                    var collider = rim.gameObject.AddComponent<BoxCollider>();
+                    collider.size = new Vector3(.4f, 2.5f, .8f);
+                }
+                return;
+            }
+
             var frameObj = new GameObject($"DoorFrame_{dir}");
             frameObj.transform.SetParent(parent, false);
 
@@ -461,7 +494,7 @@ namespace Hellfire.Dungeon
             }
         }
 
-        private void BuildRoomGate(Transform parent, DungeonRoomNode room, Vector2Int dir, Vector3 wallPos)
+        private void BuildRoomGate(Transform parent, DungeonRoomNode room, Vector2Int dir, Vector3 wallPos, DungeonArtSet art)
         {
             var gateObj = new GameObject($"Gate_{dir}");
             gateObj.transform.SetParent(parent);
@@ -475,7 +508,22 @@ namespace Hellfire.Dungeon
 
             bool isZAxisWall = (dir.y != 0);
 
-            if (isZAxisWall)
+            if (art != null)
+            {
+                var facing = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.y), Vector3.up);
+                Vector3 outward = new Vector3(dir.x, 0f, dir.y) * -.24f;
+                art.Place(art.Gate, visualRoot.transform, outward, facing, _corridorWidth / art.GateSize.x);
+                var size = isZAxisWall ? new Vector3(_corridorWidth, _wallHeight, .4f) :
+                    new Vector3(.4f, _wallHeight, _corridorWidth);
+                var box = gateObj.AddComponent<BoxCollider>();
+                box.center = Vector3.up * _wallHeight * .5f;
+                box.size = size;
+                var obstacle = gateObj.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+                obstacle.center = box.center;
+                obstacle.size = size;
+                roomGate.Initialize(visualRoot.transform, box, obstacle, _wallHeight);
+            }
+            else if (isZAxisWall)
             {
                 // Song sắt đứng dọc theo trục X (cách nhau khoảng 0.4m)
                 for (float x = -_corridorWidth * 0.5f + 0.2f; x <= _corridorWidth * 0.5f - 0.19f; x += 0.4f)
@@ -610,6 +658,7 @@ namespace Hellfire.Dungeon
             Vector3 end = b.WorldCenter - diff.normalized * halfB;
             Vector3 midPoint = (start + end) * 0.5f;
             float length = Vector3.Distance(start, end);
+            var art = _roomArt[a.DistanceFromSpawn <= b.DistanceFromSpawn ? a.GridPosition : b.GridPosition];
             Debug.Log($"[DungeonCorridor] {corridor.RoomA}->{corridor.RoomB} length={length:F2}m");
 
             // Sàn hành lang
@@ -625,11 +674,11 @@ namespace Hellfire.Dungeon
                 // 2 tường 2 bên hành lang
                 BuildCorridorWall(corridorObj.transform,
                     new Vector3(midPoint.x, _wallHeight * 0.5f, midPoint.z + _corridorWidth * 0.5f),
-                    new Vector3(length, _wallHeight, 1f));
+                    new Vector3(length, _wallHeight, 1f), art, Vector2Int.up);
 
                 BuildCorridorWall(corridorObj.transform,
                     new Vector3(midPoint.x, _wallHeight * 0.5f, midPoint.z - _corridorWidth * 0.5f),
-                    new Vector3(length, _wallHeight, 1f));
+                    new Vector3(length, _wallHeight, 1f), art, Vector2Int.down);
             }
             else
             {
@@ -638,17 +687,19 @@ namespace Hellfire.Dungeon
                 // 2 tường 2 bên hành lang
                 BuildCorridorWall(corridorObj.transform,
                     new Vector3(midPoint.x + _corridorWidth * 0.5f, _wallHeight * 0.5f, midPoint.z),
-                    new Vector3(1f, _wallHeight, length));
+                    new Vector3(1f, _wallHeight, length), art, Vector2Int.right);
 
                 BuildCorridorWall(corridorObj.transform,
                     new Vector3(midPoint.x - _corridorWidth * 0.5f, _wallHeight * 0.5f, midPoint.z),
-                    new Vector3(1f, _wallHeight, length));
+                    new Vector3(1f, _wallHeight, length), art, Vector2Int.left);
             }
 
             var renderer = floor.GetComponent<MeshRenderer>();
             if (renderer != null)
             {
-                if (_corridorFloorMaterial != null)
+                if (art != null)
+                    renderer.sharedMaterial = art.Floor;
+                else if (_corridorFloorMaterial != null)
                 {
                     renderer.sharedMaterial = _corridorFloorMaterial;
                 }
@@ -658,17 +709,19 @@ namespace Hellfire.Dungeon
                 }
             }
 
+            if (art != null) BuildCeiling(corridorObj.transform, midPoint + Vector3.up * _wallHeight,
+                isHorizontal ? new Vector2(length, _corridorWidth + 1f) : new Vector2(_corridorWidth + 1f, length), art);
             // 2 đèn điểm ở 1/3 và 2/3 chiều dài, nháy nhẹ theo mục 9.1 và 17.2
             Vector3 light1Pos = Vector3.Lerp(start, end, 1f / 3f);
             light1Pos.y = _wallHeight - 1.2f;
-            CreateCorridorLight(corridorObj.transform, light1Pos, "CorridorLight_1");
+            CreateCorridorLight(corridorObj.transform, light1Pos, "CorridorLight_1", art);
 
             Vector3 light2Pos = Vector3.Lerp(start, end, 2f / 3f);
             light2Pos.y = _wallHeight - 1.2f;
-            CreateCorridorLight(corridorObj.transform, light2Pos, "CorridorLight_2");
+            CreateCorridorLight(corridorObj.transform, light2Pos, "CorridorLight_2", art);
         }
 
-        private void CreateCorridorLight(Transform parent, Vector3 worldPos, string name)
+        private void CreateCorridorLight(Transform parent, Vector3 worldPos, string name, DungeonArtSet art, float range = 9f)
         {
             var lightObj = new GameObject(name);
             lightObj.transform.SetParent(parent);
@@ -676,21 +729,16 @@ namespace Hellfire.Dungeon
 
             var light = lightObj.AddComponent<Light>();
             light.type = LightType.Point;
-            light.range = 9f;
-            light.color = new Color(1.0f, 0.72f, 0.45f);
+            light.range = range;
+            light.color = art != null ? art.CorridorLight : new Color(1.0f, 0.72f, 0.45f);
             light.intensity = 1.2f;
 
             lightObj.AddComponent<CorridorLightFlicker>();
         }
 
-        private void BuildCorridorWall(Transform parent, Vector3 pos, Vector3 scale)
+        private void BuildCorridorWall(Transform parent, Vector3 pos, Vector3 scale, DungeonArtSet art, Vector2Int outside)
         {
-            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            wall.name = "CorridorWall";
-            wall.transform.SetParent(parent);
-            wall.transform.position = pos;
-            wall.transform.localScale = scale;
-            ApplyWallMaterial(wall);
+            BuildWallSegment(parent, "CorridorWall", parent.InverseTransformPoint(pos), scale, outside.y != 0, art, outside);
         }
 
         private void ApplyWallMaterial(GameObject obj)

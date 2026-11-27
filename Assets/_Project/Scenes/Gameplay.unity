@@ -616,6 +616,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b032dcebc11f4ee4915ef7eb1c43fc07, type: 2}
   - {fileID: 11400000, guid: 02155a80cbb94f8f9589527d715bfd60, type: 2}
   - {fileID: 11400000, guid: eafa858a9ef147d8a38b13686b54980a, type: 2}
+  _lavaArt: {fileID: 11400000, guid: a11ca4f46ac2745d4b5d8d83737fead8, type: 2}
+  _iceArt: {fileID: 11400000, guid: f29c2d5a047f74b95a0dd2a95c944746, type: 2}
   _dungeonRoot: {fileID: 0}
 --- !u!1 &100988745
 GameObject:
