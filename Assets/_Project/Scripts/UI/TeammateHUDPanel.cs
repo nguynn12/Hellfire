@@ -139,6 +139,7 @@ namespace Hellfire.UI
 
             var bgImg = root.AddComponent<Image>();
             bgImg.color = new Color(0.12f, 0.08f, 0.1f, 0.85f);
+            InfernalTheme.Paint(root.transform, "Panel", Color.white);
 
             // Chip màu + số
             var chipObj = new GameObject("ColorChip", typeof(RectTransform), typeof(Image));

@@ -76,11 +76,14 @@ namespace Hellfire.UI
         private void Start()
         {
             AutoResolveReferences();
+            EnsureSettingsControls();
+            InfernalLayouts.MainMenu(GetComponentInParent<Canvas>().transform);
             RegisterButtonListeners();
             ShowMainPanel();
             CheckForDisconnectNotice();
             LoadSettings();
             LoadPlayerName();
+            if (_hostRoomNameInput != null) _hostRoomNameInput.characterLimit = 30;
             AttachButtonFeedbacks();
 
             if (LanDiscovery.Instance != null)
@@ -332,17 +335,18 @@ namespace Hellfire.UI
             if (_joinIpPanel != null) _joinIpPanel.SetActive(_joinIpPanel == targetPanel);
             if (_lanScanPanel != null) _lanScanPanel.SetActive(_lanScanPanel == targetPanel);
             if (_settingsPanel != null) _settingsPanel.SetActive(_settingsPanel == targetPanel);
+            if (targetPanel == _mainPanel) InfernalTheme.Focus(_mainHostButton);
+            else if (targetPanel == _hostPanel) InfernalTheme.Focus(_hostRoomNameInput);
+            else if (targetPanel == _joinIpPanel) InfernalTheme.Focus(_joinIpInput);
+            else if (targetPanel == _settingsPanel) InfernalTheme.Focus(_mouseSensitivitySlider);
+            else if (targetPanel == _lanScanPanel) InfernalTheme.Focus(_scanRefreshButton);
         }
 
         public void OnClickHost()
         {
             SavePlayerName();
             string roomName = _hostRoomNameInput != null ? _hostRoomNameInput.text : "Hellfire LAN Match";
-            ushort port = 7777;
-            if (_hostPortInput != null && ushort.TryParse(_hostPortInput.text, out var p))
-            {
-                port = p;
-            }
+            if (!ReadPort(_hostPortInput, out ushort port)) return;
 
             SetStatus("Đang khởi tạo Host...");
             if (NetworkConnectManager.Instance != null)
@@ -363,11 +367,13 @@ namespace Hellfire.UI
         {
             SavePlayerName();
             string ip = _joinIpInput != null ? _joinIpInput.text : "127.0.0.1";
-            ushort port = 7777;
-            if (_joinPortInput != null && ushort.TryParse(_joinPortInput.text, out var p))
+            if (!System.Net.IPAddress.TryParse(ip.Trim(), out _))
             {
-                port = p;
+                SetStatus("Địa chỉ IP không hợp lệ.");
+                InfernalTheme.Focus(_joinIpInput);
+                return;
             }
+            if (!ReadPort(_joinPortInput, out ushort port)) return;
 
             SetStatus($"Đang kết nối tới {ip}:{port}...");
             if (NetworkConnectManager.Instance != null)
@@ -378,6 +384,15 @@ namespace Hellfire.UI
                     SetStatus("Không thể kết nối tới máy chủ.");
                 }
             }
+        }
+
+        private bool ReadPort(TMP_InputField field, out ushort port)
+        {
+            port = 7777;
+            if (field == null || (ushort.TryParse(field.text, out port) && port > 0)) return true;
+            SetStatus("Cổng mạng phải từ 1 đến 65535.");
+            InfernalTheme.Focus(field);
+            return false;
         }
 
         public void RefreshLanScan()
@@ -436,6 +451,9 @@ namespace Hellfire.UI
                 txtRect.offsetMin = Vector2.zero;
                 txtRect.offsetMax = Vector2.zero;
 
+                InfernalTheme.Button(btn);
+                roomItemObj.AddComponent<UIButtonFeedback>();
+
                 var capturedRoom = room;
                 btn.onClick.AddListener(() =>
                 {
@@ -488,6 +506,40 @@ namespace Hellfire.UI
         public void OnReduceScreenShakeChanged(bool value)
         {
             GameSettings.SetReduceScreenShake(value);
+        }
+
+        private void EnsureSettingsControls()
+        {
+            if (_settingsPanel == null || _mouseSensitivitySlider == null) return;
+            var panel = _settingsPanel.transform;
+            if (_fovSlider == null)
+                _fovSlider = CreateSettingSlider(panel, "Fov", "Góc nhìn", out _fovValueText);
+            if (_masterVolumeSlider == null)
+                _masterVolumeSlider = CreateSettingSlider(panel, "Volume", "Âm lượng tổng", out _masterVolumeValueText);
+            if (_reduceScreenShakeToggle == null)
+            {
+                var row = new GameObject("ScreenShakeToggle", typeof(RectTransform), typeof(Toggle));
+                row.transform.SetParent(panel, false);
+                var toggle = row.GetComponent<Toggle>();
+                var check = new GameObject("Box", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+                check.transform.SetParent(row.transform, false);
+                InfernalTheme.Place(check.transform, new Vector2(.5f, .5f), 195, 0, 47, 42);
+                var mark = InfernalTheme.Ornament(check.transform, "Sigil", new Vector2(.5f, .5f), 0, 0, 31, 31);
+                toggle.targetGraphic = check;
+                toggle.graphic = mark;
+                InfernalTheme.Label(row.transform, "Label", "Giảm rung màn hình", -90, 0, 265, 44, 23);
+                _reduceScreenShakeToggle = toggle;
+            }
+        }
+
+        private Slider CreateSettingSlider(Transform panel, string key, string label, out TextMeshProUGUI value)
+        {
+            var slider = Instantiate(_mouseSensitivitySlider, panel);
+            slider.name = key + "Slider";
+            slider.onValueChanged = new Slider.SliderEvent();
+            InfernalTheme.Label(panel, key + "Label", label, 0, 0, 260, 40, 23);
+            value = (TextMeshProUGUI)InfernalTheme.Label(panel, key + "Value", "", 0, 0, 85, 40, 23);
+            return slider;
         }
 
         private void LoadSettings()

@@ -38,6 +38,13 @@ namespace Hellfire.UI
         private DungeonGrid _cachedGrid;
         private bool _isMapOpen = false;
         private float _lastUpdateCheck = 0f;
+        private GameObject _minimap;
+        private readonly Image[] _miniRooms = new Image[9];
+        private readonly TMP_Text[] _miniLabels = new TMP_Text[9];
+        private readonly Image[] _miniEast = new Image[9];
+        private readonly Image[] _miniNorth = new Image[9];
+        private Vector2Int _lastLocalRoom;
+        private DungeonGrid _discoveredGrid;
 
         public bool IsMapOpen => _isMapOpen;
 
@@ -51,6 +58,22 @@ namespace Hellfire.UI
 
             Instance = this;
             BuildUIHierarchyIfMissing();
+            if (_mapPanel != null)
+            {
+                InfernalTheme.Dim(_mapPanel.transform, .91f);
+                InfernalTheme.Panel(_mapPanel.transform, 1080, 870);
+                if (transform is RectTransform overlay)
+                {
+                    overlay.anchorMin = Vector2.zero;
+                    overlay.anchorMax = Vector2.one;
+                    overlay.offsetMin = overlay.offsetMax = Vector2.zero;
+                }
+                InfernalTheme.Place(_titleText.transform, new Vector2(.5f, .5f), 0, 354, 850, 52);
+                InfernalTheme.Place(_legendText.transform, new Vector2(.5f, .5f), 0, -350, 995, 58);
+                InfernalTheme.Type(_titleText, 33, InfernalTheme.Gold, true);
+                InfernalTheme.Type(_legendText, 18, InfernalTheme.Bone);
+                BuildMinimap();
+            }
         }
 
         private void Start()
@@ -72,7 +95,9 @@ namespace Hellfire.UI
         private void Update()
         {
             // Phím Tab bật/tắt bản đồ toàn màn hình (Mục 16.8)
-            if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
+            if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame &&
+                (_isMapOpen || (!GameplayHUD.BlocksGameplayInput &&
+                (Hellfire.Networking.GameManager.Instance?.CanPlayerMove() ?? true))))
             {
                 ToggleMap();
             }
@@ -82,6 +107,7 @@ namespace Hellfire.UI
             {
                 _lastUpdateCheck = Time.time;
                 UpdatePlayerVisitations();
+                UpdateMinimap();
             }
 
             // Nếu map đang mở thì cập nhật vị trí người chơi và trạng thái phòng
@@ -94,19 +120,89 @@ namespace Hellfire.UI
         public void ToggleMap()
         {
             _isMapOpen = !_isMapOpen;
+            PlayerMovement.LocalInstance?.SetCursorLock(!GameplayHUD.BlocksGameplayInput);
 
             if (_mapPanel != null)
             {
                 _mapPanel.SetActive(_isMapOpen);
             }
 
+            UpdateMinimap();
             if (_isMapOpen)
             {
+                transform.SetAsLastSibling();
                 RefreshMapGeometry();
                 UpdatePlayerVisitations();
                 UpdateMapDisplay();
             }
         }
+
+        private void BuildMinimap()
+        {
+            _minimap = new GameObject("DungeonMinimap", typeof(RectTransform), typeof(Image));
+            _minimap.transform.SetParent(transform, false);
+            InfernalTheme.Place(_minimap.transform, Vector2.one, -136, -212, 210, 188);
+            InfernalTheme.Paint(_minimap.transform, "Panel", Color.white);
+            _minimap.GetComponent<Image>().raycastTarget = false;
+            InfernalTheme.Label(_minimap.transform, "MapHint", "TAB  BẢN ĐỒ", 0, -66, 175, 24, 17);
+            var centre = new Vector2(.5f, .5f);
+            for (int i = 0; i < 9; i++)
+            {
+                float x = (i % 3 - 1) * 44f;
+                float y = (i / 3 - 1) * 36f + 13f;
+                _miniEast[i] = MiniImage("East", centre, x + 22f, y, 44f, 3f, InfernalTheme.Gold);
+                _miniNorth[i] = MiniImage("North", centre, x, y + 18f, 3f, 36f, InfernalTheme.Gold);
+                _miniRooms[i] = MiniImage("Room", centre, x, y, 26f, 22f, InfernalTheme.Obsidian);
+                _miniLabels[i] = InfernalTheme.Label(_miniRooms[i].transform, "RoomType", "", 0, 0, 26, 22, 16);
+            }
+            for (int i = 0; i < 9; i++) _miniRooms[i].transform.SetAsLastSibling();
+            _minimap.SetActive(false);
+        }
+
+        private Image MiniImage(string name, Vector2 anchor, float x, float y, float w, float h, Color color)
+        {
+            var image = new GameObject(name, typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            image.transform.SetParent(_minimap.transform, false);
+            InfernalTheme.Place(image.transform, anchor, x, y, w, h);
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private void UpdateMinimap()
+        {
+            if (_minimap == null) return;
+            var grid = GetActiveGrid();
+            var local = PlayerMovement.LocalInstance;
+            bool visible = grid != null && local != null && !_isMapOpen &&
+                (Hellfire.Networking.GameManager.Instance?.CanPlayerMove() ?? true);
+            _minimap.SetActive(visible);
+            if (!visible) return;
+
+            for (int i = 0; i < 9; i++)
+            {
+                Vector2Int cell = _lastLocalRoom + new Vector2Int(i % 3 - 1, i / 3 - 1);
+                bool shown = grid.Rooms.TryGetValue(cell, out var room) && IsDiscovered(cell);
+                _miniRooms[i].gameObject.SetActive(shown);
+                _miniEast[i].enabled = shown && i % 3 != 2 && room.HasConnection(cell + Vector2Int.right) &&
+                    IsDiscovered(cell + Vector2Int.right);
+                _miniNorth[i].enabled = shown && i / 3 != 2 && room.HasConnection(cell + Vector2Int.up) &&
+                    IsDiscovered(cell + Vector2Int.up);
+                if (!shown) continue;
+                _miniRooms[i].color = i == 4 ? InfernalTheme.Gold : new Color(.27f, .22f, .19f);
+                _miniLabels[i].color = i == 4 ? InfernalTheme.Obsidian : InfernalTheme.Bone;
+                _miniLabels[i].text = i == 4 ? "•" : room.RoomType switch
+                {
+                    DungeonRoomType.Boss => "B",
+                    DungeonRoomType.Upgrade => "T",
+                    DungeonRoomType.Treasure => "R",
+                    DungeonRoomType.Shop => "C",
+                    _ => ""
+                };
+            }
+        }
+
+        private bool IsDiscovered(Vector2Int cell) => _visitedRooms.Contains(cell) || _revealedRooms.Contains(cell);
 
         private DungeonGrid GetActiveGrid()
         {
@@ -121,6 +217,23 @@ namespace Hellfire.UI
         {
             var grid = GetActiveGrid();
             if (grid == null) return;
+
+            if (_discoveredGrid != grid)
+            {
+                _discoveredGrid = grid;
+                _lastLocalRoom = grid.SpawnPosition;
+                _visitedRooms.Clear();
+            }
+            if (PlayerMovement.LocalInstance is { } local)
+            {
+                foreach (var room in grid.Rooms.Values)
+                {
+                    if (!room.Contains(local.transform.position)) continue;
+                    _lastLocalRoom = room.GridPosition;
+                    _visitedRooms.Add(room.GridPosition);
+                    break;
+                }
+            }
 
             // Luôn mở phòng Spawn
             _visitedRooms.Add(grid.SpawnPosition);
@@ -237,7 +350,7 @@ namespace Hellfire.UI
 
                 if (room.RoomType == DungeonRoomType.Boss)
                 {
-                    iconText.text = "💀"; // Biểu tượng đầu lâu phòng boss theo mục 16.8
+                    iconText.text = "B"; // Biểu tượng đầu lâu phòng boss theo mục 16.8
                     iconText.color = new Color(1f, 0.2f, 0.2f, 1f);
                 }
                 else if (room.RoomType == DungeonRoomType.Spawn)
@@ -328,24 +441,24 @@ namespace Hellfire.UI
                     switch (room.RoomType)
                     {
                         case DungeonRoomType.Boss:
-                            iconText.text = "💀";
+                            iconText.text = "B";
                             iconText.color = new Color(1f, 0.2f, 0.2f, 1f);
                             break;
                         case DungeonRoomType.Upgrade:
-                            iconText.text = "✦"; // Tế đàn (Mục 17.9)
+                            iconText.text = "T"; // Tế đàn (Mục 17.9)
                             iconText.color = new Color(0.35f, 0.9f, 1f, 1f);
                             break;
                         case DungeonRoomType.Treasure:
-                            iconText.text = "📦"; // Rương (Mục 17.9)
+                            iconText.text = "R"; // Rương (Mục 17.9)
                             iconText.color = new Color(1f, 0.88f, 0.25f, 1f);
                             break;
                         case DungeonRoomType.Shop:
-                            iconText.text = "🪙"; // Đồng xu (Mục 17.9)
+                            iconText.text = "C"; // Đồng xu (Mục 17.9)
                             iconText.color = new Color(1f, 0.75f, 0.15f, 1f);
                             break;
                         case DungeonRoomType.Combat:
                             bool isCleared = DungeonManager.ClearedRoomsClient.Contains(coord);
-                            iconText.text = isCleared ? "" : "🔒"; // Ổ khóa nhỏ khi chưa dọn, biến mất khi Cleared (Mục 17.9)
+                            iconText.text = isCleared ? "" : "X"; // Ổ khóa nhỏ khi chưa dọn, biến mất khi Cleared (Mục 17.9)
                             iconText.color = new Color(1f, 0.6f, 0.25f, 0.95f);
                             break;
                         case DungeonRoomType.Spawn:
@@ -403,7 +516,7 @@ namespace Hellfire.UI
                     {
                         // Bản thân: Mũi tên chỉ hướng nhìn (Mục 16.8)
                         img.color = new Color(1f, 1f, 1f, 0.2f);
-                        txt.text = "▲";
+                        txt.text = "^";
                         txt.fontSize = 20;
                         txt.color = playerColor;
 
@@ -495,7 +608,7 @@ namespace Hellfire.UI
                 tRect.anchoredPosition = new Vector2(0f, -40f);
                 tRect.sizeDelta = new Vector2(600f, 40f);
                 _titleText = titleObj.GetComponent<TextMeshProUGUI>();
-                _titleText.text = "🗺️ BẢN ĐỒ HẦM NGỤC (TAB ĐỂ ĐÓNG)";
+                _titleText.text = "BẢN ĐỒ HẦM NGỤC (TAB ĐỂ ĐÓNG)";
                 _titleText.fontSize = 24;
                 _titleText.fontStyle = FontStyles.Bold;
                 _titleText.alignment = TextAlignmentOptions.Center;
@@ -519,7 +632,7 @@ namespace Hellfire.UI
                 lRect.anchoredPosition = new Vector2(0f, 35f);
                 lRect.sizeDelta = new Vector2(900f, 35f);
                 _legendText = legendObj.GetComponent<TextMeshProUGUI>();
-                _legendText.text = "<color=#7799CC>[■] Đã Qua</color>   |   <color=#445566>[◽] Liền Kề</color>   |   <color=#FF3333>💀 Boss</color>   |   <color=#55CCFF>✦ Tế Đàn</color>   |   <color=#FFD700>📦 Rương</color>   |   <color=#FFA500>🪙 Shop</color>   |   <color=#FF8844>🔒 Combat</color>   |   ▲ Bản thân";
+                _legendText.text = "<color=#7799CC>[+] Đã Qua</color>   |   <color=#445566>[-] Liền Kề</color>   |   <color=#FF3333>B Boss</color>   |   <color=#55CCFF>T Tế Đàn</color>   |   <color=#FFD700>R Rương</color>   |   <color=#FFA500>C Shop</color>   |   <color=#FF8844>X Combat</color>   |   ^ Bản thân";
                 _legendText.fontSize = 15;
                 _legendText.alignment = TextAlignmentOptions.Center;
                 _legendText.color = new Color(0.8f, 0.85f, 0.9f, 0.9f);

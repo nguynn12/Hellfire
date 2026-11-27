@@ -22,6 +22,8 @@ namespace Hellfire.Combat
         private void Awake()
         {
             if (_textMesh == null) _textMesh = GetComponent<TextMeshPro>();
+            if (_textMesh != null)
+                Hellfire.UI.InfernalTheme.Type(_textMesh, _textMesh.fontSize, Hellfire.UI.InfernalTheme.Bone, true);
         }
 
         public void Initialize(float damage, bool isHeadshot, Camera targetCamera = null)
@@ -40,7 +42,7 @@ namespace Hellfire.Combat
             {
                 _textMesh.SetText("{0:0}", dmgInt);
                 _textMesh.fontSize = 4.0f;
-                _initialColor = Color.white;
+                _initialColor = Hellfire.UI.InfernalTheme.Bone;
             }
 
             _textMesh.color = _initialColor;

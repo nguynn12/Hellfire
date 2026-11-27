@@ -87,6 +87,8 @@ namespace Hellfire.Items
 
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             if (_promptText == null) _promptText = GetComponentInChildren<TextMeshPro>();
+            if (_promptText != null)
+                Hellfire.UI.InfernalTheme.Type(_promptText, _promptText.fontSize, Hellfire.UI.InfernalTheme.Gold, true);
             if (_chestLight == null) _chestLight = GetComponentInChildren<Light>();
         }
 

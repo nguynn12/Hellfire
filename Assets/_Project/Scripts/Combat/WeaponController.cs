@@ -333,7 +333,7 @@ namespace Hellfire.Combat
         private void HandleAttackInput()
         {
             if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove()) return;
-            if (_currentWeapon == null || _playerCamera == null) return;
+            if (_currentWeapon == null || _playerCamera == null || Hellfire.UI.GameplayHUD.BlocksGameplayInput) return;
 
             bool triggerPressed = false;
             if (Mouse.current != null)

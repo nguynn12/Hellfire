@@ -52,6 +52,8 @@ namespace Hellfire.UI
             AutoResolveReferences();
             RegisterButtonListeners();
             UpdateUI();
+            InfernalLayouts.Lobby(GetComponentInParent<Canvas>().transform);
+            InfernalTheme.Focus(NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer ? _startGameButton : _readyButton);
             AttachButtonFeedbacks();
 
             if (NetworkManager.Singleton != null)
@@ -61,6 +63,8 @@ namespace Hellfire.UI
             }
 
             PlayerIdentity.OnAnyPlayerIdentityChanged += HandleIdentityChanged;
+            if (GameManager.Instance != null)
+                GameManager.Instance.RoomDisplayName.OnValueChanged += HandleRoomNameChanged;
         }
 
         private void AutoResolveReferences()
@@ -206,6 +210,8 @@ namespace Hellfire.UI
             }
 
             PlayerIdentity.OnAnyPlayerIdentityChanged -= HandleIdentityChanged;
+            if (GameManager.Instance != null)
+                GameManager.Instance.RoomDisplayName.OnValueChanged -= HandleRoomNameChanged;
         }
 
         private void Update()
@@ -217,6 +223,11 @@ namespace Hellfire.UI
         private void HandleClientListChanged(ulong clientId)
         {
             UpdateUI();
+        }
+
+        private void HandleRoomNameChanged(Unity.Collections.FixedString128Bytes previous, Unity.Collections.FixedString128Bytes current)
+        {
+            if (_roomTitleText != null) _roomTitleText.text = current.ToString();
         }
 
         private void HandleIdentityChanged()
@@ -231,9 +242,11 @@ namespace Hellfire.UI
 
             bool isHost = nm.IsServer;
 
-            if (_roomTitleText != null && NetworkConnectManager.Instance != null)
+            if (_roomTitleText != null)
             {
-                _roomTitleText.text = NetworkConnectManager.Instance.CurrentRoomName;
+                string title = GameManager.Instance?.RoomDisplayName.Value.ToString();
+                _roomTitleText.richText = false;
+                _roomTitleText.text = string.IsNullOrEmpty(title) ? "Phòng thám hiểm" : title;
             }
 
             // Hiển thị IP LAN của Host kèm nút sao chép (Mục 16.10)
@@ -335,7 +348,7 @@ namespace Hellfire.UI
             {
                 _startGameButtonText.text = allOthersReady
                     ? "BẮT ĐẦU GAME (HOST)"
-                    : "CHỜ NGƯỜI CHƠI SẴN SÀNG...";
+                    : "CHỜ SẴN SÀNG";
             }
         }
 
@@ -358,7 +371,7 @@ namespace Hellfire.UI
             var btnImg = _readyButton.GetComponent<Image>();
             if (btnImg != null)
             {
-                btnImg.color = isReady ? new Color(0.7f, 0.25f, 0.1f, 1f) : new Color(0.1f, 0.5f, 0.25f, 1f);
+                btnImg.color = isReady ? InfernalTheme.Gold : Color.white;
             }
         }
 
@@ -395,30 +408,30 @@ namespace Hellfire.UI
                         int colorIndex = identity.ColorIndex.Value;
                         int number = PlayerPalette.GetPlayerNumber(colorIndex);
                         string hex = PlayerPalette.GetColorHex(colorIndex);
-                        string playerName = identity.PlayerName.Value.ToString();
+                        string playerName = identity.PlayerName.Value.ToString().Replace("<", "‹").Replace(">", "›");
                         bool isReady = identity.IsReady.Value;
 
                         string statusTag = isSlotHost
-                            ? "<color=#00FF00>[Chủ phòng]</color>"
-                            : (isReady ? "<color=#00FF00>[Sẵn sàng]</color>" : "<color=#FFA500>[Chưa sẵn sàng]</color>");
+                            ? "<color=#CBB183>[Chủ phòng]</color>"
+                            : (isReady ? "<color=#CBB183>[Sẵn sàng]</color>" : "<color=#E59659>[Chưa sẵn sàng]</color>");
 
                         string youTag = isLocal ? " (Bạn)" : "";
 
                         // Format chuẩn: Slot N: [Số] Tên [Trạng thái] (Mục 16.1)
-                        _playerSlotTexts[i].text = $"Slot {i + 1}: <color={hex}><b>[{number}] {playerName}</b></color> {statusTag}{youTag}";
+                        _playerSlotTexts[i].text = $"{i + 1:00}   <color={hex}><b>[{number}] {playerName}</b></color> {statusTag}{youTag}";
                         _playerSlotTexts[i].color = Color.white;
                     }
                     else
                     {
                         string roleTag = isSlotHost ? " [Chủ phòng]" : "";
                         string youTag = isLocal ? " (Bạn)" : "";
-                        _playerSlotTexts[i].text = $"Slot {i + 1}: Player #{id}{roleTag}{youTag} <color=#FFA500>[Đang kết nối...]</color>";
+                        _playerSlotTexts[i].text = $"{i + 1:00}   Player #{id}{roleTag}{youTag} <color=#E59659>[Đang kết nối...]</color>";
                         _playerSlotTexts[i].color = isLocal ? Color.green : Color.white;
                     }
                 }
                 else
                 {
-                    _playerSlotTexts[i].text = $"Slot {i + 1}: [Trống]";
+                    _playerSlotTexts[i].text = $"{i + 1:00}   Còn trống";
                     _playerSlotTexts[i].color = Color.gray;
                 }
             }
@@ -442,7 +455,7 @@ namespace Hellfire.UI
 
             if (_connectionInfoText != null)
             {
-                _connectionInfoText.text = $"<color=#00FF00>Đã sao chép: {fullIp}</color>";
+                _connectionInfoText.text = $"<color=#CBB183>Đã sao chép: {fullIp}</color>";
             }
         }
 

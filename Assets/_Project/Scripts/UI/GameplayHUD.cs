@@ -81,6 +81,7 @@ namespace Hellfire.UI
         [SerializeField] private TextMeshProUGUI _floorText;
         private GameManager _floorGameManager;
         private TextMeshProUGUI _staminaText;
+        private RectTransform _staminaFill;
         private int _lastStaminaPercent = -1;
 
         [Header("Dungeon Map (Mục 16.8)")]
@@ -91,6 +92,10 @@ namespace Hellfire.UI
         [SerializeField] private TextMeshProUGUI _gameOverStatsText;
 
         private bool _isPaused;
+        private static GameplayHUD _activeHud;
+        public static bool HandlesPause => _activeHud != null;
+        public static bool BlocksGameplayInput => _activeHud != null &&
+            (_activeHud._isPaused || (_activeHud._dungeonMapUI != null && _activeHud._dungeonMapUI.IsMapOpen));
         private Health _localPlayerHealth;
         private WeaponController _localWeaponController;
         private PlayerRevive _localPlayerRevive;
@@ -103,16 +108,63 @@ namespace Hellfire.UI
 
         private void UpdateSprintStamina()
         {
-            if (_staminaText == null) return;
+            if (_staminaText == null || _staminaFill == null) return;
             var movement = PlayerMovement.LocalInstance;
             int percent = movement == null ? 100 : Mathf.RoundToInt(movement.StaminaFraction * 100f);
-            bool visible = percent < 100 && !_isPaused &&
+            _staminaFill.anchorMax = new Vector2(Mathf.Lerp(.09f, 1f, percent / 100f), .5f);
+            bool visible = !_isPaused &&
                 (_localPlayerHealth == null || (!_localPlayerHealth.IsDowned.Value && !_localPlayerHealth.IsDead.Value));
             if (_staminaText.gameObject.activeSelf != visible)
+            {
                 _staminaText.gameObject.SetActive(visible);
+                _staminaFill.parent.gameObject.SetActive(visible);
+            }
             if (!visible || percent == _lastStaminaPercent) return;
             _lastStaminaPercent = percent;
             _staminaText.SetText("Thể lực {0:0}%", percent);
+        }
+
+        private void BuildStatusLabels(Transform root)
+        {
+            var left = new Vector2(0f, 0f);
+            if (_armorText == null)
+            {
+                _armorText = (TextMeshProUGUI)InfernalTheme.Label(root, "ArmorText", "", 0, 0, 200, 32, 22);
+                InfernalTheme.Place(_armorText.transform, left, 227, 215, 260, 32);
+                _armorText.gameObject.SetActive(false);
+            }
+
+            if (_shieldIndicatorPanel == null)
+            {
+                _shieldTimerText = (TextMeshProUGUI)InfernalTheme.Label(root, "ShieldTimerText", "", 0, 0, 240, 32, 22);
+                InfernalTheme.Place(_shieldTimerText.transform, left, 227, 250, 340, 36);
+                _shieldIndicatorPanel = _shieldTimerText.gameObject;
+            }
+
+            if (_buffToastText == null)
+                _buffToastText = (TextMeshProUGUI)InfernalTheme.Label(root, "BuffToastText", "", 0, -245, 960, 64, 26);
+        }
+
+        private void BuildStaminaMeter()
+        {
+            var health = InfernalTheme.Find(GetComponentInParent<Canvas>().transform, "HealthPanel");
+            if (health == null || _staminaText == null) return;
+            var centre = new Vector2(.5f, .5f);
+            _staminaText.transform.SetParent(health, false);
+            InfernalTheme.Place(_staminaText.transform, centre, 6, -25, 150, 23);
+            InfernalTheme.Type(_staminaText, 17, InfernalTheme.Gold);
+            var track = InfernalTheme.Ornament(health, "Meter", centre, 0, -49, 270, 16);
+            track.preserveAspect = false;
+            InfernalTheme.Paint(track.transform, "Meter", Color.white);
+            var fill = new GameObject("StaminaFill", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            _staminaFill = fill.rectTransform;
+            _staminaFill.SetParent(track.transform, false);
+            _staminaFill.anchorMin = new Vector2(0f, .5f);
+            _staminaFill.anchorMax = new Vector2(1f, .5f);
+            _staminaFill.offsetMin = new Vector2(12f, -3f);
+            _staminaFill.offsetMax = new Vector2(-12f, 3f);
+            fill.color = InfernalTheme.Gold;
+            fill.raycastTarget = false;
         }
 
         private void Awake()
@@ -122,7 +174,12 @@ namespace Hellfire.UI
 
         private void Start()
         {
+            _activeHud = this;
             AutoResolveReferences();
+            var root = GetComponentInParent<Canvas>().transform;
+            BuildStatusLabels(root);
+            InfernalLayouts.Gameplay(root);
+            BuildStaminaMeter();
             RegisterButtonListeners();
             AttachButtonFeedbacks();
 
@@ -317,7 +374,7 @@ namespace Hellfire.UI
             }
 
             // Boss Health Bar UI (Mục 16.6)
-            var bossUI = GetComponentInChildren<BossHealthBarUI>(true);
+            var bossUI = root.GetComponentInChildren<BossHealthBarUI>(true);
             if (bossUI == null)
             {
                 var bObj = new GameObject("BossHealthBarUI", typeof(RectTransform), typeof(BossHealthBarUI));
@@ -682,6 +739,7 @@ namespace Hellfire.UI
 
                 if (_victoryReturnButton != null) _victoryReturnButton.gameObject.SetActive(isHost);
                 if (_victoryWaitingText != null) _victoryWaitingText.gameObject.SetActive(!isHost);
+                if (isHost) InfernalTheme.Focus(_victoryReturnButton);
 
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
@@ -693,6 +751,7 @@ namespace Hellfire.UI
 
                 if (_gameOverReturnButton != null) _gameOverReturnButton.gameObject.SetActive(isHost);
                 if (_gameOverWaitingText != null) _gameOverWaitingText.gameObject.SetActive(!isHost);
+                if (isHost) InfernalTheme.Focus(_gameOverReturnButton);
 
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
@@ -741,6 +800,7 @@ namespace Hellfire.UI
 
         private void OnDestroy()
         {
+            if (_activeHud == this) _activeHud = null;
             if (_floorGameManager != null) _floorGameManager.CurrentFloor.OnValueChanged -= UpdateFloorLabel;
             if (_localPlayerHealth != null)
             {
@@ -792,26 +852,38 @@ namespace Hellfire.UI
         {
             int mins = Mathf.FloorToInt(duration / 60f);
             int secs = Mathf.FloorToInt(duration % 60f);
-            string summaryText = $"<b>THỜI GIAN LƯỢT CHƠI: {mins:00}:{secs:00}</b>\n\n";
+            UpdateOutcomeStats(_victoryStatsText, stats, mins, secs);
+            UpdateOutcomeStats(_gameOverStatsText, stats, mins, secs);
+        }
 
-            summaryText += "<size=16><b>NGƯỜI CHƠI                   HẠ GỤC       SÁT THƯƠNG       CỨU       GỤC</b></size>\n";
-            summaryText += "─────────────────────────────────────────────────────────────\n";
+        private static void UpdateOutcomeStats(TextMeshProUGUI duration, PlayerMatchStats[] stats, int mins, int secs)
+        {
+            if (duration == null) return;
+            duration.text = $"THỜI GIAN  {mins:00}:{secs:00}";
 
-            foreach (var stat in stats)
+            var panel = duration.transform.parent;
+            if (InfernalTheme.Find(panel, "ResultHeading0") != null) return;
+            string[] headings = { "NGƯỜI CHƠI", "HẠ GỤC", "SÁT THƯƠNG", "CỨU", "LẦN GỤC" };
+            float[] x = { -290f, -85f, 70f, 217f, 346f };
+            float[] w = { 260f, 110f, 150f, 90f, 130f };
+            for (int column = 0; column < headings.Length; column++)
             {
-                Color pColor = PlayerPalette.GetColor(stat.ColorIndex);
-                string hex = ColorUtility.ToHtmlStringRGB(pColor);
-                string nameCol = $"<color=#{hex}><b>[P{stat.ColorIndex + 1}] {stat.PlayerName}</b></color>";
-                summaryText += $"{nameCol,-28} {stat.Kills,7}       {Mathf.RoundToInt(stat.DamageDealt),10}       {stat.Revives,5}       {stat.TimesDowned,5}\n";
+                var heading = InfernalTheme.Label(panel, "ResultHeading" + column, headings[column], x[column], 34, w[column], 28, 18);
+                InfernalTheme.Type(heading, 18, InfernalTheme.Gold, true);
             }
 
-            if (_victoryStatsText != null)
+            for (int row = 0; row < stats.Length; row++)
             {
-                _victoryStatsText.text = summaryText;
-            }
-            if (_gameOverStatsText != null)
-            {
-                _gameOverStatsText.text = summaryText;
+                var player = stats[row];
+                string[] cells = { $"[P{player.ColorIndex + 1}] {player.PlayerName}", player.Kills.ToString(),
+                    Mathf.RoundToInt(player.DamageDealt).ToString(), player.Revives.ToString(), player.TimesDowned.ToString() };
+                for (int column = 0; column < cells.Length; column++)
+                {
+                    var cell = InfernalTheme.Label(panel, $"ResultCell{row}_{column}", cells[column],
+                        x[column], -4 - row * 34f, w[column], 31, 20);
+                    cell.richText = false;
+                    cell.overflowMode = TextOverflowModes.Ellipsis;
+                }
             }
         }
 
@@ -1092,10 +1164,16 @@ namespace Hellfire.UI
             if (_pauseMenuPanel != null)
             {
                 _pauseMenuPanel.SetActive(_isPaused);
+                if (_isPaused)
+                {
+                    _pauseMenuPanel.transform.SetAsLastSibling();
+                    InfernalTheme.Focus(_resumeButton);
+                }
             }
 
-            Cursor.lockState = _isPaused ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible = _isPaused;
+            PlayerMovement.LocalInstance?.SetCursorLock(!BlocksGameplayInput);
+            Cursor.lockState = BlocksGameplayInput ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = BlocksGameplayInput;
         }
 
         public void ResumeGame()
@@ -1106,8 +1184,9 @@ namespace Hellfire.UI
                 _pauseMenuPanel.SetActive(false);
             }
 
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            PlayerMovement.LocalInstance?.SetCursorLock(!BlocksGameplayInput);
+            Cursor.lockState = BlocksGameplayInput ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = BlocksGameplayInput;
         }
 
         public void LeaveGame()
