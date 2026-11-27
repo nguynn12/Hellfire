@@ -65,6 +65,7 @@ namespace Hellfire.Combat
 
         // Runtime states
         private readonly List<RuntimeWeapon> _runtimeWeapons = new List<RuntimeWeapon>();
+        private readonly Dictionary<WeaponData, int> _magazineByWeapon = new Dictionary<WeaponData, int>();
         private int _currentAmmo;
         private float _nextFireTime;
         private bool _isReloading;
@@ -130,6 +131,7 @@ namespace Hellfire.Combat
 
             // Khởi tạo danh sách RuntimeWeapon từ danh sách ScriptableObject tĩnh
             _runtimeWeapons.Clear();
+            _magazineByWeapon.Clear();
             for (int i = 0; i < _availableWeapons.Count; i++)
             {
                 if (_availableWeapons[i] != null)
@@ -216,9 +218,12 @@ namespace Hellfire.Combat
             if (index == _currentWeaponIndex && _currentWeapon == _availableWeapons[index]) return;
 
             if (_isReloading) CancelReload();
+            if (_currentWeapon != null)
+                _magazineByWeapon[_currentWeapon] = _currentAmmo;
             _currentWeaponIndex = index;
             _currentWeapon = _availableWeapons[index];
-            _currentAmmo = _currentWeapon.MagSize;
+            _currentAmmo = _magazineByWeapon.TryGetValue(_currentWeapon, out int rounds)
+                ? rounds : _currentWeapon.MagSize;
             _isReloading = false;
             _nextFireTime = Time.time + 0.15f;
 
@@ -383,7 +388,8 @@ namespace Hellfire.Combat
             for (int i = 0; i < pellets; i++)
             {
                 Vector3 shootDir = CalculateSpreadDirection(cameraForward, effectiveSpread, seed + i);
-                Vector3 endPoint = Physics.Raycast(cameraPos, shootDir, out var hit, range) ? hit.point : cameraPos + shootDir * range;
+                Vector3 endPoint = Physics.Raycast(cameraPos, shootDir, out var hit, range,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) ? hit.point : cameraPos + shootDir * range;
                 DrawCosmeticTracer(GetMuzzlePosition(), endPoint);
             }
 
@@ -443,7 +449,8 @@ namespace Hellfire.Combat
             {
                 Vector3 shootDir = CalculateSpreadDirection(baseDirection, weaponToUse.Spread, seed + i);
 
-                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range))
+                if (Physics.Raycast(clientOrigin, shootDir, out var hit, range,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 {
                     // 1. Kiểm tra Friendly Fire (đồng đội)
                     if (hit.collider.CompareTag("Player") || hit.collider.GetComponentInParent<PlayerMovement>() != null)

@@ -52,7 +52,7 @@ namespace Hellfire.EditorTools
                 {
                     scenes = scenes,
                     target = BuildTarget.StandaloneOSX,
-                    locationPathName = "/private/tmp/hf_phase1/HellfirePhaseOneQA.app",
+                    locationPathName = "/private/tmp/hf_stabilization/HellfireStabilizationQA.app",
                     extraScriptingDefines = new[] { "HELLFIRE_PHASE1_SMOKE" },
                     options = BuildOptions.Development
                 };

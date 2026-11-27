@@ -57,6 +57,7 @@ namespace Hellfire.Items
 
         private Vector3 _initialPosition;
         private bool _hasDespawned = false;
+        private SphereCollider _pickupTrigger;
 
         public ItemPickupType Type => (ItemPickupType)_netPickupType.Value;
         public PowerUpData PowerUp => _powerUpData;
@@ -65,6 +66,7 @@ namespace Hellfire.Items
         private void Awake()
         {
             _initialPosition = transform.position;
+            _pickupTrigger = GetComponent<SphereCollider>();
             if (_meshRenderer == null) _meshRenderer = GetComponentInChildren<MeshRenderer>();
             if (_pointLight == null) _pointLight = GetComponentInChildren<Light>();
             if (_nameLabel == null) _nameLabel = GetComponentInChildren<TextMeshPro>();
@@ -240,17 +242,32 @@ namespace Hellfire.Items
 
         private void OnTriggerEnter(Collider other)
         {
-            // Server hoặc Offline có thẩm quyền xác thực và trao vật phẩm (Mục 6.3)
-            if (!GameModeHelper.IsServerOrOffline || _hasDespawned) return;
+            TryCollect(other.GetComponentInParent<PlayerMovement>());
+        }
 
-            if (!other.CompareTag("Player") && other.GetComponentInParent<PlayerMovement>() == null)
+        private void FixedUpdate()
+        {
+            // The remote owner's CharacterController is disabled on the server.
+            // Use its replicated position and the same pickup volume on the server.
+            if (!IsServer || !IsSpawned || _hasDespawned || _pickupTrigger == null ||
+                !_pickupTrigger.enabled || NetworkManager == null) return;
+            foreach (var client in NetworkManager.ConnectedClientsList)
             {
-                return;
+                if (client.PlayerObject == null) continue;
+                var player = client.PlayerObject.GetComponent<PlayerMovement>();
+                if (player == null) continue;
+                var sample = player.transform.position + Vector3.up * .5f;
+                if ((_pickupTrigger.ClosestPoint(sample) - sample).sqrMagnitude <= .0001f)
+                    TryCollect(player);
+                if (_hasDespawned) break;
             }
+        }
 
-            var playerMove = other.GetComponentInParent<PlayerMovement>();
-            if (playerMove == null) return;
-
+        private void TryCollect(PlayerMovement playerMove)
+        {
+            if (playerMove == null || !GameModeHelper.IsServerOrOffline || _hasDespawned ||
+                (!GameModeHelper.IsOffline && !IsSpawned)) return;
+            if (GameManager.Instance != null && !GameManager.Instance.CanPlayerMove()) return;
             var playerHealth = playerMove.GetComponent<Health>();
             if (playerHealth != null && (playerHealth.IsDowned.Value || playerHealth.IsDead.Value))
             {

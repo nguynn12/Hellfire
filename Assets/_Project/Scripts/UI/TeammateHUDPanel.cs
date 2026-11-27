@@ -439,7 +439,7 @@ namespace Hellfire.UI
 
             if (_downedTimerText != null)
             {
-                _downedTimerText.text = $"⚠ GỤC: {minutes:00}:{seconds:00}";
+                _downedTimerText.text = $"GỤC: {minutes:00}:{seconds:00}";
             }
         }
     }

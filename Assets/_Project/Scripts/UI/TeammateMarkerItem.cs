@@ -182,7 +182,7 @@ namespace Hellfire.UI
                 if (_distanceText != null)
                 {
                     float timer = Mathf.Max(0f, _targetHealth.DownedTimer.Value);
-                    _distanceText.text = $"⚠ {Mathf.CeilToInt(timer)}s";
+                    _distanceText.text = $"Gục: {Mathf.CeilToInt(timer)}s";
                     _distanceText.color = Color.red;
                 }
             }

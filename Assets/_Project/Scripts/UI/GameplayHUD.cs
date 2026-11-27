@@ -197,6 +197,16 @@ namespace Hellfire.UI
             if (_gameOverReturnButton == null) _gameOverReturnButton = FindComponentInHierarchy<Button>(root, "GameOverReturnButton");
             if (_gameOverWaitingText == null) _gameOverWaitingText = FindComponentInHierarchy<TextMeshProUGUI>(root, "GameOverWaitingText");
 
+            if (canvas != null)
+            {
+                if (_victoryOverlayPanel == null)
+                    _victoryOverlayPanel = CreateOutcomePanel(root, "Victory", "CHIẾN THẮNG",
+                        out _victoryReturnButton, out _victoryWaitingText);
+                if (_gameOverOverlayPanel == null)
+                    _gameOverOverlayPanel = CreateOutcomePanel(root, "GameOver", "THẤT BẠI",
+                        out _gameOverReturnButton, out _gameOverWaitingText);
+            }
+
             // Souls Counter (Mục 17.7)
             if (_soulsText == null) _soulsText = FindComponentInHierarchy<TextMeshProUGUI>(root, "SoulsText");
             if (_soulsText == null && canvas != null)
@@ -375,6 +385,53 @@ namespace Hellfire.UI
             InitProceduralAudioClips();
         }
 
+        private static GameObject CreateOutcomePanel(Transform root, string prefix, string title,
+            out Button returnButton, out TextMeshProUGUI waitingText)
+        {
+            var panel = new GameObject(prefix + "OverlayPanel", typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(root, false);
+            var panelRect = (RectTransform)panel.transform;
+            panelRect.anchorMin = Vector2.zero;
+            panelRect.anchorMax = Vector2.one;
+            panelRect.offsetMin = panelRect.offsetMax = Vector2.zero;
+            panel.GetComponent<Image>().color = new Color(.035f, .03f, .035f, .94f);
+            AddOutcomeLabel(panel.transform, prefix + "Title", title, new Vector2(.5f, .72f),
+                new Vector2(360f, 62f), 40f);
+            var buttonObject = new GameObject(prefix + "ReturnButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonObject.transform.SetParent(panel.transform, false);
+            AnchorOutcomeElement((RectTransform)buttonObject.transform, new Vector2(.5f, .19f), new Vector2(260f, 54f));
+            var buttonImage = buttonObject.GetComponent<Image>();
+            buttonImage.color = new Color(.53f, .25f, .12f);
+            returnButton = buttonObject.GetComponent<Button>();
+            returnButton.targetGraphic = buttonImage;
+            AddOutcomeLabel(buttonObject.transform, "Label", "Về sảnh", new Vector2(.5f, .5f), new Vector2(250f, 50f), 25f);
+            waitingText = AddOutcomeLabel(panel.transform, prefix + "WaitingText", "Đang chờ chủ phòng về sảnh",
+                new Vector2(.5f, .19f), new Vector2(360f, 50f), 22f);
+            panel.SetActive(false);
+            return panel;
+        }
+
+        private static TextMeshProUGUI AddOutcomeLabel(Transform parent, string name, string value,
+            Vector2 anchor, Vector2 size, float fontSize)
+        {
+            var label = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            label.transform.SetParent(parent, false);
+            var text = label.GetComponent<TextMeshProUGUI>();
+            AnchorOutcomeElement(text.rectTransform, anchor, size);
+            text.text = value;
+            text.fontSize = fontSize;
+            text.alignment = TextAlignmentOptions.Center;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private static void AnchorOutcomeElement(RectTransform rect, Vector2 anchor, Vector2 size)
+        {
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = size;
+        }
+
         private TextMeshProUGUI CreateSoulsText(Transform root)
         {
             var obj = new GameObject("SoulsText");
@@ -460,7 +517,7 @@ namespace Hellfire.UI
                 }
                 if (_shieldTimerText != null)
                 {
-                    _shieldTimerText.text = $"🛡️ KHIÊN BẢO VỆ: {_localBuffManager.ShieldTimeRemaining:F1}s";
+                    _shieldTimerText.text = $"KHIÊN BẢO VỆ: {_localBuffManager.ShieldTimeRemaining:F1}s";
                 }
             }
             else
@@ -586,7 +643,7 @@ namespace Hellfire.UI
                     msg = $"<color=#FF4444>+ {(value * 100):0}% SÁT THƯƠNG SÚNG!</color>";
                     break;
                 case PowerUpType.GuardianShield:
-                    msg = "<color=#FFFF00>🛡️ KHIÊN BẢO VỆ KÍCH HOẠT (8 GIÂY BẤT TỬ)!</color>";
+                    msg = "<color=#FFFF00>KHIÊN BẢO VỆ KÍCH HOẠT (8 GIÂY BẤT TỬ)!</color>";
                     break;
             }
 
@@ -620,7 +677,7 @@ namespace Hellfire.UI
 
             if (next == GameState.Victory)
             {
-                if (_victoryOverlayPanel != null) _victoryOverlayPanel.SetActive(true);
+                ShowOutcomePanel(_victoryOverlayPanel);
                 if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(false);
 
                 if (_victoryReturnButton != null) _victoryReturnButton.gameObject.SetActive(isHost);
@@ -631,7 +688,7 @@ namespace Hellfire.UI
             }
             else if (next == GameState.GameOver)
             {
-                if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(true);
+                ShowOutcomePanel(_gameOverOverlayPanel);
                 if (_victoryOverlayPanel != null) _victoryOverlayPanel.SetActive(false);
 
                 if (_gameOverReturnButton != null) _gameOverReturnButton.gameObject.SetActive(isHost);
@@ -645,6 +702,15 @@ namespace Hellfire.UI
                 if (_victoryOverlayPanel != null) _victoryOverlayPanel.SetActive(false);
                 if (_gameOverOverlayPanel != null) _gameOverOverlayPanel.SetActive(false);
             }
+        }
+
+        private void ShowOutcomePanel(GameObject panel)
+        {
+            if (_pauseMenuPanel != null) _pauseMenuPanel.SetActive(false);
+            _isPaused = false;
+            if (panel == null) return;
+            panel.transform.SetAsLastSibling();
+            panel.SetActive(true);
         }
 
         private void ReturnToLobbyFromHUD()
@@ -726,7 +792,7 @@ namespace Hellfire.UI
         {
             int mins = Mathf.FloorToInt(duration / 60f);
             int secs = Mathf.FloorToInt(duration % 60f);
-            string summaryText = $"<b>⏱️ THỜI GIAN LƯỢT CHƠI: {mins:00}:{secs:00}</b>\n\n";
+            string summaryText = $"<b>THỜI GIAN LƯỢT CHƠI: {mins:00}:{secs:00}</b>\n\n";
 
             summaryText += "<size=16><b>NGƯỜI CHƠI                   HẠ GỤC       SÁT THƯƠNG       CỨU       GỤC</b></size>\n";
             summaryText += "─────────────────────────────────────────────────────────────\n";
