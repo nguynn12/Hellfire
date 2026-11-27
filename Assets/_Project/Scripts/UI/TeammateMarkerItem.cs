@@ -83,12 +83,13 @@ namespace Hellfire.UI
 
             if (_iconBackground != null)
             {
-                _iconBackground.color = color;
+                _iconBackground.color = Color.Lerp(Color.white, color, .24f);
             }
 
             if (_playerNumberText != null)
             {
                 _playerNumberText.text = number.ToString();
+                _playerNumberText.color = Color.Lerp(InfernalTheme.Bone, color, .34f);
             }
         }
 
@@ -130,14 +131,20 @@ namespace Hellfire.UI
 
             float minX = marginX;
             float maxX = screenWidth - marginX;
-            float minY = marginY;
-            float maxY = screenHeight - marginY;
+            bool sideHud = screenPos.x < screenWidth * .22f || screenPos.x > screenWidth * .78f;
+            // Keep the badge and its distance label above the lower HUD cards.
+            float minY = sideHud ? screenHeight * .20f : marginY;
+            float maxY = screenPos.x > screenWidth * .84f ? screenHeight * .66f : screenHeight - marginY;
 
             bool isOffScreen = isBehind || screenPos.x < minX || screenPos.x > maxX || screenPos.y < minY || screenPos.y > maxY;
 
             // Kẹp vào mép màn hình khi ngoài màn hình
             float clampedX = Mathf.Clamp(screenPos.x, minX, maxX);
             float clampedY = Mathf.Clamp(screenPos.y, minY, maxY);
+            Vector2 centre = new Vector2(screenWidth * .5f, screenHeight * .5f);
+            float reticleClearance = screenHeight * .05f;
+            if (!isOffScreen && (new Vector2(clampedX, clampedY) - centre).sqrMagnitude < reticleClearance * reticleClearance)
+                clampedY = centre.y + reticleClearance;
 
             if (_rootRect != null)
             {
@@ -183,7 +190,7 @@ namespace Hellfire.UI
                 {
                     float timer = Mathf.Max(0f, _targetHealth.DownedTimer.Value);
                     _distanceText.text = $"Gục: {Mathf.CeilToInt(timer)}s";
-                    _distanceText.color = Color.red;
+                    _distanceText.color = new Color32(255, 159, 113, 255);
                 }
             }
             else
@@ -196,7 +203,7 @@ namespace Hellfire.UI
                 if (_distanceText != null)
                 {
                     _distanceText.text = $"{Mathf.RoundToInt(distance)}m";
-                    _distanceText.color = Color.white;
+                    _distanceText.color = InfernalTheme.Bone;
                 }
             }
 

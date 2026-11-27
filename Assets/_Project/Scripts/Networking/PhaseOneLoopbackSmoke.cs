@@ -65,6 +65,15 @@ namespace Hellfire.Networking
                 if (!Click("SettingsButton")) { Fail("Settings button"); yield break; }
                 yield return Capture("Settings");
                 if (!CheckSettings()) { Fail("Settings backends"); yield break; }
+                var shake = GameObject.Find("ScreenShakeToggle").GetComponent<Toggle>();
+                bool originalShake = shake.isOn;
+                shake.isOn = true;
+                yield return new WaitForSecondsRealtime(.18f);
+                yield return Capture("Settings-Enabled");
+                shake.isOn = false;
+                yield return new WaitForSecondsRealtime(.18f);
+                yield return Capture("Settings-Disabled");
+                shake.isOn = originalShake;
                 if (!Click("SettingsBackBtn")) { Fail("Settings back"); yield break; }
             }
 
@@ -97,6 +106,21 @@ namespace Hellfire.Networking
                 {
                     yield return WaitFor(() => NetworkManager.Singleton.ConnectedClientsIds.Count == 2, "two Lobby players");
                     if (_finished) yield break;
+                    var copy = GameObject.Find("CopyIpButton")?.GetComponent<Button>();
+                    var pointer = PointerAt(copy?.transform as RectTransform, Vector2.zero);
+                    if (pointer == null || copy.targetGraphic is not Image copyImage || copyImage.sprite == null)
+                    { Fail("Lobby Copy IP graphic or hitbox"); yield break; }
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
+                    yield return new WaitForSecondsRealtime(.15f);
+                    Color hover = copyImage.canvasRenderer.GetColor();
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+                    yield return new WaitForSecondsRealtime(.15f);
+                    if (copyImage.canvasRenderer.GetColor() == hover)
+                    { Fail("Lobby Copy IP pressed feedback"); yield break; }
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerUpHandler);
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerExitHandler);
+                    yield return new WaitForSecondsRealtime(.15f);
+                    Debug.Log(Tag + " COPY_IP_POINTER_STATES");
                     yield return Capture("Lobby");
                     StartCoroutine(CaptureLoading());
                 }
@@ -239,6 +263,20 @@ namespace Hellfire.Networking
             Destroy(snapshot);
         }
 
+        private static PointerEventData PointerAt(RectTransform target, Vector2 localOffset)
+        {
+            if (target == null || EventSystem.current == null) return null;
+            Canvas.ForceUpdateCanvases();
+            var pointer = new PointerEventData(EventSystem.current)
+            {
+                position = RectTransformUtility.WorldToScreenPoint(null, target.TransformPoint(localOffset)),
+                button = PointerEventData.InputButton.Left
+            };
+            var hits = new System.Collections.Generic.List<RaycastResult>();
+            EventSystem.current.RaycastAll(pointer, hits);
+            return hits.Count > 0 && hits[0].gameObject.transform.IsChildOf(target) ? pointer : null;
+        }
+
         private static bool CheckSettings()
         {
             var fov = GameObject.Find("FovSlider")?.GetComponent<Slider>();
@@ -250,10 +288,13 @@ namespace Hellfire.Networking
             bool originalShake = shake.isOn;
             fov.value = originalFov < 100f ? 105f : 80f;
             volume.value = originalVolume < .5f ? .8f : .35f;
-            shake.isOn = !originalShake;
+            var pointer = PointerAt(shake.transform as RectTransform, new Vector2(-190f, 0f));
+            if (pointer != null) ExecuteEvents.Execute(shake.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+            var state = GameObject.Find("ShakeStateText")?.GetComponent<TMP_Text>();
             bool connected = Mathf.Approximately(GameSettings.FieldOfView, fov.value) &&
                 Mathf.Approximately(AudioListener.volume, volume.value) &&
-                GameSettings.ReduceScreenShake == shake.isOn;
+                GameSettings.ReduceScreenShake == shake.isOn && shake.isOn != originalShake &&
+                state?.text == (shake.isOn ? "BẬT" : "TẮT");
             fov.value = originalFov;
             volume.value = originalVolume;
             shake.isOn = originalShake;
@@ -274,11 +315,27 @@ namespace Hellfire.Networking
             health.TakeDamage(10000f, HitboxType.Torso, ulong.MaxValue);
             yield return WaitFor(() => health.IsDowned.Value, "client downed");
             if (_finished) yield break;
+            if (!string.IsNullOrEmpty(_captureDirectory))
+            {
+                yield return WaitFor(() => GameObject.Find("DownedOverlay")?.GetComponentInChildren<TMP_Text>()?.text.StartsWith("GỤC") == true,
+                    "teammate downed HUD");
+                if (_finished) yield break;
+                yield return Capture("TeammateDowned");
+            }
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.E));
             yield return WaitFor(() => !health.IsDowned.Value && health.CurrentHealth.Value > 0f, "revive completed by player input");
             if (_finished) yield break;
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
             Debug.Log(Tag + " REVIVE_CLIENT");
+            if (!string.IsNullOrEmpty(_captureDirectory))
+            {
+                var teammate = GameObject.Find("TeammateSlot")?.transform;
+                var healthFill = teammate?.Find("HealthBar/Fill") as RectTransform;
+                if (healthFill == null ||
+                    !Mathf.Approximately(healthFill.anchorMax.x, health.CurrentHealth.Value / health.MaxHealth))
+                { Fail("teammate HUD health fill after revive"); yield break; }
+                Debug.Log(Tag + " TEAMMATE_HUD_HEALTH");
+            }
             foreach (var player in players)
                 player.PlayerObject.GetComponent<Health>().TakeDamage(10000f, HitboxType.Torso, ulong.MaxValue);
         }

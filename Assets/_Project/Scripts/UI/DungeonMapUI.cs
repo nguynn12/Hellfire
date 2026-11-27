@@ -71,7 +71,7 @@ namespace Hellfire.UI
                 InfernalTheme.Place(_titleText.transform, new Vector2(.5f, .5f), 0, 354, 850, 52);
                 InfernalTheme.Place(_legendText.transform, new Vector2(.5f, .5f), 0, -350, 995, 58);
                 InfernalTheme.Type(_titleText, 33, InfernalTheme.Gold, true);
-                InfernalTheme.Type(_legendText, 18, InfernalTheme.Bone);
+                InfernalTheme.Type(_legendText, 20, InfernalTheme.Bone);
                 BuildMinimap();
             }
         }
@@ -141,19 +141,20 @@ namespace Hellfire.UI
         {
             _minimap = new GameObject("DungeonMinimap", typeof(RectTransform), typeof(Image));
             _minimap.transform.SetParent(transform, false);
-            InfernalTheme.Place(_minimap.transform, Vector2.one, -136, -212, 210, 188);
+            InfernalTheme.Place(_minimap.transform, Vector2.one, -149, -229, 230, 210);
             InfernalTheme.Paint(_minimap.transform, "Panel", Color.white);
             _minimap.GetComponent<Image>().raycastTarget = false;
-            InfernalTheme.Label(_minimap.transform, "MapHint", "TAB  BẢN ĐỒ", 0, -66, 175, 24, 17);
+            InfernalTheme.Label(_minimap.transform, "MapNorth", "BẮC", 0, 80, 170, 22, 16);
+            InfernalTheme.Label(_minimap.transform, "MapHint", "TAB  Bản đồ", 0, -75, 190, 26, 18);
             var centre = new Vector2(.5f, .5f);
             for (int i = 0; i < 9; i++)
             {
-                float x = (i % 3 - 1) * 44f;
-                float y = (i / 3 - 1) * 36f + 13f;
-                _miniEast[i] = MiniImage("East", centre, x + 22f, y, 44f, 3f, InfernalTheme.Gold);
-                _miniNorth[i] = MiniImage("North", centre, x, y + 18f, 3f, 36f, InfernalTheme.Gold);
-                _miniRooms[i] = MiniImage("Room", centre, x, y, 26f, 22f, InfernalTheme.Obsidian);
-                _miniLabels[i] = InfernalTheme.Label(_miniRooms[i].transform, "RoomType", "", 0, 0, 26, 22, 16);
+                float x = (i % 3 - 1) * 50f;
+                float y = (i / 3 - 1) * 39f + 7f;
+                _miniEast[i] = MiniImage("East", centre, x + 25f, y, 50f, 3f, InfernalTheme.Gold);
+                _miniNorth[i] = MiniImage("North", centre, x, y + 19.5f, 3f, 39f, InfernalTheme.Gold);
+                _miniRooms[i] = MiniImage("Room", centre, x, y, 34f, 25f, InfernalTheme.Obsidian);
+                _miniLabels[i] = InfernalTheme.Label(_miniRooms[i].transform, "RoomType", "", 0, 0, 34, 25, 18);
             }
             for (int i = 0; i < 9; i++) _miniRooms[i].transform.SetAsLastSibling();
             _minimap.SetActive(false);
@@ -189,7 +190,8 @@ namespace Hellfire.UI
                 _miniNorth[i].enabled = shown && i / 3 != 2 && room.HasConnection(cell + Vector2Int.up) &&
                     IsDiscovered(cell + Vector2Int.up);
                 if (!shown) continue;
-                _miniRooms[i].color = i == 4 ? InfernalTheme.Gold : new Color(.27f, .22f, .19f);
+                Color roomColor = _visitedRooms.Contains(cell) ? new Color32(85, 64, 49, 255) : new Color32(58, 53, 50, 255);
+                _miniRooms[i].color = i == 4 ? InfernalTheme.Gold : roomColor;
                 _miniLabels[i].color = i == 4 ? InfernalTheme.Obsidian : InfernalTheme.Bone;
                 _miniLabels[i].text = i == 4 ? "•" : room.RoomType switch
                 {
@@ -632,7 +634,7 @@ namespace Hellfire.UI
                 lRect.anchoredPosition = new Vector2(0f, 35f);
                 lRect.sizeDelta = new Vector2(900f, 35f);
                 _legendText = legendObj.GetComponent<TextMeshProUGUI>();
-                _legendText.text = "<color=#7799CC>[+] Đã Qua</color>   |   <color=#445566>[-] Liền Kề</color>   |   <color=#FF3333>B Boss</color>   |   <color=#55CCFF>T Tế Đàn</color>   |   <color=#FFD700>R Rương</color>   |   <color=#FFA500>C Shop</color>   |   <color=#FF8844>X Combat</color>   |   ^ Bản thân";
+                _legendText.text = "<color=#B0C2DA>[+] Đã qua</color>   |   <color=#B7AB9D>[-] Liền kề</color>   |   ^ Bạn\n<color=#FF8272>B Boss</color>   |   <color=#9DD9EB>T Tế đàn</color>   |   <color=#E6C25E>R Rương</color>   |   <color=#E4BA77>C Cửa hàng</color>   |   <color=#FFAC75>X Chiến đấu</color>";
                 _legendText.fontSize = 15;
                 _legendText.alignment = TextAlignmentOptions.Center;
                 _legendText.color = new Color(0.8f, 0.85f, 0.9f, 0.9f);

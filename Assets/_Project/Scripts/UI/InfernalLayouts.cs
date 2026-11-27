@@ -53,7 +53,7 @@ namespace Hellfire.UI
             SettingRow(settings, "Sensitivity", 137);
             SettingRow(settings, "Fov", 60);
             SettingRow(settings, "Volume", -17);
-            Place(settings, "ScreenShakeToggle", 0, -101, 510, 44);
+            Place(settings, "ScreenShakeToggle", 0, -110, 555, 64);
             Place(settings, "SettingsBackBtn", 0, -200, 324, 60);
             Dim(Find(root, "DisconnectModal"), .89f);
             Paint(Find(root, "ModalBox"), "Panel", Color.white);
@@ -85,7 +85,9 @@ namespace Hellfire.UI
             Panel(panel, 916, 742);
             Type(panel, "LobbyTitle", 50, Gold, true);
             Place(panel, "LobbyTitle", 0, 255, 700, 70);
-            Place(panel, "ConnectionInfo", 0, 186, 660, 40);
+            Place(panel, "ConnectionInfo", -112, 184, 455, 49);
+            var connection = Find(panel, "ConnectionInfo")?.GetComponent<TMP_Text>();
+            if (connection != null) connection.overflowMode = TextOverflowModes.Ellipsis;
             Place(panel, "PlayerCount", 0, 126, 550, 38);
             for (int i = 1; i <= 4; i++)
             {
@@ -101,7 +103,7 @@ namespace Hellfire.UI
                 row.transform.SetSiblingIndex(slot.GetSiblingIndex());
                 Type(slot.GetComponentInChildren<TMP_Text>(true), 24, Bone);
             }
-            Place(panel, "CopyIpButton", 278, 186, 202, 46);
+            Place(panel, "CopyIpButton", 223, 184, 234, 55);
             Type(panel, "ConnectionInfo", 21, Bone);
             Type(panel, "PlayerCount", 23, Gold, true);
             Place(panel, "StartGameButton", -174, -246, 325, 62);
@@ -115,27 +117,32 @@ namespace Hellfire.UI
             Controls(root);
             var left = Find(root, "HealthPanel");
             var right = Find(root, "AmmoPanel");
-            Place(left, Vector2.zero, 227, 120, 374, 150);
-            Place(right, Vector2.right, -227, 120, 374, 150);
+            Place(left, Vector2.zero, 212, 112, 352, 144);
+            Place(right, Vector2.right, -212, 112, 352, 144);
             Paint(left, "Panel", Color.white);
             Paint(right, "Panel", Color.white);
-            Ornament(left, "Health", Centre, -139, 24, 42, 42);
-            Ornament(right, "Ammo", Centre, 137, -17, 42, 42);
-            Place(left, "HealthText", 21, 38, 270, 43);
+            Ornament(left, "Health", Centre, -133, 31, 38, 38);
+            Ornament(right, "Ammo", Centre, 125, -10, 38, 38);
+            Place(left, "HealthText", 15, 38, 250, 44);
             Type(left, "HealthText", 31, Bone, true);
-            Place(left, "HealthSlider", 0, 0, 285, 24);
+            Place(left, "HealthSlider", 0, 4, 272, 21);
             Meter(Find(left, "HealthSlider")?.GetComponent<Slider>(), Blood);
-            Place(right, "WeaponNameText", 0, 38, 325, 39);
+            Place(right, "WeaponNameText", 0, 39, 312, 36);
             Type(right, "WeaponNameText", 23, Gold, true);
-            Place(right, "AmmoText", -12, -10, 260, 57);
+            Place(right, "AmmoText", -12, -7, 245, 52);
             Type(right, "AmmoText", 49, Bone, true);
-            Place(right, "ReloadPromptText", -5, -52, 280, 28);
+            Place(right, "ReloadPromptText", -5, -48, 280, 26);
             Type(right, "ReloadPromptText", 19, Gold, true);
-            Place(Find(root, "SoulsText"), Vector2.one, -148, -53, 235, 39);
-            Place(Find(root, "FloorText"), Vector2.one, -148, -92, 235, 35);
-            Type(root, "SoulsText", 26, Gold, true);
+            var safeCorner = new GameObject("RunStatus", typeof(RectTransform)).transform;
+            safeCorner.SetParent(root, false);
+            Place(safeCorner, Vector2.one, -149, -74, 230, 76);
+            Panel(safeCorner, 230, 76);
+            safeCorner.SetAsFirstSibling();
+            Place(Find(root, "SoulsText"), Vector2.one, -157, -57, 162, 31);
+            Place(Find(root, "FloorText"), Vector2.one, -157, -91, 162, 30);
+            Type(root, "SoulsText", 23, Gold, true);
             Type(root, "FloorText", 21, Bone);
-            Ornament(root, "Sigil", Vector2.one, -245, -53, 28, 28);
+            Ornament(root, "Sigil", Vector2.one, -236, -56, 23, 23);
             Place(Find(root, "PlayerInfoText"), Vector2.up, 188, -48, 310, 32);
 
             Dim(Find(root, "PauseMenuPanel"), .83f);
@@ -151,7 +158,12 @@ namespace Hellfire.UI
             Ornament(pauseBox, "Sigil", Centre, 0, 53, 30, 30);
             Place(pauseBox, "ResumeButton", 0, -15, 335, 66);
             Place(pauseBox, "LeaveGameButton", 0, -99, 335, 62);
-            Paint(Find(root, "RevivePromptPanel"), "Panel", Color.white);
+            var revive = Find(root, "RevivePromptPanel");
+            Place(revive, new Vector2(.5f, 0f), 0, 238, 420, 74);
+            Paint(revive, "Panel", Color.white);
+            Place(revive, "RevivePromptText", 0, 13, 368, 30);
+            Place(revive, "ReviveProgressBar", 0, -16, 302, 16);
+            Type(revive, "RevivePromptText", 22, Bone, true);
             Type(root, "DownedTimerText", 27, Bone, true);
             Type(root, "BuffToastText", 26, Gold, true);
             var hit = Find(root, "Hitmarker");
@@ -166,14 +178,14 @@ namespace Hellfire.UI
             var panel = Find(root, prefix + "OverlayPanel");
             if (panel == null) return;
             Backdrop(panel, artwork);
-            Panel(panel, 1080, 536, 0, -10);
+            Panel(panel, 1030, 494, 0, -10);
             Type(panel, prefix + "Title", 60, Gold, true);
-            Place(panel, prefix + "Title", 0, 165, 900, 84);
-            Ornament(panel, "Sigil", Centre, 0, 230, 42, 42);
-            Place(panel, prefix + "StatsText", 0, 86, 820, 32);
+            Place(panel, prefix + "Title", 0, 145, 900, 80);
+            Ornament(panel, "Sigil", Centre, 0, 205, 38, 38);
+            Place(panel, prefix + "StatsText", 0, 78, 820, 32);
             Type(panel, prefix + "StatsText", 21, Bone);
-            Place(panel, prefix + "ReturnButton", 0, -193, 338, 62);
-            Place(panel, prefix + "WaitingText", 0, -193, 620, 62);
+            Place(panel, prefix + "ReturnButton", 0, -179, 338, 61);
+            Place(panel, prefix + "WaitingText", 0, -179, 620, 61);
         }
     }
 }

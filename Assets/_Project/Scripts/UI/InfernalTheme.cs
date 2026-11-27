@@ -155,10 +155,10 @@ namespace Hellfire.UI
                 Paint(graphic.transform, art, Color.white);
 
             var colors = selectable.colors;
-            colors.normalColor = new Color(.76f, .72f, .68f);
-            colors.highlightedColor = new Color(1f, .89f, .73f);
+            colors.normalColor = new Color(.83f, .79f, .74f);
+            colors.highlightedColor = new Color(1f, .94f, .83f);
             colors.selectedColor = colors.highlightedColor;
-            colors.pressedColor = new Color(.76f, .49f, .35f);
+            colors.pressedColor = new Color(.67f, .46f, .33f);
             colors.disabledColor = new Color(.40f, .39f, .38f);
             colors.colorMultiplier = 1f;
             colors.fadeDuration = .1f;

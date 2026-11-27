@@ -129,6 +129,7 @@ namespace Hellfire.UI
                 img.color = new Color(0.2f, 0.35f, 0.5f, 0.95f);
 
                 _copyIpButton = copyObj.GetComponent<Button>();
+                _copyIpButton.targetGraphic = img;
 
                 var textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
                 textObj.transform.SetParent(copyObj.transform, false);

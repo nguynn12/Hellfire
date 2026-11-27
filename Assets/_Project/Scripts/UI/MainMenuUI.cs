@@ -56,6 +56,7 @@ namespace Hellfire.UI
         [SerializeField] private Slider _masterVolumeSlider;
         [SerializeField] private TextMeshProUGUI _masterVolumeValueText;
         [SerializeField] private Toggle _reduceScreenShakeToggle;
+        private TMP_Text _shakeStateText;
         [SerializeField] private Button _settingsBackButton;
 
         [Header("Disconnect Modal")]
@@ -506,6 +507,7 @@ namespace Hellfire.UI
         public void OnReduceScreenShakeChanged(bool value)
         {
             GameSettings.SetReduceScreenShake(value);
+            UpdateShakeState(value);
         }
 
         private void EnsureSettingsControls()
@@ -518,18 +520,30 @@ namespace Hellfire.UI
                 _masterVolumeSlider = CreateSettingSlider(panel, "Volume", "Âm lượng tổng", out _masterVolumeValueText);
             if (_reduceScreenShakeToggle == null)
             {
-                var row = new GameObject("ScreenShakeToggle", typeof(RectTransform), typeof(Toggle));
+                var row = new GameObject("ScreenShakeToggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
                 row.transform.SetParent(panel, false);
                 var toggle = row.GetComponent<Toggle>();
-                var check = new GameObject("Box", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
-                check.transform.SetParent(row.transform, false);
-                InfernalTheme.Place(check.transform, new Vector2(.5f, .5f), 195, 0, 47, 42);
-                var mark = InfernalTheme.Ornament(check.transform, "Sigil", new Vector2(.5f, .5f), 0, 0, 31, 31);
-                toggle.targetGraphic = check;
-                toggle.graphic = mark;
-                InfernalTheme.Label(row.transform, "Label", "Giảm rung màn hình", -90, 0, 265, 44, 23);
+                toggle.targetGraphic = row.GetComponent<Image>();
+                var centre = new Vector2(.5f, .5f);
+                var box = new GameObject("Checkbox", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+                box.transform.SetParent(row.transform, false);
+                InfernalTheme.Place(box.transform, centre, 149, 0, 40, 40);
+                InfernalTheme.Paint(box.transform, "Panel", Color.white);
+                box.pixelsPerUnitMultiplier = 5f;
+                box.raycastTarget = false;
+                toggle.graphic = InfernalTheme.Ornament(box.transform, "Sigil", centre, 0, 0, 25, 25);
+                var label = InfernalTheme.Label(row.transform, "Label", "Giảm rung màn hình", -101, 0, 305, 44, 24);
+                label.alignment = TextAlignmentOptions.MidlineLeft;
+                _shakeStateText = InfernalTheme.Label(row.transform, "ShakeStateText", "", 208, 0, 65, 44, 21);
                 _reduceScreenShakeToggle = toggle;
             }
+        }
+
+        private void UpdateShakeState(bool on)
+        {
+            if (_shakeStateText == null) return;
+            _shakeStateText.text = on ? "BẬT" : "TẮT";
+            _shakeStateText.color = on ? InfernalTheme.Gold : InfernalTheme.Bone;
         }
 
         private Slider CreateSettingSlider(Transform panel, string key, string label, out TextMeshProUGUI value)
@@ -591,6 +605,7 @@ namespace Hellfire.UI
             {
                 _reduceScreenShakeToggle.onValueChanged.RemoveAllListeners();
                 _reduceScreenShakeToggle.isOn = reduceShake;
+                UpdateShakeState(reduceShake);
                 _reduceScreenShakeToggle.onValueChanged.AddListener(OnReduceScreenShakeChanged);
             }
         }

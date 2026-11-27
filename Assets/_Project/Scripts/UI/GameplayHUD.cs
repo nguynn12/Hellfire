@@ -130,14 +130,14 @@ namespace Hellfire.UI
             if (_armorText == null)
             {
                 _armorText = (TextMeshProUGUI)InfernalTheme.Label(root, "ArmorText", "", 0, 0, 200, 32, 22);
-                InfernalTheme.Place(_armorText.transform, left, 227, 215, 260, 32);
+                InfernalTheme.Place(_armorText.transform, left, 212, 204, 260, 32);
                 _armorText.gameObject.SetActive(false);
             }
 
             if (_shieldIndicatorPanel == null)
             {
                 _shieldTimerText = (TextMeshProUGUI)InfernalTheme.Label(root, "ShieldTimerText", "", 0, 0, 240, 32, 22);
-                InfernalTheme.Place(_shieldTimerText.transform, left, 227, 250, 340, 36);
+                InfernalTheme.Place(_shieldTimerText.transform, left, 212, 239, 340, 36);
                 _shieldIndicatorPanel = _shieldTimerText.gameObject;
             }
 
@@ -151,9 +151,9 @@ namespace Hellfire.UI
             if (health == null || _staminaText == null) return;
             var centre = new Vector2(.5f, .5f);
             _staminaText.transform.SetParent(health, false);
-            InfernalTheme.Place(_staminaText.transform, centre, 6, -25, 150, 23);
-            InfernalTheme.Type(_staminaText, 17, InfernalTheme.Gold);
-            var track = InfernalTheme.Ornament(health, "Meter", centre, 0, -49, 270, 16);
+            InfernalTheme.Place(_staminaText.transform, centre, 0, -23, 170, 24);
+            InfernalTheme.Type(_staminaText, 19, InfernalTheme.Gold);
+            var track = InfernalTheme.Ornament(health, "Meter", centre, 0, -48, 270, 16);
             track.preserveAspect = false;
             InfernalTheme.Paint(track.transform, "Meter", Color.white);
             var fill = new GameObject("StaminaFill", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
@@ -309,14 +309,13 @@ namespace Hellfire.UI
                     var panelObj = new GameObject("TeammatePanel", typeof(RectTransform), typeof(TeammateHUDPanel));
                     panelObj.transform.SetParent(root, false);
                     var pRect = panelObj.GetComponent<RectTransform>();
-                    pRect.anchorMin = new Vector2(0f, 0.45f);
-                    pRect.anchorMax = new Vector2(0f, 0.75f);
-                    pRect.pivot = new Vector2(0f, 0.5f);
-                    pRect.anchoredPosition = new Vector2(25f, 0f);
-                    pRect.sizeDelta = new Vector2(240f, 180f);
+                    pRect.anchorMin = pRect.anchorMax = Vector2.up;
+                    pRect.pivot = Vector2.up;
+                    pRect.anchoredPosition = new Vector2(36f, -85f);
+                    pRect.sizeDelta = new Vector2(222f, 174f);
 
                     var vlg = panelObj.AddComponent<VerticalLayoutGroup>();
-                    vlg.spacing = 10f;
+                    vlg.spacing = 7f;
                     vlg.childControlWidth = true;
                     vlg.childControlHeight = false;
                     vlg.childForceExpandWidth = true;
@@ -864,23 +863,29 @@ namespace Hellfire.UI
             var panel = duration.transform.parent;
             if (InfernalTheme.Find(panel, "ResultHeading0") != null) return;
             string[] headings = { "NGƯỜI CHƠI", "HẠ GỤC", "SÁT THƯƠNG", "CỨU", "LẦN GỤC" };
-            float[] x = { -290f, -85f, 70f, 217f, 346f };
+            float[] x = { -293f, -100f, 64f, 218f, 347f };
             float[] w = { 260f, 110f, 150f, 90f, 130f };
             for (int column = 0; column < headings.Length; column++)
             {
-                var heading = InfernalTheme.Label(panel, "ResultHeading" + column, headings[column], x[column], 34, w[column], 28, 18);
-                InfernalTheme.Type(heading, 18, InfernalTheme.Gold, true);
+                var heading = InfernalTheme.Label(panel, "ResultHeading" + column, headings[column], x[column], 26, w[column], 34, 20);
+                InfernalTheme.Type(heading, 20, InfernalTheme.Gold, true);
             }
 
             for (int row = 0; row < stats.Length; row++)
             {
                 var player = stats[row];
+                float y = -14 - row * 34f;
+                var stripe = new GameObject("ResultRow" + row, typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+                stripe.transform.SetParent(panel, false);
+                InfernalTheme.Place(stripe.transform, new Vector2(.5f, .5f), 0, y, 864, 32);
+                stripe.color = new Color(.87f, .74f, .58f, row % 2 == 0 ? .09f : .045f);
+                stripe.raycastTarget = false;
                 string[] cells = { $"[P{player.ColorIndex + 1}] {player.PlayerName}", player.Kills.ToString(),
                     Mathf.RoundToInt(player.DamageDealt).ToString(), player.Revives.ToString(), player.TimesDowned.ToString() };
                 for (int column = 0; column < cells.Length; column++)
                 {
                     var cell = InfernalTheme.Label(panel, $"ResultCell{row}_{column}", cells[column],
-                        x[column], -4 - row * 34f, w[column], 31, 20);
+                        x[column], y, w[column], 32, 22);
                     cell.richText = false;
                     cell.overflowMode = TextOverflowModes.Ellipsis;
                 }
