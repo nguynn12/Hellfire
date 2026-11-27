@@ -24,17 +24,17 @@ namespace Hellfire.EditorTools
             AssetDatabase.Refresh();
             try
             {
-                var lava = MakeBiome("Lava", new Color(.26f, .17f, .15f), new Color(1, .57f, .3f));
-                var ice = MakeBiome("Ice", new Color(.21f, .31f, .39f), new Color(.41f, .74f, 1));
+                var lava = MakeBiome("Lava", new Color(1f, .31f, .105f));
+                var ice = MakeBiome("Ice", new Color(.36f, .69f, 1f));
                 var scene = EditorSceneManager.OpenScene("Assets/_Project/Scenes/Gameplay.unity");
                 var generator = Object.FindAnyObjectByType<DungeonGenerator>();
                 Assign(generator, ("_lavaArt", lava), ("_iceArt", ice));
                 EditorSceneManager.SaveScene(scene);
 
                 Assign(Weapon("Pistol"), ("_viewmodelPrefab", WeaponLab("Viewmodel")), ("_worldModelPrefab", WeaponLab("WorldModel")));
-                ConfigureWeapon("SMG", "IronShredder", .43f, new Vector3(0f, -.13f, .10f), 0f);
-                ConfigureWeapon("Shotgun", "BoneCrusher", .51f, new Vector3(0f, -.14f, .11f), 0f);
-                ConfigureWeapon("Rifle", "ObsidianFang", .53f, new Vector3(0f, -.10f, .13f), 0f);
+                ConfigureWeapon("SMG", "IronShredder", .43f, new Vector3(0f, -.13f, .10f), .075f);
+                ConfigureWeapon("Shotgun", "BoneCrusher", .51f, new Vector3(0f, -.14f, .11f), .07f);
+                ConfigureWeapon("Rifle", "ObsidianFang", .53f, new Vector3(0f, -.10f, .13f), .065f);
 
                 const string playerPath = "Assets/_Project/Prefabs/Player.prefab";
                 using (var edit = new PrefabUtility.EditPrefabContentsScope(playerPath))
@@ -71,7 +71,7 @@ namespace Hellfire.EditorTools
         private static GameObject WeaponLab(string kind) => AssetDatabase.LoadAssetAtPath<GameObject>(
             "Assets/_Project/Art/WeaponDevelopment/HellsWhisper/PF_HellsWhisper_" + kind + ".prefab");
 
-        private static void ConfigureWeapon(string slot, string model, float length, Vector3 position, float yaw)
+        private static void ConfigureWeapon(string slot, string model, float length, Vector3 position, float adsHeight)
         {
             string path = "Assets/_Project/Models/Weapons/" + model;
             var original = LoadModel(path);
@@ -81,9 +81,7 @@ namespace Hellfire.EditorTools
             var bounds = GetBounds(instance);
             float scale = length / bounds.size.z;
             var offset = new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
-            var rotate = Quaternion.Euler(0f, yaw, 0f);
-            instance.transform.localPosition = position - rotate * (offset * scale);
-            instance.transform.localRotation = rotate * instance.transform.localRotation;
+            instance.transform.localPosition = position - offset * scale;
             instance.transform.localScale *= scale;
             foreach (var item in instance.GetComponentsInChildren<Renderer>())
             {
@@ -93,23 +91,49 @@ namespace Hellfire.EditorTools
             }
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, Output + "/" + model + "_Viewmodel.prefab");
             Object.DestroyImmediate(root);
-            Assign(Weapon(slot), ("_viewmodelPrefab", prefab));
+            var weapon = Weapon(slot);
+            Assign(weapon, ("_viewmodelPrefab", prefab));
+            var serialized = new SerializedObject(weapon);
+            serialized.FindProperty("_adsPosition").vector3Value = new Vector3(0f, adsHeight, .41f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
             Debug.Log($"[VISUAL] {slot} uses {model}, FPS length={length:F2}m");
         }
 
-        private static DungeonArtSet MakeBiome(string biome, Color floorColor, Color light)
+        private static DungeonArtSet MakeBiome(string biome, Color light)
         {
             var set = GetOrCreate<DungeonArtSet>(Output + "/" + biome + ".asset");
             (set.Wall, set.WallSize) = MakeModule(biome + "Wall", true);
             (set.Door, set.DoorSize) = MakeModule(biome + "DoorWay");
             (set.Gate, set.GateSize) = MakeModule(biome + "Gate");
             (set.Pillar, set.PillarSize) = MakeModule(biome + "Pillar");
-            var baseline = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Materials/M_LoS_Obstacle_Wall.mat");
-            set.Floor = Surface(baseline, biome + "_Floor", floorColor);
-            set.Ceiling = Surface(baseline, biome + "_Ceiling", floorColor * .60f);
+            var baseline = set.Wall.GetComponent<MeshRenderer>().sharedMaterial;
+            var maps = DungeonMasonryTextures.Build(biome, Output);
+            set.Floor = Masonry(baseline, biome + "_Floor", Color.white, maps, 1f);
+            set.Ceiling = Masonry(baseline, biome + "_Ceiling", new Color(.79f, .79f, .79f), maps, .8f);
             set.CorridorLight = light;
             EditorUtility.SetDirty(set);
             return set;
+        }
+
+        private static Material Masonry(Material template, string id, Color tint,
+            (Texture2D color, Texture2D normal, Texture2D mask) maps, float bump)
+        {
+            var material = Surface(template, id, tint);
+            material.SetTexture("_BaseMap", maps.color);
+            material.SetTexture("_MainTex", maps.color);
+            material.SetTexture("_BumpMap", maps.normal);
+            material.SetFloat("_BumpScale", bump);
+            material.SetTexture("_MetallicGlossMap", maps.mask);
+            material.SetTexture("_OcclusionMap", maps.mask);
+            material.SetFloat("_OcclusionStrength", .8f);
+            material.SetFloat("_Smoothness", 1f);
+            material.SetFloat("_Metallic", 0f);
+            material.SetTexture("_EmissionMap", null);
+            material.SetColor("_EmissionColor", Color.black);
+            material.DisableKeyword("_EMISSION");
+            material.EnableKeyword("_METALLICSPECGLOSSMAP");
+            material.EnableKeyword("_OCCLUSIONMAP");
+            return material;
         }
 
         private static (GameObject prefab, Vector3 size) MakeModule(string id, bool recurringWall = false)
@@ -139,7 +163,6 @@ namespace Hellfire.EditorTools
             root.AddComponent<MeshFilter>().sharedMesh = saved;
             var art = root.AddComponent<MeshRenderer>();
             art.sharedMaterial = MaterialForModel(path, id);
-            art.shadowCastingMode = ShadowCastingMode.Off;
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, Output + "/" + id + ".prefab");
             Debug.Log($"[VISUAL] {id} {filter.sharedMesh.vertexCount}->{saved.vertexCount} verts; " +
                       $"{saved.GetIndexCount(0) / 3} triangles; authored size {bounds.size:F3}");
@@ -167,7 +190,14 @@ namespace Hellfire.EditorTools
             if (emission != null)
             {
                 material.SetTexture("_EmissionMap", emission);
-                material.SetColor("_EmissionColor", new Color(.58f, .58f, .58f));
+                float strength = id switch
+                {
+                    "LavaWall" => .93f,
+                    "LavaDoorWay" or "LavaPillar" => 1.2f,
+                    "IceDoorWay" or "IcePillar" => .53f,
+                    _ => .58f
+                };
+                material.SetColor("_EmissionColor", Color.white * strength);
                 material.EnableKeyword("_EMISSION");
             }
             material.enableInstancing = true;

@@ -267,6 +267,15 @@ namespace Hellfire.Networking
             foreach (string biome in new[] { "Lava", "Ice" })
             foreach (string kind in new[] { "_WallTiles", "DoorWay", "Gate", "Pillar" })
                 if (!art.Any(item => item.StartsWith(biome + kind, StringComparison.Ordinal))) return false;
+            foreach (string surface in new[] { "MasonryFloor", "MasonryVault" })
+            {
+                var renderers = root.GetComponentsInChildren<MeshRenderer>().Where(renderer => renderer.name == surface).ToArray();
+                if (renderers.Length != grid.Rooms.Count + grid.Corridors.Count ||
+                    renderers.Any(renderer => renderer.GetComponent<Collider>() != null ||
+                        renderer.sharedMaterial.GetTexture("_BaseMap") == null ||
+                        renderer.sharedMaterial.GetTexture("_BumpMap") == null))
+                    return false;
+            }
 
             foreach (var gates in generator.RoomGates.Values)
             foreach (var gate in gates)
@@ -315,6 +324,14 @@ namespace Hellfire.Networking
                     model.GetComponentsInChildren<Collider>().Any(collider => collider.enabled))
                 { Fail("viewmodel references or collider " + captions[i]); yield break; }
                 yield return Capture(captions[i] + "-Hip");
+                var strafe = i % 2 == 0 ? Key.D : Key.A;
+                Vector3 start = movement.transform.position;
+                InputSystem.QueueStateEvent(keys, new KeyboardState(strafe));
+                yield return new WaitForSecondsRealtime(.25f);
+                yield return Capture(captions[i] + "-Moving");
+                InputSystem.QueueStateEvent(keys, new KeyboardState());
+                if (Vector3.Distance(start, movement.transform.position) < .05f || !model.gameObject.activeInHierarchy)
+                { Fail("viewmodel during strafe " + captions[i]); yield break; }
                 InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Right));
                 yield return WaitFor(() => weapon.IsAimingDownSights && camera.fieldOfView < 72f, "ADS " + captions[i]);
                 if (_finished) yield break;

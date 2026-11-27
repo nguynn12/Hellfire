@@ -26,6 +26,7 @@ MonoBehaviour:
   _isAutomatic: 0
   _magSize: 6
   _reloadTime: 2.2
+  _adsPosition: {x: 0, y: 0.07, z: 0.41}
   _viewmodelPrefab: {fileID: 2558497541599566264, guid: 9783e852a6b714492956ae0470a82e16, type: 3}
   _worldModelPrefab: {fileID: 0}
   _fireSound: {fileID: 0}

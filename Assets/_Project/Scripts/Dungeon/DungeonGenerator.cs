@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace Hellfire.Dungeon
 {
@@ -286,9 +287,14 @@ namespace Hellfire.Dungeon
             var art = _roomArt[room.GridPosition];
             if (art != null)
             {
-                renderer.sharedMaterial = art.Floor;
-                BuildCeiling(roomObj.transform, Vector3.up * _wallHeight, room.Size, art);
-                CreateCorridorLight(roomObj.transform, room.WorldCenter + Vector3.up * (_wallHeight - .65f), "RoomLight", art, 16f);
+                DungeonMasonry.Floor(roomObj.transform, floor.transform, art.Floor);
+                DungeonMasonry.Vault(roomObj.transform, Vector3.zero, room.Size, _wallHeight, art.Ceiling, false);
+                var centre = room.WorldCenter;
+                CreateLight(roomObj.transform, centre + new Vector3(room.Size.x * .25f, _wallHeight - .55f, room.Size.y * .28f),
+                    "VaultKey", art, 17f, 8.5f, centre + Vector3.down * .8f);
+                var bounce = CreateLight(roomObj.transform, centre + new Vector3(-room.Size.x * .19f, 2.7f, -room.Size.y * .21f),
+                    "MasonryBounce", art, 11f, art == _lavaArt ? 3.7f : 2.5f);
+                bounce.color = Color.Lerp(art.CorridorLight, new Color(.78f, .8f, .87f), .35f);
             }
             Vector2 halfRoom = room.Size * 0.5f;
             float wallThickness = 1f;
@@ -338,22 +344,14 @@ namespace Hellfire.Dungeon
                 var bounds = new Bounds(room.WorldCenter + bottom + Vector3.up * art.PillarSize.y * .5f, art.PillarSize);
                 if (!RoomThemeBuilder.Allowed(room, bounds)) continue;
                 var pillar = art.Place(art.Pillar, parent, bottom, Quaternion.identity);
+                var shaft = pillar.GetComponent<MeshFilter>().transform;
+                float top = DungeonMasonry.VaultHeight(_wallHeight, room.Size, bottom.x, bottom.z, false);
+                shaft.localScale = new Vector3(1f, top / art.PillarSize.y, 1f);
                 var collider = pillar.AddComponent<BoxCollider>();
-                collider.center = Vector3.up * art.PillarSize.y * .5f;
-                collider.size = art.PillarSize;
+                collider.center = Vector3.up * art.PillarSize.y * .5f / shaft.localScale.y;
+                collider.size = new Vector3(art.PillarSize.x, art.PillarSize.y / shaft.localScale.y, art.PillarSize.z);
                 room.ObstacleBounds.Add(bounds);
             }
-        }
-
-        private void BuildCeiling(Transform parent, Vector3 centre, Vector2 size, DungeonArtSet art)
-        {
-            var ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            ceiling.name = "Ceiling";
-            ceiling.transform.SetParent(parent, false);
-            ceiling.transform.localPosition = centre + Vector3.up * .12f;
-            ceiling.transform.localScale = new Vector3(size.x, .24f, size.y);
-            DestroyImmediate(ceiling.GetComponent<Collider>());
-            ceiling.GetComponent<Renderer>().sharedMaterial = art.Ceiling;
         }
 
         private void BuildRoomWall(Transform parent, DungeonRoomNode room, Vector2Int dir, Vector3 wallPos, Vector3 wallScale)
@@ -399,7 +397,11 @@ namespace Hellfire.Dungeon
             {
                 wallPos.y = 0f;
                 var facing = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.y), Vector3.up);
-                var door = art.Place(art.Door, parent, wallPos, facing, (_corridorWidth + 1.15f) / art.DoorSize.x);
+                float scale = (_corridorWidth + 1.15f) / art.DoorSize.x;
+                var door = art.Place(art.Door, parent, wallPos, facing, scale);
+                // Recessed warm/cold spill is attached to existing masonry at the passage.
+                Vector3 recess = parent.TransformPoint(wallPos + facing * new Vector3(0f, Mathf.Min(2.65f, art.DoorSize.y * scale - .60f), .65f));
+                CreateLight(parent, recess, "DoorwaySpill", art, 6.6f, 2.1f);
                 // Preserve a 3.2 m clear lane and keep the sides aligned to the original 4 m opening.
                 for (int side = -1; side <= 1; side += 2)
                 {
@@ -698,7 +700,7 @@ namespace Hellfire.Dungeon
             if (renderer != null)
             {
                 if (art != null)
-                    renderer.sharedMaterial = art.Floor;
+                    DungeonMasonry.Floor(corridorObj.transform, floor.transform, art.Floor);
                 else if (_corridorFloorMaterial != null)
                 {
                     renderer.sharedMaterial = _corridorFloorMaterial;
@@ -709,31 +711,50 @@ namespace Hellfire.Dungeon
                 }
             }
 
-            if (art != null) BuildCeiling(corridorObj.transform, midPoint + Vector3.up * _wallHeight,
-                isHorizontal ? new Vector2(length, _corridorWidth + 1f) : new Vector2(_corridorWidth + 1f, length), art);
+            if (art != null)
+            {
+                var span = isHorizontal ? new Vector2(length + .3f, _corridorWidth + .25f) :
+                    new Vector2(_corridorWidth + .25f, length + .3f);
+                DungeonMasonry.Vault(corridorObj.transform, corridorObj.transform.InverseTransformPoint(midPoint),
+                    span, _wallHeight, art.Ceiling, true);
+            }
             // 2 đèn điểm ở 1/3 và 2/3 chiều dài, nháy nhẹ theo mục 9.1 và 17.2
             Vector3 light1Pos = Vector3.Lerp(start, end, 1f / 3f);
             light1Pos.y = _wallHeight - 1.2f;
-            CreateCorridorLight(corridorObj.transform, light1Pos, "CorridorLight_1", art);
+            CreateLight(corridorObj.transform, light1Pos, "CorridorLight_1", art, 9f, art == null ? 1.2f : 4.2f);
 
             Vector3 light2Pos = Vector3.Lerp(start, end, 2f / 3f);
             light2Pos.y = _wallHeight - 1.2f;
-            CreateCorridorLight(corridorObj.transform, light2Pos, "CorridorLight_2", art);
+            CreateLight(corridorObj.transform, light2Pos, "CorridorLight_2", art, 9f, art == null ? 1.2f : 4.2f);
         }
 
-        private void CreateCorridorLight(Transform parent, Vector3 worldPos, string name, DungeonArtSet art, float range = 9f)
+        private Light CreateLight(Transform parent, Vector3 worldPos, string name, DungeonArtSet art, float range,
+            float intensity, Vector3? focus = null)
         {
             var lightObj = new GameObject(name);
             lightObj.transform.SetParent(parent);
             lightObj.transform.position = worldPos;
 
             var light = lightObj.AddComponent<Light>();
-            light.type = LightType.Point;
+            light.type = focus.HasValue ? LightType.Spot : LightType.Point;
             light.range = range;
             light.color = art != null ? art.CorridorLight : new Color(1.0f, 0.72f, 0.45f);
-            light.intensity = 1.2f;
+            light.intensity = intensity;
+            if (focus.HasValue)
+            {
+                light.transform.LookAt(focus.Value);
+                light.spotAngle = 115f;
+                light.innerSpotAngle = 74f;
+                light.shadows = LightShadows.Soft;
+                light.shadowStrength = .7f;
+                if (Application.isPlaying)
+                    light.GetUniversalAdditionalLightData().additionalLightsShadowResolutionTier =
+                        UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow;
+            }
 
-            lightObj.AddComponent<CorridorLightFlicker>();
+            if (name.StartsWith("CorridorLight", StringComparison.Ordinal) && (art == null || art == _lavaArt))
+                lightObj.AddComponent<CorridorLightFlicker>();
+            return light;
         }
 
         private void BuildCorridorWall(Transform parent, Vector3 pos, Vector3 scale, DungeonArtSet art, Vector2Int outside)

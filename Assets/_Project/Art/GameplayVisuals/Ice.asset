@@ -18,7 +18,7 @@ MonoBehaviour:
   Pillar: {fileID: 2932328087550437459, guid: 5c61402001fd54e5cbcb81bf61678e38, type: 3}
   Floor: {fileID: 2100000, guid: 6f901043088ed4f0d89e3f4a106c2e5b, type: 2}
   Ceiling: {fileID: 2100000, guid: c5f19a8b5f2984676985c3cdda48306f, type: 2}
-  CorridorLight: {r: 0.41, g: 0.74, b: 1, a: 1}
+  CorridorLight: {r: 0.36, g: 0.69, b: 1, a: 1}
   WallSize: {x: 1.8987516, y: 1.814079, z: 0.36925086}
   DoorSize: {x: 1.8461015, y: 1.7108114, z: 0.46166125}
   GateSize: {x: 1.7576095, y: 1.812644, z: 0.17944397}
