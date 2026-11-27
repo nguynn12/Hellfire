@@ -212,30 +212,23 @@ namespace Hellfire.Networking
         /// </summary>
         public void ReturnToLobby()
         {
-            if (!IsServer)
-            {
-                ReturnToLobbyServerRpc();
+            if (!IsServer || (CurrentState.Value != GameState.Victory && CurrentState.Value != GameState.GameOver))
                 return;
-            }
-
-            SetState(GameState.Lobby);
 
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.SceneManager != null)
             {
                 Debug.Log($"[GameManager] Host đang chuyển tất cả người chơi về Sảnh ({_lobbySceneName})...");
-                NetworkManager.Singleton.SceneManager.LoadScene(_lobbySceneName, LoadSceneMode.Single);
+                var status = NetworkManager.Singleton.SceneManager.LoadScene(_lobbySceneName, LoadSceneMode.Single);
+                if (status == SceneEventProgressStatus.Started)
+                    SetState(GameState.Lobby);
+                else
+                    Debug.LogWarning($"[GameManager] Không mở được sảnh: {status}");
             }
             else
             {
+                SetState(GameState.Lobby);
                 SceneManager.LoadScene(_lobbySceneName);
             }
-        }
-
-        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-        public void ReturnToLobbyServerRpc(RpcParams rpcParams = default)
-        {
-            // Server xử lý yêu cầu chuyển scene về Sảnh Lobby cho tất cả người chơi
-            ReturnToLobby();
         }
 
         public bool CanPlayerMove()

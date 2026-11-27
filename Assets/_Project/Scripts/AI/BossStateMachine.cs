@@ -3,6 +3,7 @@
 // Môi trường thực thi: CHỈ TRÊN SERVER (Server-Authoritative).
 
 using System.Collections;
+using System.Collections.Generic;
 using Hellfire.Combat;
 using Unity.Netcode;
 using UnityEngine;
@@ -38,6 +39,7 @@ namespace Hellfire.AI
         private float _lastSummonHealthThreshold;
         private float _phase2RangedTimer;
         private bool _isPhase2RangedMode = false;
+        private readonly HashSet<Health> _playersHit = new HashSet<Health>();
 
         public static BossStateMachine ActiveBoss { get; private set; }
         public static event System.Action<BossStateMachine> OnBossSpawned;
@@ -231,16 +233,7 @@ namespace Hellfire.AI
             PlayAttackFeedbackClientRpc();
 
             // Quét vùng trước mặt trong bán kính 4m
-            Collider[] hitColliders = Physics.OverlapSphere(transform.position + transform.forward * 2f, 2.5f);
-            foreach (var col in hitColliders)
-            {
-                var playerHealth = col.GetComponentInParent<Health>();
-                if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
-                {
-                    var payload = new DamagePayload(_phase1MeleeDamage, 15f, HitboxType.Torso, NetworkObjectId);
-                    playerHealth.TakeDamage(payload);
-                }
-            }
+            DamagePlayersInArea(transform.position + transform.forward * 2f, 2.5f, _phase1MeleeDamage, 15f);
         }
 
         private void ExecuteFireballRangedAOE()
@@ -258,13 +251,19 @@ namespace Hellfire.AI
         {
             yield return new WaitForSeconds(delay);
 
-            Collider[] hitColliders = Physics.OverlapSphere(center, _fireballExplosionRadius);
-            foreach (var col in hitColliders)
+            DamagePlayersInArea(center, _fireballExplosionRadius, _phase2FireballDamage, 20f);
+        }
+
+        private void DamagePlayersInArea(Vector3 center, float radius, float damage, float penetration)
+        {
+            _playersHit.Clear();
+            // The player's body, head and controller can all overlap the same attack.
+            foreach (var collider in Physics.OverlapSphere(center, radius, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
-                var playerHealth = col.GetComponentInParent<Health>();
-                if (playerHealth != null && IsTargetAliveAndValid(playerHealth))
+                var playerHealth = collider.GetComponentInParent<Health>();
+                if (IsTargetAliveAndValid(playerHealth) && _playersHit.Add(playerHealth))
                 {
-                    var payload = new DamagePayload(_phase2FireballDamage, 20f, HitboxType.Torso, NetworkObjectId);
+                    var payload = new DamagePayload(damage, penetration, HitboxType.Torso, NetworkObjectId);
                     playerHealth.TakeDamage(payload);
                 }
             }
