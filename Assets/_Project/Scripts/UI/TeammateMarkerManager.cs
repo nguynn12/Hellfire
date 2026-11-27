@@ -101,7 +101,9 @@ namespace Hellfire.UI
             iconRect.sizeDelta = new Vector2(28f, 28f);
             iconRect.anchoredPosition = new Vector2(0f, 0f);
             var iconImg = iconObj.GetComponent<Image>();
-            iconImg.color = Color.cyan;
+            InfernalTheme.Paint(iconRect, "Panel", Color.white);
+            iconImg.pixelsPerUnitMultiplier = 7f;
+            iconImg.raycastTarget = false;
 
             var numObj = new GameObject("NumberText", typeof(RectTransform), typeof(TextMeshProUGUI));
             numObj.transform.SetParent(iconObj.transform, false);
@@ -109,7 +111,7 @@ namespace Hellfire.UI
             numTmp.fontSize = 15;
             numTmp.fontStyle = FontStyles.Bold;
             numTmp.alignment = TextAlignmentOptions.Center;
-            numTmp.color = Color.black;
+            InfernalTheme.Type(numTmp, 15, InfernalTheme.Bone, true);
             var numRect = numObj.GetComponent<RectTransform>();
             numRect.anchorMin = Vector2.zero;
             numRect.anchorMax = Vector2.one;
@@ -176,11 +178,10 @@ namespace Hellfire.UI
 
         private void LateUpdate()
         {
-            if (_mainCamera == null)
-            {
-                _mainCamera = Camera.main;
-                if (_mainCamera == null) return;
-            }
+            var playerCamera = PlayerMovement.LocalInstance?.PlayerCamera;
+            if (playerCamera != null) _mainCamera = playerCamera;
+            else if (_mainCamera == null || !_mainCamera.isActiveAndEnabled) _mainCamera = Camera.main;
+            if (_mainCamera == null) return;
 
             float screenW = Screen.width;
             float screenH = Screen.height;

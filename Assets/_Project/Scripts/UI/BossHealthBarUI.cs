@@ -42,6 +42,18 @@ namespace Hellfire.UI
 
             Instance = this;
             BuildUIHierarchyIfMissing();
+            if (transform is RectTransform overlay && overlay.parent == null)
+            {
+                overlay.anchorMin = Vector2.zero;
+                overlay.anchorMax = Vector2.one;
+                overlay.offsetMin = overlay.offsetMax = Vector2.zero;
+            }
+            InfernalTheme.Meter(_healthSlider, InfernalTheme.Blood, "Boss");
+            InfernalTheme.Place(_bossNameText.transform, new Vector2(.5f, .5f), 0, 13, 550, 35);
+            InfernalTheme.Place(_healthSlider.transform, new Vector2(.5f, .5f), 0, -16, 520, 31);
+            InfernalTheme.Type(_bossNameText, 25, InfernalTheme.Gold, true);
+            InfernalTheme.Type(_healthValueText, 17, InfernalTheme.Bone);
+            InfernalTheme.Type(_phase2BannerText, 38, InfernalTheme.Ember, true);
         }
 
         private void Start()

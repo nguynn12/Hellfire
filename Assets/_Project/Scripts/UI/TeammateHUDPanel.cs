@@ -135,10 +135,13 @@ namespace Hellfire.UI
         {
             var root = new GameObject("TeammateSlot", typeof(RectTransform), typeof(CanvasGroup));
             var rootRect = root.GetComponent<RectTransform>();
-            rootRect.sizeDelta = new Vector2(230f, 48f);
+            rootRect.sizeDelta = new Vector2(222f, 52f);
 
             var bgImg = root.AddComponent<Image>();
             bgImg.color = new Color(0.12f, 0.08f, 0.1f, 0.85f);
+            InfernalTheme.Paint(root.transform, "Panel", Color.white);
+            bgImg.pixelsPerUnitMultiplier = 3.5f;
+            bgImg.raycastTarget = false;
 
             // Chip màu + số
             var chipObj = new GameObject("ColorChip", typeof(RectTransform), typeof(Image));
@@ -146,8 +149,10 @@ namespace Hellfire.UI
             var chipRect = chipObj.GetComponent<RectTransform>();
             chipRect.anchorMin = new Vector2(0f, 0.5f);
             chipRect.anchorMax = new Vector2(0f, 0.5f);
-            chipRect.anchoredPosition = new Vector2(20f, 0f);
-            chipRect.sizeDelta = new Vector2(28f, 28f);
+            chipRect.anchoredPosition = new Vector2(23f, 0f);
+            chipRect.sizeDelta = new Vector2(26f, 30f);
+            InfernalTheme.Paint(chipRect, "Panel", Color.white);
+            chipObj.GetComponent<Image>().pixelsPerUnitMultiplier = 5f;
 
             var numObj = new GameObject("NumberText", typeof(RectTransform), typeof(TextMeshProUGUI));
             numObj.transform.SetParent(chipObj.transform, false);
@@ -155,7 +160,7 @@ namespace Hellfire.UI
             numTmp.fontSize = 16;
             numTmp.fontStyle = FontStyles.Bold;
             numTmp.alignment = TextAlignmentOptions.Center;
-            numTmp.color = Color.black;
+            InfernalTheme.Type(numTmp, 17, InfernalTheme.Bone, true);
             var numRect = numObj.GetComponent<RectTransform>();
             numRect.anchorMin = Vector2.zero;
             numRect.anchorMax = Vector2.one;
@@ -169,13 +174,16 @@ namespace Hellfire.UI
             nameTmp.fontSize = 13;
             nameTmp.fontStyle = FontStyles.Bold;
             nameTmp.alignment = TextAlignmentOptions.Left;
-            nameTmp.color = Color.white;
+            InfernalTheme.Type(nameTmp, 18, InfernalTheme.Bone, true);
+            nameTmp.richText = false;
+            nameTmp.textWrappingMode = TextWrappingModes.NoWrap;
+            nameTmp.overflowMode = TextOverflowModes.Ellipsis;
             var nameRect = nameObj.GetComponent<RectTransform>();
             nameRect.anchorMin = new Vector2(0f, 1f);
             nameRect.anchorMax = new Vector2(1f, 1f);
             nameRect.pivot = new Vector2(0f, 1f);
-            nameRect.anchoredPosition = new Vector2(40f, -4f);
-            nameRect.sizeDelta = new Vector2(-46f, 18f);
+            nameRect.anchoredPosition = new Vector2(45f, -7f);
+            nameRect.sizeDelta = new Vector2(-58f, 22f);
 
             // Thanh máu
             var barObj = new GameObject("HealthBar", typeof(RectTransform), typeof(Image));
@@ -184,10 +192,10 @@ namespace Hellfire.UI
             barRect.anchorMin = new Vector2(0f, 0f);
             barRect.anchorMax = new Vector2(1f, 0f);
             barRect.pivot = new Vector2(0f, 0f);
-            barRect.anchoredPosition = new Vector2(40f, 6f);
-            barRect.sizeDelta = new Vector2(-46f, 16f);
+            barRect.anchoredPosition = new Vector2(45f, 8f);
+            barRect.sizeDelta = new Vector2(-58f, 7f);
             var barImg = barObj.GetComponent<Image>();
-            barImg.color = new Color(0.25f, 0.05f, 0.05f, 0.9f);
+            barImg.color = new Color32(53, 39, 34, 255);
 
             var fillObj = new GameObject("Fill", typeof(RectTransform), typeof(Image));
             fillObj.transform.SetParent(barObj.transform, false);
@@ -197,11 +205,7 @@ namespace Hellfire.UI
             fillRect.offsetMin = Vector2.zero;
             fillRect.offsetMax = Vector2.zero;
             var fillImg = fillObj.GetComponent<Image>();
-            fillImg.type = Image.Type.Filled;
-            fillImg.fillMethod = Image.FillMethod.Horizontal;
-            fillImg.fillOrigin = 0;
-            fillImg.fillAmount = 1.0f;
-            fillImg.color = new Color(0.15f, 0.75f, 0.25f, 1f);
+            fillImg.color = new Color32(174, 159, 111, 255);
 
             // Overlay khi Gục (Downed)
             var downedObj = new GameObject("DownedOverlay", typeof(RectTransform));
@@ -210,8 +214,8 @@ namespace Hellfire.UI
             downedRect.anchorMin = new Vector2(0f, 0f);
             downedRect.anchorMax = new Vector2(1f, 0f);
             downedRect.pivot = new Vector2(0f, 0f);
-            downedRect.anchoredPosition = new Vector2(40f, 6f);
-            downedRect.sizeDelta = new Vector2(-46f, 16f);
+            downedRect.anchoredPosition = new Vector2(45f, 8f);
+            downedRect.sizeDelta = new Vector2(-58f, 16f);
 
             var downedTextObj = new GameObject("DownedTimerText", typeof(RectTransform), typeof(TextMeshProUGUI));
             downedTextObj.transform.SetParent(downedObj.transform, false);
@@ -219,7 +223,8 @@ namespace Hellfire.UI
             downedTmp.fontSize = 12;
             downedTmp.fontStyle = FontStyles.Bold;
             downedTmp.alignment = TextAlignmentOptions.Center;
-            downedTmp.color = Color.red;
+            InfernalTheme.Type(downedTmp, 15, new Color32(255, 159, 113, 255), true);
+            downedTmp.alignment = TextAlignmentOptions.Left;
             var dtRect = downedTextObj.GetComponent<RectTransform>();
             dtRect.anchorMin = Vector2.zero;
             dtRect.anchorMax = Vector2.one;
@@ -230,17 +235,18 @@ namespace Hellfire.UI
             var deadObj = new GameObject("DeadIcon", typeof(RectTransform), typeof(TextMeshProUGUI));
             deadObj.transform.SetParent(root.transform, false);
             var deadTmp = deadObj.GetComponent<TextMeshProUGUI>();
-            deadTmp.text = "✖ ĐÃ CHẾT";
+            deadTmp.text = "ĐÃ CHẾT";
             deadTmp.fontSize = 12;
             deadTmp.fontStyle = FontStyles.Bold;
             deadTmp.alignment = TextAlignmentOptions.Center;
-            deadTmp.color = new Color(0.6f, 0.6f, 0.6f, 1f);
+            InfernalTheme.Type(deadTmp, 15, InfernalTheme.Bone);
+            deadTmp.alignment = TextAlignmentOptions.Left;
             var deadRect = deadObj.GetComponent<RectTransform>();
             deadRect.anchorMin = new Vector2(0f, 0f);
             deadRect.anchorMax = new Vector2(1f, 0f);
             deadRect.pivot = new Vector2(0f, 0f);
-            deadRect.anchoredPosition = new Vector2(40f, 6f);
-            deadRect.sizeDelta = new Vector2(-46f, 16f);
+            deadRect.anchoredPosition = new Vector2(45f, 8f);
+            deadRect.sizeDelta = new Vector2(-58f, 16f);
 
             var slotComp = root.AddComponent<TeammateHUDItemSlot>();
             slotComp.ConfigureReferences(
@@ -330,6 +336,7 @@ namespace Hellfire.UI
             if (_boundHealth != null)
             {
                 _boundHealth.CurrentHealth.OnValueChanged += HandleHealthChanged;
+                _boundHealth.MaxHealthNet.OnValueChanged += HandleHealthChanged;
                 _boundHealth.IsDowned.OnValueChanged += HandleDownedChanged;
                 _boundHealth.IsDead.OnValueChanged += HandleDeadChanged;
                 _boundHealth.DownedTimer.OnValueChanged += HandleDownedTimerChanged;
@@ -350,6 +357,7 @@ namespace Hellfire.UI
             if (_boundHealth != null)
             {
                 _boundHealth.CurrentHealth.OnValueChanged -= HandleHealthChanged;
+                _boundHealth.MaxHealthNet.OnValueChanged -= HandleHealthChanged;
                 _boundHealth.IsDowned.OnValueChanged -= HandleDownedChanged;
                 _boundHealth.IsDead.OnValueChanged -= HandleDeadChanged;
                 _boundHealth.DownedTimer.OnValueChanged -= HandleDownedTimerChanged;
@@ -379,12 +387,13 @@ namespace Hellfire.UI
 
             if (_colorChip != null)
             {
-                _colorChip.color = playerColor;
+                _colorChip.color = Color.Lerp(Color.white, playerColor, .24f);
             }
 
             if (_playerNumberText != null)
             {
                 _playerNumberText.text = playerNumber.ToString();
+                _playerNumberText.color = Color.Lerp(InfernalTheme.Bone, playerColor, .38f);
             }
 
             if (_nameText != null)
@@ -425,7 +434,11 @@ namespace Hellfire.UI
             {
                 float maxHp = _boundHealth.MaxHealth > 0f ? _boundHealth.MaxHealth : 100f;
                 float curHp = Mathf.Max(0f, _boundHealth.CurrentHealth.Value);
-                _healthFillImage.fillAmount = Mathf.Clamp01(curHp / maxHp);
+                float fraction = Mathf.Clamp01(curHp / maxHp);
+                if (_healthFillImage.sprite != null && _healthFillImage.type == Image.Type.Filled)
+                    _healthFillImage.fillAmount = fraction;
+                else
+                    _healthFillImage.rectTransform.anchorMax = new Vector2(fraction, 1f);
             }
         }
 

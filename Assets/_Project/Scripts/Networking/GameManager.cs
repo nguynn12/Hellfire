@@ -5,6 +5,7 @@
 using System;
 using Hellfire.Combat;
 using Unity.Netcode;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -37,6 +38,8 @@ namespace Hellfire.Networking
 
         public string LobbySceneName => _lobbySceneName;
         public string GameplaySceneName => _gameplaySceneName;
+
+        public NetworkVariable<FixedString128Bytes> RoomDisplayName { get; } = new();
 
         public NetworkVariable<GameState> CurrentState { get; } = new NetworkVariable<GameState>(
             GameState.Lobby,
@@ -84,6 +87,8 @@ namespace Hellfire.Networking
             if (IsServer)
             {
                 CurrentState.Value = _initialState;
+                string room = NetworkConnectManager.Instance?.CurrentRoomName ?? "Hellfire";
+                RoomDisplayName.Value = new FixedString128Bytes(room.Length > 30 ? room.Substring(0, 30) : room);
             }
         }
 

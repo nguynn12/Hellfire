@@ -600,16 +600,16 @@ MonoBehaviour:
   _corridorWidth: 4
   _minRoomCount: 8
   _maxRoomCount: 14
-  _floorMaterial: {fileID: 0}
-  _wallMaterial: {fileID: 0}
-  _spawnFloorMaterial: {fileID: 0}
-  _bossFloorMaterial: {fileID: 0}
-  _corridorFloorMaterial: {fileID: 0}
-  _doorFrameMaterial: {fileID: 0}
+  _floorMaterial: {fileID: 2100000, guid: 0d22636e104f44d47a09c1cef2701895, type: 2}
+  _wallMaterial: {fileID: 2100000, guid: 0d22636e104f44d47a09c1cef2701895, type: 2}
+  _spawnFloorMaterial: {fileID: 2100000, guid: 0d22636e104f44d47a09c1cef2701895, type: 2}
+  _bossFloorMaterial: {fileID: 2100000, guid: 0d22636e104f44d47a09c1cef2701895, type: 2}
+  _corridorFloorMaterial: {fileID: 2100000, guid: 0d22636e104f44d47a09c1cef2701895, type: 2}
+  _doorFrameMaterial: {fileID: 2100000, guid: 0d22636e104f44d47a09c1cef2701895, type: 2}
   _doorFramePostWidth: 0.35
   _doorFramePostDepth: 1.2
   _doorFrameLintelHeight: 0.4
-  _gateMaterial: {fileID: 0}
+  _gateMaterial: {fileID: 2100000, guid: 0d22636e104f44d47a09c1cef2701895, type: 2}
   _roomThemes:
   - {fileID: 11400000, guid: f8eafd73b3984d4aaa29cf76a7aa30e2, type: 2}
   - {fileID: 11400000, guid: fe867f352e7647c9b2e4c15cdf6565f0, type: 2}

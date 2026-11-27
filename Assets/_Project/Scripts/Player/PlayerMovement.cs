@@ -313,13 +313,19 @@ namespace Hellfire.Player
                 return;
             }
 
+            if (Hellfire.UI.GameplayHUD.BlocksGameplayInput)
+            {
+                ApplyGravityOnly();
+                return;
+            }
+
             // Click chuột trái vào màn hình Game tự động khóa chuột
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !_isCursorLocked)
             {
                 SetCursorLock(true);
             }
 
-            HandleCursorToggle();
+            if (!Hellfire.UI.GameplayHUD.HandlesPause) HandleCursorToggle();
 
             // Vô hiệu hóa di chuyển khi đang Gục (Downed) hoặc Chết (Dead) theo Mục 3.3 (chỉ check khi đã spawn mạng)
             if (_health != null && _health.IsSpawned && (_health.IsDowned.Value || _health.IsDead.Value))

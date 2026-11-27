@@ -12,6 +12,7 @@ using Hellfire.UI;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -28,6 +29,7 @@ namespace Hellfire.Networking
         private bool _host;
         private bool _testGameOver;
         private bool _finished;
+        private string _captureDirectory;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void SetUp()
@@ -40,6 +42,7 @@ namespace Hellfire.Networking
             var smoke = root.AddComponent<PhaseOneLoopbackSmoke>();
             smoke._host = args.Contains("-hfPhase1Host");
             smoke._testGameOver = args.Contains("-hfPhase1GameOver");
+            smoke._captureDirectory = Environment.GetEnvironmentVariable("HELLFIRE_QA_CAPTURE_DIR");
             smoke.StartCoroutine(smoke.Run());
         }
 
@@ -48,6 +51,31 @@ namespace Hellfire.Networking
             yield return WaitFor(() => NetworkConnectManager.Instance != null, "MainMenu network bootstrap");
             if (_finished) yield break;
             Debug.Log(Tag + " MAIN_MENU " + SceneManager.GetActiveScene().name);
+            if (_host && !string.IsNullOrEmpty(_captureDirectory))
+            {
+                yield return new WaitForSecondsRealtime(.4f);
+                yield return Capture("MainMenu");
+                var selected = EventSystem.current?.currentSelectedGameObject?.GetComponent<Button>();
+                if (selected == null || selected.name != "HostButton")
+                { Fail("MainMenu keyboard focus"); yield break; }
+                var move = new AxisEventData(EventSystem.current) { moveDir = MoveDirection.Down };
+                ExecuteEvents.Execute(selected.gameObject, move, ExecuteEvents.moveHandler);
+                if (EventSystem.current.currentSelectedGameObject?.name != "JoinIpButton")
+                { Fail("MainMenu keyboard navigation"); yield break; }
+                if (!Click("SettingsButton")) { Fail("Settings button"); yield break; }
+                yield return Capture("Settings");
+                if (!CheckSettings()) { Fail("Settings backends"); yield break; }
+                var shake = GameObject.Find("ScreenShakeToggle").GetComponent<Toggle>();
+                bool originalShake = shake.isOn;
+                shake.isOn = true;
+                yield return new WaitForSecondsRealtime(.18f);
+                yield return Capture("Settings-Enabled");
+                shake.isOn = false;
+                yield return new WaitForSecondsRealtime(.18f);
+                yield return Capture("Settings-Disabled");
+                shake.isOn = originalShake;
+                if (!Click("SettingsBackBtn")) { Fail("Settings back"); yield break; }
+            }
 
             if (!_host)
                 yield return WaitFor(() => File.Exists(SyncFile), "host readiness");
@@ -64,10 +92,38 @@ namespace Hellfire.Networking
                 NetworkManager.Singleton?.LocalClient?.PlayerObject != null, "Lobby and local player");
             if (_finished) yield break;
             Debug.Log(Tag + " LOBBY " + (_host ? "Host" : "Client"));
+            if (!string.IsNullOrEmpty(_captureDirectory))
+            {
+                yield return WaitFor(() => GameObject.Find("LobbyTitle")?.GetComponent<TMP_Text>()?.text == "Phase1QA",
+                    "replicated room name");
+                if (_finished) yield break;
+            }
 
             if (_host)
             {
                 File.WriteAllText(SyncFile, "Lobby");
+                if (!string.IsNullOrEmpty(_captureDirectory))
+                {
+                    yield return WaitFor(() => NetworkManager.Singleton.ConnectedClientsIds.Count == 2, "two Lobby players");
+                    if (_finished) yield break;
+                    var copy = GameObject.Find("CopyIpButton")?.GetComponent<Button>();
+                    var pointer = PointerAt(copy?.transform as RectTransform, Vector2.zero);
+                    if (pointer == null || copy.targetGraphic is not Image copyImage || copyImage.sprite == null)
+                    { Fail("Lobby Copy IP graphic or hitbox"); yield break; }
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
+                    yield return new WaitForSecondsRealtime(.15f);
+                    Color hover = copyImage.canvasRenderer.GetColor();
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+                    yield return new WaitForSecondsRealtime(.15f);
+                    if (copyImage.canvasRenderer.GetColor() == hover)
+                    { Fail("Lobby Copy IP pressed feedback"); yield break; }
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerUpHandler);
+                    ExecuteEvents.Execute(copy.gameObject, pointer, ExecuteEvents.pointerExitHandler);
+                    yield return new WaitForSecondsRealtime(.15f);
+                    Debug.Log(Tag + " COPY_IP_POINTER_STATES");
+                    yield return Capture("Lobby");
+                    StartCoroutine(CaptureLoading());
+                }
                 yield return WaitFor(() => NetworkManager.Singleton.ConnectedClientsList.Count == 2 &&
                     NetworkManager.Singleton.ConnectedClientsList.All(client => client.PlayerObject != null) &&
                     NetworkManager.Singleton.ConnectedClientsList.Where(client => client.ClientId != NetworkManager.ServerClientId)
@@ -89,6 +145,38 @@ namespace Hellfire.Networking
                 .OrderBy(room => room.GridPosition.x).ThenBy(room => room.GridPosition.y)
                 .Select(room => $"{room.GridPosition}:{room.RoomType}:{room.Theme?.name}:{room.Size}:{room.ObstacleBounds.Count}"));
             Debug.Log($"{Tag} PLAYING seed={dungeon.DungeonSeed.Value} rooms={grid.Rooms.Count} signature={signature}");
+            if (_host && !string.IsNullOrEmpty(_captureDirectory))
+            {
+                yield return new WaitForSecondsRealtime(.65f);
+                var health = GameObject.Find("HealthText")?.GetComponent<TMP_Text>();
+                var stamina = GameObject.Find("StaminaText")?.GetComponent<TMP_Text>();
+                if (health == null || string.IsNullOrEmpty(health.text) || stamina == null ||
+                    !stamina.text.Contains("%") || GameObject.Find("FloorText") == null || GameObject.Find("DungeonMinimap") == null)
+                { Fail("Health, stamina or floor HUD not displaying gameplay data"); yield break; }
+                yield return Capture("Gameplay");
+                var menuKeyboard = InputSystem.AddDevice<Keyboard>();
+                yield return Press(menuKeyboard, Key.Escape);
+                if (GameObject.Find("PauseMenuPanel") == null)
+                { Fail("Pause overlay through Escape"); yield break; }
+                yield return Capture("Pause");
+                var pausedPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
+                var pausedWeapon = pausedPlayer.GetComponent<WeaponController>();
+                int ammoWhilePaused = pausedWeapon.CurrentAmmo;
+                var menuMouse = InputSystem.AddDevice<Mouse>();
+                InputSystem.QueueStateEvent(menuMouse, new MouseState().WithButton(MouseButton.Left));
+                yield return new WaitForSecondsRealtime(.15f);
+                InputSystem.RemoveDevice(menuMouse);
+                if (pausedWeapon.CurrentAmmo != ammoWhilePaused)
+                { Fail("Pause mouse click fired the weapon"); yield break; }
+                if (!Click("ResumeButton")) { Fail("Pause resume"); yield break; }
+                yield return Press(menuKeyboard, Key.Tab);
+                if (GameObject.Find("DungeonMapPanel") != null)
+                {
+                    yield return Capture("Map");
+                    yield return Press(menuKeyboard, Key.Tab);
+                }
+                InputSystem.RemoveDevice(menuKeyboard);
+            }
 
             if (_host)
             {
@@ -132,14 +220,20 @@ namespace Hellfire.Networking
             if (_finished) yield break;
             if (_host)
             {
-                yield return new WaitForSecondsRealtime(1.5f);
+                yield return new WaitForSecondsRealtime(.5f);
+                yield return Capture(prefix);
+                yield return new WaitForSecondsRealtime(1f);
                 var button = GameObject.Find(prefix + "ReturnButton")?.GetComponent<Button>();
                 if (button == null || !button.IsInteractable())
                 { Fail("Host result button missing"); yield break; }
                 button.onClick.Invoke();
             }
-            else if (GameObject.Find(prefix + "WaitingText") == null || GameObject.Find(prefix + "ReturnButton") != null)
-            { Fail("Client result view"); yield break; }
+            else
+            {
+                if (GameObject.Find(prefix + "WaitingText") == null || GameObject.Find(prefix + "ReturnButton") != null)
+                { Fail("Client result view"); yield break; }
+                yield return Capture(prefix);
+            }
 
             yield return WaitFor(() => SceneManager.GetActiveScene().name == "Lobby" &&
                 GameManager.Instance?.CurrentState.Value == GameState.Lobby, "return to Lobby for both players");
@@ -148,6 +242,64 @@ namespace Hellfire.Networking
             if (_host) yield return new WaitForSecondsRealtime(1.5f);
             _finished = true;
             Application.Quit(0);
+        }
+
+        private IEnumerator CaptureLoading()
+        {
+            yield return WaitFor(() => GameObject.Find("LoadingPanel") != null, "loading overlay");
+            if (!_finished) yield return Capture("Loading");
+        }
+
+        private IEnumerator Capture(string screen)
+        {
+            if (string.IsNullOrEmpty(_captureDirectory)) yield break;
+            yield return new WaitForEndOfFrame();
+            var snapshot = ScreenCapture.CaptureScreenshotAsTexture();
+            if (snapshot == null) { Fail("Screenshot " + screen); yield break; }
+            Directory.CreateDirectory(_captureDirectory);
+            string role = _host ? "Host" : "Client";
+            File.WriteAllBytes(Path.Combine(_captureDirectory, screen + "-" + role + ".png"), snapshot.EncodeToPNG());
+            Debug.Log($"{Tag} CAPTURE {screen} {role} {snapshot.width}x{snapshot.height}");
+            Destroy(snapshot);
+        }
+
+        private static PointerEventData PointerAt(RectTransform target, Vector2 localOffset)
+        {
+            if (target == null || EventSystem.current == null) return null;
+            Canvas.ForceUpdateCanvases();
+            var pointer = new PointerEventData(EventSystem.current)
+            {
+                position = RectTransformUtility.WorldToScreenPoint(null, target.TransformPoint(localOffset)),
+                button = PointerEventData.InputButton.Left
+            };
+            var hits = new System.Collections.Generic.List<RaycastResult>();
+            EventSystem.current.RaycastAll(pointer, hits);
+            return hits.Count > 0 && hits[0].gameObject.transform.IsChildOf(target) ? pointer : null;
+        }
+
+        private static bool CheckSettings()
+        {
+            var fov = GameObject.Find("FovSlider")?.GetComponent<Slider>();
+            var volume = GameObject.Find("VolumeSlider")?.GetComponent<Slider>();
+            var shake = GameObject.Find("ScreenShakeToggle")?.GetComponent<Toggle>();
+            if (fov == null || volume == null || shake == null) return false;
+            float originalFov = fov.value;
+            float originalVolume = volume.value;
+            bool originalShake = shake.isOn;
+            fov.value = originalFov < 100f ? 105f : 80f;
+            volume.value = originalVolume < .5f ? .8f : .35f;
+            var pointer = PointerAt(shake.transform as RectTransform, new Vector2(-190f, 0f));
+            if (pointer != null) ExecuteEvents.Execute(shake.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+            var state = GameObject.Find("ShakeStateText")?.GetComponent<TMP_Text>();
+            bool connected = Mathf.Approximately(GameSettings.FieldOfView, fov.value) &&
+                Mathf.Approximately(AudioListener.volume, volume.value) &&
+                GameSettings.ReduceScreenShake == shake.isOn && shake.isOn != originalShake &&
+                state?.text == (shake.isOn ? "BẬT" : "TẮT");
+            fov.value = originalFov;
+            volume.value = originalVolume;
+            shake.isOn = originalShake;
+            if (connected) Debug.Log(Tag + " SETTINGS_CHANGE_AND_RESTORE");
+            return connected;
         }
 
         private IEnumerator CheckReviveAndGameOver(NetworkObject hostPlayer, DungeonRoomNode spawn, Keyboard keyboard)
@@ -163,11 +315,27 @@ namespace Hellfire.Networking
             health.TakeDamage(10000f, HitboxType.Torso, ulong.MaxValue);
             yield return WaitFor(() => health.IsDowned.Value, "client downed");
             if (_finished) yield break;
+            if (!string.IsNullOrEmpty(_captureDirectory))
+            {
+                yield return WaitFor(() => GameObject.Find("DownedOverlay")?.GetComponentInChildren<TMP_Text>()?.text.StartsWith("GỤC") == true,
+                    "teammate downed HUD");
+                if (_finished) yield break;
+                yield return Capture("TeammateDowned");
+            }
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.E));
             yield return WaitFor(() => !health.IsDowned.Value && health.CurrentHealth.Value > 0f, "revive completed by player input");
             if (_finished) yield break;
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
             Debug.Log(Tag + " REVIVE_CLIENT");
+            if (!string.IsNullOrEmpty(_captureDirectory))
+            {
+                var teammate = GameObject.Find("TeammateSlot")?.transform;
+                var healthFill = teammate?.Find("HealthBar/Fill") as RectTransform;
+                if (healthFill == null ||
+                    !Mathf.Approximately(healthFill.anchorMax.x, health.CurrentHealth.Value / health.MaxHealth))
+                { Fail("teammate HUD health fill after revive"); yield break; }
+                Debug.Log(Tag + " TEAMMATE_HUD_HEALTH");
+            }
             foreach (var player in players)
                 player.PlayerObject.GetComponent<Health>().TakeDamage(10000f, HitboxType.Torso, ulong.MaxValue);
         }
@@ -288,6 +456,7 @@ namespace Hellfire.Networking
             var boss = BossStateMachine.ActiveBoss.GetComponent<Health>();
             if (GameObject.Find("BossHealthBarRoot") == null)
             { Fail("Boss health HUD missing during encounter"); yield break; }
+            if (_host) yield return Capture("Boss");
             float startingHealth = boss.CurrentHealth.Value;
             int hits = 0;
             void CountHit(bool _) => hits++;

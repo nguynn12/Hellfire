@@ -82,6 +82,17 @@ namespace Hellfire.UI
             DontDestroyOnLoad(gameObject);
 
             BuildUIHierarchyIfMissing();
+            InfernalTheme.Paint(_loadingPanel.transform, "Loading", Color.white, false);
+            var centre = new Vector2(.5f, .5f);
+            InfernalTheme.Panel(_loadingPanel.transform, 890, 350, 0, -232);
+            InfernalTheme.Paint(_spinnerRect, "Sigil", Color.white, false);
+            InfernalTheme.Place(_spinnerRect, centre, 0, -148, 41, 41);
+            InfernalTheme.Place(_titleText.transform, centre, 0, -88, 680, 65);
+            InfernalTheme.Type(_titleText, 55, InfernalTheme.Gold, true);
+            InfernalTheme.Place(_readyStatusText.transform, centre, 0, -227, 750, 44);
+            InfernalTheme.Type(_readyStatusText, 28, InfernalTheme.Bone, true);
+            InfernalTheme.Place(_tipText.transform, centre, 0, -311, 765, 72);
+            InfernalTheme.Type(_tipText, 22, InfernalTheme.Bone);
             SceneManager.sceneLoaded += HandleSceneLoaded;
         }
 
@@ -161,9 +172,9 @@ namespace Hellfire.UI
                 ready = DungeonManager.Instance.ReadyCount.Value;
             }
 
-            if (NetworkManager.Singleton != null)
+            if (GameManager.Instance != null)
             {
-                total = Mathf.Max(1, NetworkManager.Singleton.ConnectedClients.Count);
+                total = Mathf.Max(1, GameManager.Instance.LockedPlayerCount.Value, ready);
             }
 
             _readyStatusText.text = $"Đang tạo hầm ngục... {ready}/{total} sẵn sàng";
