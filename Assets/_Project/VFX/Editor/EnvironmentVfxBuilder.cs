@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using Hellfire.Dungeon;
 using Hellfire.Vfx;
 using UnityEditor;
 using UnityEditor.Rendering.Universal.ShaderGUI;
@@ -17,6 +18,23 @@ namespace Hellfire.EditorTools
         private const string Root = "Assets/_Project/VFX";
         internal const string Sandbox = Root + "/Scenes/EnvironmentVfxSandbox.unity";
         private enum Mask { Ember, Haze, Frost }
+
+        public static void BindDungeonPrefabs()
+        {
+            BindBiome("Lava", "LavaEmber");
+            BindBiome("Ice", "FrozenMist");
+            AssetDatabase.SaveAssets();
+            EditorApplication.Exit(0);
+        }
+
+        private static void BindBiome(string biome, string effect)
+        {
+            var art = AssetDatabase.LoadAssetAtPath<DungeonArtSet>("Assets/_Project/Art/GameplayVisuals/" + biome + ".asset");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(Root + "/Prefabs/" + effect + ".prefab");
+            if (art == null || prefab == null) throw new InvalidOperationException("Missing biome or VFX prefab for " + biome);
+            art.AmbientVfx = prefab;
+            EditorUtility.SetDirty(art);
+        }
 
         [MenuItem("Hellfire/VFX/Rebuild Environment Sandbox")]
         public static void Assemble()

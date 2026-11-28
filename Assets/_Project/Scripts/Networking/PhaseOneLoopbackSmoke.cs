@@ -9,6 +9,7 @@ using Hellfire.Dungeon;
 using Hellfire.Items;
 using Hellfire.Player;
 using Hellfire.UI;
+using Hellfire.Vfx;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -142,6 +143,7 @@ namespace Hellfire.Networking
             if (_finished) yield break;
             var dungeon = DungeonManager.Instance;
             var grid = dungeon.Generator.ActiveGrid;
+            bool captureDungeonVfx = Environment.GetEnvironmentVariable("HELLFIRE_QA_VFX") == "1";
             string signature = string.Join(";", grid.Rooms.Values
                 .OrderBy(room => room.GridPosition.x).ThenBy(room => room.GridPosition.y)
                 .Select(room => $"{room.GridPosition}:{room.RoomType}:{room.Theme?.name}:{room.Size}:{room.ObstacleBounds.Count}"));
@@ -149,12 +151,16 @@ namespace Hellfire.Networking
             if (Environment.GetEnvironmentVariable("HELLFIRE_QA_VISUALS") == "1")
             {
                 if (!CheckDungeonArt(dungeon.Generator, grid)) { Fail("Dungeon art or open gates/NavMesh"); yield break; }
+                if (captureDungeonVfx && !DungeonVfxSmoke.CheckPlacement(dungeon.Generator)) { Fail("Dungeon VFX placement"); yield break; }
                 if (_host)
                 {
                     yield return CheckViewmodels(grid.SpawnRoom);
                     if (_finished) yield break;
                     yield return CaptureBiomes(dungeon.Generator, grid);
                     if (_finished) yield break;
+                    if (captureDungeonVfx && !string.IsNullOrEmpty(_captureDirectory))
+                        yield return DungeonVfxSmoke.CaptureGameplay(dungeon.Generator,
+                            NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerMovement>().PlayerCamera, Capture);
                 }
             }
             if (_host && !string.IsNullOrEmpty(_captureDirectory))
@@ -216,7 +222,7 @@ namespace Hellfire.Networking
 
             if (!_host && !_testGameOver)
             {
-                yield return CheckClientLoot();
+                yield return CheckClientLoot(captureDungeonVfx);
                 if (_finished) yield break;
                 yield return CheckBossFight(NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerMovement>(),
                     Keyboard.current, InputSystem.AddDevice<Mouse>(), grid.BossRoom);
@@ -224,7 +230,8 @@ namespace Hellfire.Networking
             }
 
             GameState expected = _testGameOver ? GameState.GameOver : GameState.Victory;
-            yield return WaitFor(() => GameManager.Instance?.CurrentState.Value == expected, $"replicated {expected}");
+            yield return WaitFor(() => GameManager.Instance?.CurrentState.Value == expected, $"replicated {expected}",
+                captureDungeonVfx && !_host && _testGameOver ? 140f : 45f);
             if (_finished) yield break;
             Debug.Log(Tag + " " + expected.ToString().ToUpperInvariant() + " " + (_host ? "Host" : "Client"));
             string prefix = _testGameOver ? "GameOver" : "Victory";
@@ -559,6 +566,8 @@ namespace Hellfire.Networking
                      !gate.GetComponent<NavMeshObstacle>().enabled)))
             { Fail("closed gate collider and nav obstacle"); yield break; }
             Debug.Log(Tag + " COMBAT_ROOM_LOCKED");
+            if (Environment.GetEnvironmentVariable("HELLFIRE_QA_VFX") == "1")
+                yield return Capture("VFX-Combat-Readability");
 
             int hits = 0;
             void CountHit(bool _) => hits++;
@@ -617,11 +626,12 @@ namespace Hellfire.Networking
             }
         }
 
-        private IEnumerator CheckClientLoot()
+        private IEnumerator CheckClientLoot(bool captureDungeonVfx)
         {
             ItemPickup loot = null;
             yield return WaitFor(() => (loot = FindObjectsByType<ItemPickup>().FirstOrDefault(item =>
-                item.IsSpawned && (item.Weapon != null || item.PowerUp != null))) != null, "client received item identity");
+                item.IsSpawned && (item.Weapon != null || item.PowerUp != null))) != null,
+                "client received item identity", captureDungeonVfx ? 140f : 45f);
             if (_finished) yield break;
             var local = NetworkManager.Singleton.LocalClient.PlayerObject;
             Debug.Log($"{Tag} CLIENT_SAW_PICKUP item={loot.NetworkObjectId} point={loot.transform.position} player={local.transform.position}");
@@ -818,9 +828,9 @@ namespace Hellfire.Networking
             player.GetComponent<PlayerMovement>().TeleportOwnerClientRpc(target, Quaternion.identity);
         }
 
-        private IEnumerator WaitFor(Func<bool> ready, string step)
+        private IEnumerator WaitFor(Func<bool> ready, string step, float timeout = 45f)
         {
-            float deadline = Time.realtimeSinceStartup + 45f;
+            float deadline = Time.realtimeSinceStartup + timeout;
             while (!ready() && Time.realtimeSinceStartup < deadline) yield return null;
             if (!ready()) Fail(step);
         }

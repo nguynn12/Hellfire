@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using Hellfire.Vfx;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
@@ -66,6 +67,7 @@ namespace Hellfire.Dungeon
 
         public Transform GeometryRoot => _dungeonRoot;
         public DungeonGrid ActiveGrid => _activeGrid;
+        internal DungeonEnvironmentVfx EnvironmentVfx { get; private set; }
         public IReadOnlyDictionary<Vector2Int, List<RoomGate>> RoomGates => _roomGates;
         public float GridCellSize => _gridCellSize;
         public float CorridorWidth => _corridorWidth;
@@ -209,6 +211,7 @@ namespace Hellfire.Dungeon
             }
 
             _roomGates.Clear();
+            EnvironmentVfx = null;
         }
 
         public void SetRoomGates(Vector2Int roomCoord, bool closed)
@@ -237,6 +240,10 @@ namespace Hellfire.Dungeon
             _roomArt.Clear();
             foreach (var room in grid.Rooms.Values)
                 _roomArt.Add(room.GridPosition, BiomeArt(room, dungeonSeed));
+
+            var vfxRoot = new GameObject("Dungeon Ambient VFX");
+            vfxRoot.transform.SetParent(_dungeonRoot, false);
+            EnvironmentVfx = vfxRoot.AddComponent<DungeonEnvironmentVfx>();
 
             // Dựng các phòng
             foreach (var kvp in grid.Rooms)
@@ -333,6 +340,7 @@ namespace Hellfire.Dungeon
                         if (wallRenderer.name.StartsWith("Wall_")) RoomThemeBuilder.Tint(wallRenderer, room.Theme.WallColor);
                 }
             }
+            EnvironmentVfx.AddRoom(room, art != null ? art.AmbientVfx : null, dungeonSeed);
         }
 
         private void BuildCombatPillars(DungeonRoomNode room, Transform parent, DungeonArtSet art)
