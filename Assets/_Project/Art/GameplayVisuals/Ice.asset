@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6d36f50947df43d29f1b478815044bf, type: 3}
+  m_Name: Ice
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Dungeon.DungeonArtSet
+  Wall: {fileID: 4124974130332460858, guid: a3e7e33afe6604d4db1b5bf108b35a35, type: 3}
+  Door: {fileID: 4988243461047047967, guid: 75c31840119724cffb0ac29b5da01d4d, type: 3}
+  Gate: {fileID: 1035581621627731443, guid: e18ef7b36c4e440e1ba767c00f278077, type: 3}
+  Pillar: {fileID: 2932328087550437459, guid: 5c61402001fd54e5cbcb81bf61678e38, type: 3}
+  Floor: {fileID: 2100000, guid: 6f901043088ed4f0d89e3f4a106c2e5b, type: 2}
+  Ceiling: {fileID: 2100000, guid: c5f19a8b5f2984676985c3cdda48306f, type: 2}
+  CorridorLight: {r: 0.36, g: 0.69, b: 1, a: 1}
+  WallSize: {x: 1.8987516, y: 1.814079, z: 0.36925086}
+  DoorSize: {x: 1.8461015, y: 1.7108114, z: 0.46166125}
+  GateSize: {x: 1.7576095, y: 1.812644, z: 0.17944397}
+  PillarSize: {x: 0.8555462, y: 1.7169284, z: 0.892152}

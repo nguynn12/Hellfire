@@ -14,17 +14,17 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
-  m_Fog: 0
-  m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  m_Fog: 1
+  m_FogColor: {r: 0.055, g: 0.06, b: 0.078, a: 1}
   m_FogMode: 3
-  m_FogDensity: 0.01
+  m_FogDensity: 0.033
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
-  m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
-  m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
+  m_AmbientSkyColor: {r: 0.37, g: 0.38, b: 0.42, a: 1}
+  m_AmbientEquatorColor: {r: 0.27, g: 0.28, b: 0.31, a: 1}
+  m_AmbientGroundColor: {r: 0.2, g: 0.19, b: 0.21, a: 1}
   m_AmbientIntensity: 1
-  m_AmbientMode: 0
+  m_AmbientMode: 1
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
   m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
   m_HaloStrength: 0.5
@@ -35,7 +35,7 @@ RenderSettings:
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 128
   m_ReflectionBounces: 1
-  m_ReflectionIntensity: 1
+  m_ReflectionIntensity: 0.34
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
   m_UseRadianceAmbientProbe: 0
@@ -616,6 +616,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b032dcebc11f4ee4915ef7eb1c43fc07, type: 2}
   - {fileID: 11400000, guid: 02155a80cbb94f8f9589527d715bfd60, type: 2}
   - {fileID: 11400000, guid: eafa858a9ef147d8a38b13686b54980a, type: 2}
+  _lavaArt: {fileID: 11400000, guid: a11ca4f46ac2745d4b5d8d83737fead8, type: 2}
+  _iceArt: {fileID: 11400000, guid: f29c2d5a047f74b95a0dd2a95c944746, type: 2}
   _dungeonRoot: {fileID: 0}
 --- !u!1 &100988745
 GameObject:
@@ -1831,8 +1833,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
-  m_Color: {r: 1, g: 0.8, b: 0.65, a: 1}
-  m_Intensity: 1
+  m_Color: {r: 0.92, g: 0.94, b: 1, a: 1}
+  m_Intensity: 0.28
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208

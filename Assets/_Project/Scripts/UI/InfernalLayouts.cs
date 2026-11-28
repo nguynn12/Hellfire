@@ -20,10 +20,10 @@ namespace Hellfire.UI
             if (logo != null)
             {
                 logo.text = "HELLFIRE";
-                logo.font = Resources.Load<TMP_FontAsset>("Fonts & Materials/Anton SDF") ?? logo.font;
-                logo.fontSize = 112f;
+                Display(logo);
+                logo.fontSize = 88f;
                 logo.color = Bone;
-                logo.characterSpacing = 9f;
+                logo.characterSpacing = 5f;
                 logo.alignment = TextAlignmentOptions.Center;
             }
             if (Find(menu, "SubTitleText") is { } subtitle) subtitle.gameObject.SetActive(false);
@@ -35,6 +35,8 @@ namespace Hellfire.UI
             Place(menu, "ScanLanButton", -550, -48, 420, 60);
             Place(menu, "SettingsButton", -550, -120, 420, 60);
             Place(menu, "QuitButton", -550, -192, 420, 60);
+            foreach (string name in new[] { "HostButton", "JoinIpButton", "ScanLanButton", "SettingsButton", "QuitButton" })
+                Display(Find(menu, name)?.GetComponentInChildren<TMP_Text>(true));
 
             Form(root, "HostPanel", "HostTitle");
             Form(root, "JoinIpPanel", "JoinTitle");
@@ -66,7 +68,8 @@ namespace Hellfire.UI
             if (panel == null) return;
             Dim(panel, .49f);
             Panel(panel, 842, 620);
-            Type(panel, title, 48, Gold, true);
+            Type(panel, title, 47, Gold, true);
+            Display(Find(panel, title)?.GetComponent<TMP_Text>());
             Ornament(panel, "Sigil", Centre, 0, 176, 29, 29);
         }
 
@@ -83,7 +86,8 @@ namespace Hellfire.UI
             var panel = Find(root, "LobbyPanel");
             Backdrop(panel, "Menu");
             Panel(panel, 916, 742);
-            Type(panel, "LobbyTitle", 50, Gold, true);
+            Type(panel, "LobbyTitle", 48, Gold, true);
+            Display(Find(panel, "LobbyTitle")?.GetComponent<TMP_Text>());
             Place(panel, "LobbyTitle", 0, 255, 700, 70);
             Place(panel, "ConnectionInfo", -112, 184, 455, 49);
             var connection = Find(panel, "ConnectionInfo")?.GetComponent<TMP_Text>();
@@ -179,7 +183,8 @@ namespace Hellfire.UI
             if (panel == null) return;
             Backdrop(panel, artwork);
             Panel(panel, 1030, 494, 0, -10);
-            Type(panel, prefix + "Title", 60, Gold, true);
+            Type(panel, prefix + "Title", 58, Gold, true);
+            Display(Find(panel, prefix + "Title")?.GetComponent<TMP_Text>());
             Place(panel, prefix + "Title", 0, 145, 900, 80);
             Ornament(panel, "Sigil", Centre, 0, 205, 38, 38);
             Place(panel, prefix + "StatsText", 0, 78, 820, 32);

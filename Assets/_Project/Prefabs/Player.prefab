@@ -43,8 +43,8 @@ Camera:
   m_GameObject: {fileID: 836263713636257207}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0.015, g: 0.018, b: 0.024, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -756,6 +756,7 @@ GameObject:
   - component: {fileID: 1912518411114849863}
   - component: {fileID: 4142404767945708372}
   - component: {fileID: 140014000001}
+  - component: {fileID: 2308209167478224720}
   m_Layer: 7
   m_Name: WeaponViewmodel
   m_TagString: Untagged
@@ -991,3 +992,15 @@ MonoBehaviour:
   _camera: {fileID: 3801938197726472895}
   _presentation: {fileID: 11400000, guid: 3cb4d20e16cf44a3a5b25801b6faee58, type: 2}
   _fallbackRenderer: {fileID: 5734774103955328913}
+--- !u!114 &2308209167478224720
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6457979424595455948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db18f547dcda243ef89284d93d8d2459, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Combat.WeaponViewmodelPresenter
