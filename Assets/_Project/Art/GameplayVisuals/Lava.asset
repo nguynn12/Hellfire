@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6d36f50947df43d29f1b478815044bf, type: 3}
+  m_Name: Lava
+  m_EditorClassIdentifier: Assembly-CSharp::Hellfire.Dungeon.DungeonArtSet
+  Wall: {fileID: 7733044812335415993, guid: 441359f107484499eac6e3cdf20bb3ad, type: 3}
+  Door: {fileID: 2912438821084572432, guid: 27d2cea660c4b48b48cb8dfa6db03e60, type: 3}
+  Gate: {fileID: 1337753724115042296, guid: 71b469fe3f21a4c799943025f5aa8399, type: 3}
+  Pillar: {fileID: 976427361084502828, guid: 82f81b4925bf14a06a0ee8b7e667666a, type: 3}
+  Floor: {fileID: 2100000, guid: 4fc020e4a43a0461884fe410148e7c1f, type: 2}
+  Ceiling: {fileID: 2100000, guid: 180492e0acec840a8bcfe58b80ffca8b, type: 2}
+  CorridorLight: {r: 1, g: 0.31, b: 0.105, a: 1}
+  WallSize: {x: 1.8985709, y: 1.8649299, z: 0.35253626}
+  DoorSize: {x: 1.9011464, y: 1.5866859, z: 0.52898484}
+  GateSize: {x: 1.8981112, y: 1.883898, z: 0.22354387}
+  PillarSize: {x: 0.9269971, y: 1.8989135, z: 0.9425137}

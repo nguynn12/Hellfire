@@ -140,6 +140,10 @@ namespace Hellfire.Dungeon
 
                 // Host sinh seed ngẫu nhiên (hoặc dùng overrideSeed nếu thiết lập)
                 int seedToUse = _overrideSeed > 0 ? _overrideSeed : UnityEngine.Random.Range(100000, 999999);
+#if HELLFIRE_PHASE1_SMOKE
+                if (int.TryParse(System.Environment.GetEnvironmentVariable("HELLFIRE_QA_DUNGEON_SEED"), out int qaSeed)
+                    && qaSeed > 0) seedToUse = qaSeed;
+#endif
                 DungeonSeed.Value = seedToUse;
             }
             else

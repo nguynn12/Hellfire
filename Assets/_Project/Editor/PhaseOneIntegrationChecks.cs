@@ -26,7 +26,9 @@ namespace Hellfire.EditorTools
                     foreach (var root in scene.GetRootGameObjects())
                         missing += ScanHierarchy(root, path);
                 }
-                string[] prefabs = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Project/Prefabs", "Assets/_Project/Art/WeaponDevelopment" });
+                string[] prefabs = AssetDatabase.FindAssets("t:Prefab", new[] {
+                    "Assets/_Project/Prefabs", "Assets/_Project/Art/WeaponDevelopment", "Assets/_Project/Art/GameplayVisuals"
+                });
                 foreach (string guid in prefabs)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -56,6 +58,8 @@ namespace Hellfire.EditorTools
                 if (missing != 0 || badMaterials != 0)
                     throw new InvalidOperationException("Scene or prefab validation failed.");
                 ValidateInfernalSprites();
+                if (UnityEngine.Resources.Load<Font>("Infernal/Fonts/Cinzel") == null)
+                    throw new InvalidOperationException("Missing Gothic display font.");
 
                 var build = new BuildPlayerOptions
                 {
