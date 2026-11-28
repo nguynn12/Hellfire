@@ -10,6 +10,7 @@ namespace Hellfire.Dungeon
         public GameObject Door;
         public GameObject Gate;
         public GameObject Pillar;
+        public GameObject AmbientVfx;
         public Material Floor;
         public Material Ceiling;
         public Color CorridorLight;

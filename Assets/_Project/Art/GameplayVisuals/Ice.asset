@@ -16,6 +16,7 @@ MonoBehaviour:
   Door: {fileID: 4988243461047047967, guid: 75c31840119724cffb0ac29b5da01d4d, type: 3}
   Gate: {fileID: 1035581621627731443, guid: e18ef7b36c4e440e1ba767c00f278077, type: 3}
   Pillar: {fileID: 2932328087550437459, guid: 5c61402001fd54e5cbcb81bf61678e38, type: 3}
+  AmbientVfx: {fileID: 5674934061825324434, guid: 5b00b1c94622b42e9a92f41ab475f5a2, type: 3}
   Floor: {fileID: 2100000, guid: 6f901043088ed4f0d89e3f4a106c2e5b, type: 2}
   Ceiling: {fileID: 2100000, guid: c5f19a8b5f2984676985c3cdda48306f, type: 2}
   CorridorLight: {r: 0.36, g: 0.69, b: 1, a: 1}
